@@ -411,10 +411,37 @@ endpoint.
 
 ## 15. Features with no API and therefore no mobile screen
 
-- Push notifications and announcements — no endpoint exists.
+- Server-sent push and announcements — no endpoint exists. Lesson reminders are
+  scheduled locally from `GET /api/lessons` (section 16), not delivered by the
+  API.
 - Course/program catalog, enrollment, and payments — no endpoint exists. The
   teacher directory plus lesson requests are the API's equivalent of browsing
   and enrolling.
 - In-app messaging outside the Jitsi room — no endpoint exists.
 - Attendance history — only live teacher presence exists.
 - Group classes — lessons are one teacher and one student.
+
+---
+
+## 16. Lesson reminders (local notifications)
+
+No notification endpoint is used or needed. `LessonReminderProvider` reads the
+same `GET /api/lessons` response the Schedule screen uses and schedules local
+notifications with `expo-notifications`:
+
+| Behaviour | Detail |
+| --- | --- |
+| Source data | `GET /api/lessons` — student/teacher see their own lessons; admin sees all |
+| Included lessons | `status === "scheduled"`, ends in the future, starts more than 5 minutes from now |
+| Trigger | `startsAt − 5 minutes`, one notification per lesson |
+| Identifier | `lesson-reminder:{lessonId}` (deterministic, replaced on every sync) |
+| Limit | 60 pending reminders (iOS allows 64 pending per app) |
+| Refresh | Rebuilt whenever the `/api/lessons` query data changes; cancellations and reschedules follow automatically |
+| Sign-out | Pending lesson reminders are cancelled |
+| Tap action | Opens `(app)/lesson/[id]` |
+| Permission | Requested once after sign-in; Android channel `lesson-reminders` |
+
+Delivery is per device: an account receives reminders on each phone where it
+has opened the app and synced the lesson list. Guaranteed delivery to a device
+that has never run the app would require server push (token registration plus a
+scheduler), which the current API does not provide.

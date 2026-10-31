@@ -13,6 +13,7 @@ import {
 } from "@react-navigation/native";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
+import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
 import { queryClient } from "@/lib/query-client";
 import { BrandLockup } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
@@ -101,7 +102,9 @@ const RootLayout = () => (
       <QueryClientProvider client={queryClient}>
         <AppThemeProvider>
           <AuthProvider>
-            <RootNavigator />
+            <LessonReminderProvider>
+              <RootNavigator />
+            </LessonReminderProvider>
           </AuthProvider>
         </AppThemeProvider>
       </QueryClientProvider>

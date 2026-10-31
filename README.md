@@ -23,6 +23,7 @@ production data.
 | Secure storage | `expo-secure-store` (identity cache and theme only) |
 | Live lessons | Jitsi External API in `react-native-webview` |
 | Media | `expo-camera`, `expo-audio`, `expo-image-picker`, `expo-image-manipulator` |
+| Notifications | `expo-notifications` (local lesson reminders only) |
 | Connectivity | `@react-native-community/netinfo` |
 | Tests | Vitest |
 
@@ -74,7 +75,7 @@ EXPO_PUBLIC_JITSI_DOMAIN=meet.jit.si
 | Command | Purpose |
 | --- | --- |
 | `npm start` | Start the Expo dev server |
-| `npm run ios` / `npm run android` | Start on a simulator/emulator |
+| `npm run ios` / `npm run android` | Build and run a local native app (`expo run:*`) |
 | `npm run lint` | Expo ESLint (includes React Compiler rules) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit tests |
@@ -103,7 +104,7 @@ src/
   features/            Role dashboards and request list features
   hooks/               use-online-status
   lib/                 Formatting, status logic, selectors, validation, storage, query client
-  providers/           Auth and theme providers
+  providers/           Auth, theme, and lesson-reminder providers
   theme/               Design tokens (light and dark)
 ```
 
@@ -246,6 +247,29 @@ Known Jitsi limitations in this client:
 
 ---
 
+## Lesson reminders
+
+`src/providers/lesson-reminder-provider.tsx` schedules one local notification
+per upcoming lesson, five minutes before `startsAt`, for whichever account is
+signed in on the device:
+
+- The source is the existing `GET /api/lessons`: students and teachers see their
+  own lessons, admins see every lesson, so each role is reminded without a new
+  endpoint.
+- Only `scheduled` lessons are included. Reminders are rebuilt whenever the
+  lesson list changes, so reschedules and cancellations follow automatically.
+- The permission prompt appears once after sign-in. On Android the channel is
+  `lesson-reminders`; declare `SCHEDULE_EXACT_ALARM` if exact delivery matters
+  (the app already does).
+- Tapping a reminder opens `/lesson/{id}`.
+- At most 60 reminders are pending (iOS caps pending notifications at 64).
+  Sign-out cancels every pending lesson reminder.
+- Delivery is per device and needs that account to have opened the app at least
+  once since the lesson was booked. There is no server push — the API has no
+  device-token or notification endpoint.
+
+---
+
 ## Design system
 
 The app mirrors the web brand tokens in `src/theme/tokens.ts`:
@@ -347,7 +371,8 @@ No automated end-to-end suite is committed.
 
 ## Not implemented (no backend feature)
 
-- Push notifications and announcements.
+- Server-sent push notifications and announcements. Lesson reminders are local
+  to each device (see above); the API has no push endpoint.
 - Course/program catalog, enrollment, payments, or billing.
 - In-app chat outside the Jitsi room.
 - Attendance history (only live teacher presence exists).

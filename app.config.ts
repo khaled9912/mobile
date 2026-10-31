@@ -43,6 +43,9 @@ const config: ExpoConfig = {
       "RECORD_AUDIO",
       "READ_MEDIA_IMAGES",
       "MODIFY_AUDIO_SETTINGS",
+      "POST_NOTIFICATIONS",
+      "VIBRATE",
+      "SCHEDULE_EXACT_ALARM",
     ],
   },
   plugins: [
@@ -89,6 +92,14 @@ const config: ExpoConfig = {
           "Ana Quran lets you choose a photo for your profile picture.",
         cameraPermission:
           "Ana Quran uses your camera so you can take a profile picture.",
+      },
+    ],
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/android-icon-monochrome.png",
+        color: "#1a3a52",
+        defaultChannel: "lesson-reminders",
       },
     ],
   ],

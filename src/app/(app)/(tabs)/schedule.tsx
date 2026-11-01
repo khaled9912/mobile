@@ -12,6 +12,7 @@ import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { pastLessons, upcomingLessons } from "@/lib/lesson-selectors";
 import { isReportDue } from "@/lib/status";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 type Filter = "upcoming" | "past" | "all";
 
@@ -32,6 +33,7 @@ export default function ScheduleTab() {
   }, [filter, lessonsQuery.data]);
 
   const perspective = isTeacher ? "teacher" : isAdmin ? "admin" : "student";
+  const { refreshing, onRefresh } = usePullRefresh(lessonsQuery.refetch);
 
   if (!role) {
     return (
@@ -42,10 +44,7 @@ export default function ScheduleTab() {
   }
 
   return (
-    <Screen
-      refreshing={lessonsQuery.isFetching}
-      onRefresh={() => void lessonsQuery.refetch()}
-    >
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow={isAdmin ? "Academy schedule" : "Your lessons"}
         title="Schedule"

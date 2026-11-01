@@ -16,13 +16,17 @@ import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { RequestCard } from "@/components/lesson/request-card";
 import { openRequests } from "@/lib/lesson-selectors";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export const TeacherRequests = () => {
   const queryClient = useQueryClient();
   const requestsQuery = useQuery({
     queryKey: ["lesson-requests", "teacher"],
     queryFn: getIncomingLessonRequests,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(requestsQuery.refetch);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -87,10 +91,7 @@ export const TeacherRequests = () => {
   };
 
   return (
-    <Screen
-      refreshing={requestsQuery.isFetching}
-      onRefresh={() => void requestsQuery.refetch()}
-    >
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow="Teacher portal"
         title="Lesson requests"

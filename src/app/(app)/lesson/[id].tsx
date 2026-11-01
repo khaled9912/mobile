@@ -24,6 +24,8 @@ import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import {
   isLessonEnded,
   lessonStatusLabel,
@@ -47,7 +49,9 @@ export default function LessonRoomScreen() {
     queryKey: ["lessons", id],
     queryFn: () => getLessonById(id as string),
     enabled: Boolean(id),
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(lessonQuery.refetch);
 
   const lesson = lessonQuery.data;
   const ended = lesson ? isLessonEnded(lesson) : false;
@@ -142,12 +146,12 @@ export default function LessonRoomScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Refresh lesson"
-        accessibilityState={{ busy: lessonQuery.isFetching }}
+        accessibilityState={{ busy: refreshing }}
         hitSlop={12}
-        onPress={() => void lessonQuery.refetch()}
+        onPress={onRefresh}
         style={styles.headerButton}
       >
-        {lessonQuery.isFetching ? (
+        {refreshing ? (
           <ActivityIndicator
             size="small"
             color={showingRoom ? "#ffffff" : colors.brand}
@@ -230,8 +234,8 @@ export default function LessonRoomScreen() {
           contentContainerStyle={styles.scroll}
           refreshControl={
             <RefreshControl
-              refreshing={lessonQuery.isFetching}
-              onRefresh={() => void lessonQuery.refetch()}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor={colors.brand}
               colors={[colors.brand]}
             />
@@ -265,8 +269,8 @@ export default function LessonRoomScreen() {
           contentContainerStyle={styles.scroll}
           refreshControl={
             <RefreshControl
-              refreshing={lessonQuery.isFetching}
-              onRefresh={() => void lessonQuery.refetch()}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               tintColor={colors.brand}
               colors={[colors.brand]}
             />

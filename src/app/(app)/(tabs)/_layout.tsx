@@ -1,5 +1,4 @@
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useAuth, isAdminRole } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 
@@ -10,101 +9,27 @@ const TabLayout = () => {
   const isTeacher = role === "teacher";
   const isAdmin = isAdminRole(role);
 
+  // The visible bar lives in (app)/_layout so it also covers stack screens.
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.link,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.border,
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarStyle: { display: "none" },
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "home" : "home-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" />
       <Tabs.Screen
         name="book"
-        options={{
-          title: "Book",
-          href: isStudent ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "library" : "library-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
+        options={{ href: isStudent ? undefined : null }}
       />
       <Tabs.Screen
         name="requests"
-        options={{
-          title: isAdmin ? "Approvals" : "Requests",
-          href: isTeacher || isAdmin ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "mail" : "mail-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
+        options={{ href: isTeacher || isAdmin ? undefined : null }}
       />
-      <Tabs.Screen
-        name="schedule"
-        options={{
-          title: "Schedule",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "calendar" : "calendar-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="people"
-        options={{
-          title: "People",
-          href: isAdmin ? undefined : null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "people" : "people-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={size}
-              color={color as string}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="schedule" />
+      <Tabs.Screen name="people" options={{ href: isAdmin ? undefined : null }} />
+      <Tabs.Screen name="profile" />
     </Tabs>
   );
 };

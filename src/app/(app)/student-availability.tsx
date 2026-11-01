@@ -20,6 +20,8 @@ import {
   formatTimeRange,
   relativeDay,
 } from "@/lib/format";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export default function StudentAvailabilityScreen() {
   const queryClient = useQueryClient();
@@ -29,7 +31,9 @@ export default function StudentAvailabilityScreen() {
   const slotsQuery = useQuery({
     queryKey: ["student-availability", "teacher"],
     queryFn: getTeacherStudentAvailability,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(slotsQuery.refetch);
 
   const select = useMutation({
     mutationFn: (slotId: string) => selectStudentAvailability(slotId),
@@ -74,11 +78,7 @@ export default function StudentAvailabilityScreen() {
 
   return (
     <RoleGate roles={["teacher"]}>
-      <Screen
-        edges={["left", "right"]}
-        refreshing={slotsQuery.isFetching}
-        onRefresh={() => void slotsQuery.refetch()}
-      >
+      <Screen edges={["left", "right"]} refreshing={refreshing} onRefresh={onRefresh}>
         <PageHeader
           eyebrow="Teacher portal"
           title="Student preferences"

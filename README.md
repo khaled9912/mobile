@@ -276,6 +276,43 @@ signed in on the device:
 
 ---
 
+## Navigation and live sync
+
+**Persistent bottom bar.** `src/components/navigation/persistent-tab-bar.tsx` is
+rendered by `src/app/(app)/_layout.tsx` underneath the stack, so it stays
+visible on every internal screen (teacher profile, availability, settings,
+forms) instead of only on the five tab roots. The Expo Router tab bar is hidden;
+the stack keeps its native headers and swipe-back gestures.
+
+- Tabs are role-filtered: Home, Book (`student`), Requests (`teacher`, labelled
+  Approvals for admins), Schedule, People (`admin`), Profile.
+- Screens inside a section keep their tab highlighted via `sectionTab()`
+  (e.g. `/teachers/[id]` highlights Book, `/profile/edit` highlights Profile).
+- Fullscreen lesson rooms hide the bar; the offline banner offsets itself by
+  `TAB_BAR_CONTENT_HEIGHT` when the bar is present.
+
+**Cross-role status.** The API has no push or streaming channel, so the app
+polls while it is in the foreground. `LIVE_SYNC_INTERVAL` in
+`src/lib/query-client.ts` (30s) is set on the queries whose state another role
+can change:
+
+- `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
+  reminders all update together) and `["lessons", id]` in the lesson room.
+- `["lesson-requests", …]` for student, teacher and admin approval lists,
+  including the teacher directory page.
+- `["availability","teacher"]` and `["student-availability","teacher"]` so
+  bookings and new student preferences disappear or appear without a refresh.
+
+Polling pauses automatically when the app is backgrounded (TanStack Query's
+focus manager) and resumes on return. Pull-to-refresh uses
+`src/hooks/use-pull-refresh.ts` instead of `isFetching`, so a background poll
+never flashes the refresh spinner. An approval therefore reaches the other role
+within about 30 seconds, or immediately on pull-to-refresh. Instant delivery
+would need a server-side push/SSE channel, which is out of scope while the API
+stays unchanged.
+
+---
+
 ## Developer tools: API debugger
 
 Hidden behind the app version on Profile so it never appears for normal users:

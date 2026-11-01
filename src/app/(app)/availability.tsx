@@ -27,6 +27,8 @@ import {
   relativeDay,
 } from "@/lib/format";
 import type { Tone } from "@/lib/status";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 const MAX_SLOT_MINUTES = 240;
 
@@ -74,7 +76,9 @@ export default function TeacherAvailabilityScreen() {
   const slotsQuery = useQuery({
     queryKey: ["availability", "teacher"],
     queryFn: getMyAvailability,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(slotsQuery.refetch);
 
   const end = useMemo(
     () => new Date(start.getTime() + duration * 60 * 1000),
@@ -167,13 +171,7 @@ export default function TeacherAvailabilityScreen() {
 
   return (
     <RoleGate roles={["teacher"]}>
-      <Screen
-        edges={["left", "right"]}
-        refreshing={slotsQuery.isFetching}
-        onRefresh={() => {
-          void slotsQuery.refetch();
-        }}
-      >
+      <Screen edges={["left", "right"]} refreshing={refreshing} onRefresh={onRefresh}>
         <PageHeader
           eyebrow="Teacher portal"
           title="Manage availability"

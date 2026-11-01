@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { getLessons } from "@/api/lessons";
 import { useAuth } from "@/providers/auth-provider";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { buildLessonReminders } from "@/lib/lesson-reminders";
 import {
   cancelLessonReminders,
@@ -43,6 +44,7 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
     queryKey: ["lessons"],
     queryFn: getLessons,
     enabled: authenticated,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   useEffect(() => {

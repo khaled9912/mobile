@@ -26,6 +26,8 @@ import {
   relativeDay,
 } from "@/lib/format";
 import { openRequests } from "@/lib/lesson-selectors";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export default function TeacherProfileScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -38,11 +40,16 @@ export default function TeacherProfileScreen() {
     queryKey: ["teacher-profile", teacherId],
     queryFn: () => getTeacherProfile(teacherId),
     enabled: Boolean(teacherId),
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const requestsQuery = useQuery({
     queryKey: ["lesson-requests", "student"],
     queryFn: getMyLessonRequests,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(() =>
+    Promise.all([teacherQuery.refetch(), requestsQuery.refetch()])
+  );
 
   const request = useMutation({
     mutationFn: (slotId: string) => requestLessonSlot(slotId),
@@ -87,11 +94,7 @@ export default function TeacherProfileScreen() {
 
   return (
     <RoleGate roles={["student"]}>
-      <Screen
-        edges={["left", "right"]}
-        refreshing={teacherQuery.isFetching}
-        onRefresh={() => void teacherQuery.refetch()}
-      >
+      <Screen edges={["left", "right"]} refreshing={refreshing} onRefresh={onRefresh}>
         {teacherQuery.isLoading ? (
           <LoadingView label="Loading teacher profile…" />
         ) : teacherQuery.isError ? (

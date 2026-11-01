@@ -15,13 +15,20 @@ import { StatCard } from "@/components/ui/stat-card";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { RequestCard } from "@/components/lesson/request-card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export const AdminHome = () => {
   const { user } = useAuth();
-  const lessonsQuery = useQuery({ queryKey: ["lessons"], queryFn: getLessons });
+  const lessonsQuery = useQuery({
+    queryKey: ["lessons"],
+    queryFn: getLessons,
+    refetchInterval: LIVE_SYNC_INTERVAL,
+  });
   const approvalsQuery = useQuery({
     queryKey: ["lesson-requests", "pending-admin"],
     queryFn: getAdminLessonApprovals,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const studentsQuery = useQuery({
     queryKey: ["admin", "students"],
@@ -35,21 +42,17 @@ export const AdminHome = () => {
   const lessons = lessonsQuery.data ?? [];
   const approvals = approvalsQuery.data ?? [];
   const upcoming = upcomingLessons(lessons);
-  const refreshing =
-    lessonsQuery.isFetching ||
-    approvalsQuery.isFetching ||
-    studentsQuery.isFetching ||
-    teachersQuery.isFetching;
-
-  const refresh = () => {
-    void lessonsQuery.refetch();
-    void approvalsQuery.refetch();
-    void studentsQuery.refetch();
-    void teachersQuery.refetch();
-  };
+  const { refreshing, onRefresh } = usePullRefresh(() =>
+    Promise.all([
+      lessonsQuery.refetch(),
+      approvalsQuery.refetch(),
+      studentsQuery.refetch(),
+      teachersQuery.refetch(),
+    ])
+  );
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow="Academy administration"
         title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
@@ -80,7 +83,10 @@ export const AdminHome = () => {
             Loading approvals…
           </AppText>
         ) : approvalsQuery.isError ? (
-          <ErrorView error={approvalsQuery.error} onRetry={refresh} />
+          <ErrorView
+            error={approvalsQuery.error}
+            onRetry={() => void approvalsQuery.refetch()}
+          />
         ) : approvals.length ? (
           <View style={styles.list}>
             {approvals.slice(0, 3).map((request) => (

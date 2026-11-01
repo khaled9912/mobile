@@ -19,6 +19,8 @@ import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
 import { openRequests } from "@/lib/lesson-selectors";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export default function BookScreen() {
   const { role } = useAuth();
@@ -31,30 +33,29 @@ export default function BookScreen() {
     queryKey: ["lesson-requests", "student"],
     queryFn: getMyLessonRequests,
     enabled: role === "student",
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const assignedQuery = useQuery({
     queryKey: ["assigned-teacher"],
     queryFn: getAssignedTeacherAvailability,
     enabled: role === "student",
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   const teachers = directoryQuery.data ?? [];
   const open = openRequests(requestsQuery.data ?? []);
   const assignedId = assignedQuery.data?.teacher?.id ?? null;
-  const refreshing =
-    directoryQuery.isFetching ||
-    requestsQuery.isFetching ||
-    assignedQuery.isFetching;
-
-  const refresh = () => {
-    void directoryQuery.refetch();
-    void requestsQuery.refetch();
-    void assignedQuery.refetch();
-  };
+  const { refreshing, onRefresh } = usePullRefresh(() =>
+    Promise.all([
+      directoryQuery.refetch(),
+      requestsQuery.refetch(),
+      assignedQuery.refetch(),
+    ])
+  );
 
   return (
     <RoleGate roles={["student"]}>
-      <Screen refreshing={refreshing} onRefresh={refresh}>
+      <Screen refreshing={refreshing} onRefresh={onRefresh}>
         <PageHeader
           eyebrow="Student portal"
           title="Choose your teacher"

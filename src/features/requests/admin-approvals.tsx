@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { RequestCard } from "@/components/lesson/request-card";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 type Filter = Extract<
   LessonRequestStatus,
@@ -31,7 +33,9 @@ export const AdminApprovals = () => {
   const approvalsQuery = useQuery({
     queryKey: ["lesson-requests", "admin", filter],
     queryFn: () => getAdminLessonRequests(filter),
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
+  const { refreshing, onRefresh } = usePullRefresh(approvalsQuery.refetch);
 
   const decide = useMutation({
     mutationFn: ({
@@ -83,10 +87,7 @@ export const AdminApprovals = () => {
   };
 
   return (
-    <Screen
-      refreshing={approvalsQuery.isFetching}
-      onRefresh={() => void approvalsQuery.refetch()}
-    >
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow="Academy administration"
         title="Lesson approvals"

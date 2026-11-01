@@ -18,6 +18,13 @@ focusManager.setEventListener((handleFocus) => {
   return () => subscription.remove();
 });
 
+/**
+ * Class and request screens re-fetch on this cadence while the app is active,
+ * so an approval or status change made by another role appears without a manual
+ * refresh. True push updates would need a server-side channel.
+ */
+export const LIVE_SYNC_INTERVAL = 30_000;
+
 const shouldRetry = (failureCount: number, error: unknown) => {
   if (error instanceof ApiError) {
     if (error.status === 0) return failureCount < 2;

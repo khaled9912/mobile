@@ -17,14 +17,21 @@ import { StatCard } from "@/components/ui/stat-card";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { RequestCard } from "@/components/lesson/request-card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { isReportDue } from "@/lib/status";
+import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export const TeacherHome = () => {
   const { user } = useAuth();
-  const lessonsQuery = useQuery({ queryKey: ["lessons"], queryFn: getLessons });
+  const lessonsQuery = useQuery({
+    queryKey: ["lessons"],
+    queryFn: getLessons,
+    refetchInterval: LIVE_SYNC_INTERVAL,
+  });
   const requestsQuery = useQuery({
     queryKey: ["lesson-requests", "teacher"],
     queryFn: getIncomingLessonRequests,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const availabilityQuery = useQuery({
     queryKey: ["availability", "teacher"],
@@ -46,19 +53,16 @@ export const TeacherHome = () => {
       slot.status === "available" &&
       new Date(slot.startsAt).getTime() > availabilityQuery.dataUpdatedAt
   );
-  const refreshing =
-    lessonsQuery.isFetching ||
-    requestsQuery.isFetching ||
-    availabilityQuery.isFetching;
-
-  const refresh = () => {
-    void lessonsQuery.refetch();
-    void requestsQuery.refetch();
-    void availabilityQuery.refetch();
-  };
+  const { refreshing, onRefresh } = usePullRefresh(() =>
+    Promise.all([
+      lessonsQuery.refetch(),
+      requestsQuery.refetch(),
+      availabilityQuery.refetch(),
+    ])
+  );
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow="Teacher portal"
         title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
@@ -89,7 +93,10 @@ export const TeacherHome = () => {
             Loading your lessons…
           </AppText>
         ) : lessonsQuery.isError ? (
-          <ErrorView error={lessonsQuery.error} onRetry={refresh} />
+          <ErrorView
+            error={lessonsQuery.error}
+            onRetry={() => void lessonsQuery.refetch()}
+          />
         ) : upcoming.length ? (
           <View style={styles.list}>
             {upcoming.slice(0, 3).map((lesson) => (

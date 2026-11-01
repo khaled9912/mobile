@@ -11,7 +11,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ApiError } from "@/api/client";
-import { getLessonById, getLessonPresence, markTeacherPresent } from "@/api/lessons";
+import { getLessonById } from "@/api/lessons";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
@@ -21,7 +21,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
@@ -56,21 +55,18 @@ export default function LessonRoomScreen() {
   const lesson = lessonQuery.data;
   const ended = lesson ? isLessonEnded(lesson) : false;
 
-  const presenceQuery = useQuery({
-    queryKey: ["lesson-presence", id],
-    queryFn: () => getLessonPresence(id as string),
-    enabled: Boolean(id) && role === "student" && Boolean(lesson) && !ended,
-    refetchInterval: 5000,
-  });
-
-  // Heartbeat while the teacher is in the call; the API expires it after 45s.
+  // The room stays closed until the scheduled start. Waking up exactly at that
+  // moment lets the room mount without the user refreshing.
+  const startsAtMs = lesson ? new Date(lesson.startsAt).getTime() : null;
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (role !== "teacher" || !joined || !id) return;
-    const beat = () => void markTeacherPresent(id).catch(() => {});
-    beat();
-    const timer = setInterval(beat, 15000);
-    return () => clearInterval(timer);
-  }, [role, joined, id]);
+    if (startsAtMs === null) return;
+    const remaining = startsAtMs - Date.now();
+    if (remaining <= 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), remaining + 500);
+    return () => clearTimeout(timer);
+  }, [startsAtMs]);
+  const beforeStart = startsAtMs !== null && now < startsAtMs;
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -88,12 +84,8 @@ export default function LessonRoomScreen() {
   const showingRoom =
     Boolean(lesson) &&
     lesson!.status !== "cancelled" &&
+    !beforeStart &&
     (!ended || joined);
-  const waitingForTeacher =
-    showingRoom &&
-    role === "student" &&
-    !joined &&
-    !presenceQuery.data?.teacherPresent;
 
   const error = lessonQuery.error;
   const forbidden =
@@ -228,6 +220,21 @@ export default function LessonRoomScreen() {
       );
     }
 
+    if (beforeStart) {
+      return (
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
+          <EmptyState
+            icon="time-outline"
+            title="The room is not open yet"
+            body={`This lesson room opens at ${formatDateTime(lesson.startsAt)}.`}
+            action={
+              <Button title="Back to schedule" size="sm" onPress={goBack} />
+            }
+          />
+        </KeyboardAwareScrollView>
+      );
+    }
+
     if (ended && !showingRoom) {
       return (
         <KeyboardAwareScrollView
@@ -263,62 +270,6 @@ export default function LessonRoomScreen() {
       );
     }
 
-    if (waitingForTeacher) {
-      return (
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.scroll}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.brand}
-              colors={[colors.brand]}
-            />
-          }
-        >
-          <Card style={styles.waitingCard}>
-            <ActivityIndicator size="large" color={colors.brand} />
-            <AppText variant="h2" align="center" style={styles.waitingTitle}>
-              Waiting for your teacher
-            </AppText>
-            <AppText variant="small" color="muted" align="center">
-              The lesson room opens when your teacher starts the lesson. This
-              page checks automatically — the join buttons appear as soon as the
-              room is open.
-            </AppText>
-
-            <View style={styles.waitingMeta}>
-              <AppText variant="caption" color="gold" weight="700">
-                {relativeDay(lesson.startsAt).toUpperCase()}
-              </AppText>
-              <AppText variant="h3">
-                {formatTimeRange(lesson.startsAt, lesson.endsAt)}
-              </AppText>
-              <AppText variant="small" color="muted">
-                with {lesson.teacherName}
-              </AppText>
-            </View>
-
-            {presenceQuery.isError ? (
-              <Notice
-                tone="warning"
-                message="Could not check the room status. Still retrying…"
-              />
-            ) : null}
-
-            <Button
-              title="Check now"
-              variant="secondary"
-              size="sm"
-              icon="refresh"
-              loading={presenceQuery.isFetching}
-              onPress={() => void presenceQuery.refetch()}
-            />
-          </Card>
-        </KeyboardAwareScrollView>
-      );
-    }
-
     return (
       <View style={[styles.stage, { paddingBottom: insets.bottom }]}>
         <JitsiRoom
@@ -331,7 +282,7 @@ export default function LessonRoomScreen() {
     );
   };
 
-  const darkStage = showingRoom && !waitingForTeacher;
+  const darkStage = showingRoom;
 
   return (
     <View
@@ -382,11 +333,4 @@ const styles = StyleSheet.create({
   },
   recapCard: { gap: 4 },
   recapTitle: { marginTop: 2 },
-  waitingCard: {
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 28,
-  },
-  waitingTitle: { marginTop: 4 },
-  waitingMeta: { alignItems: "center", gap: 2, marginVertical: 4 },
 });

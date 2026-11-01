@@ -153,10 +153,6 @@ export interface Lesson {
   review: TeacherReview | null;
 }
 
-export interface LessonPresence {
-  teacherPresent: boolean;
-}
-
 export interface ReportPage {
   items: LessonReport[];
   hasMore: boolean;

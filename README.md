@@ -94,7 +94,7 @@ Always install Expo-managed packages with `npx expo install <package>`, not
 ```
 src/
   app/                 Expo Router routes (every file is a screen)
-    (auth)/            login, signup, forgot-password
+    (auth)/            welcome, login, signup, forgot-password
     (app)/             signed-in stack
       (tabs)/          Home, Book, Requests, Schedule, People, Profile
       lesson/[id]      live room / recap / feedback
@@ -111,8 +111,13 @@ src/
 Navigation rules:
 
 - Routes live only in `src/app/`. Non-route code stays outside it.
-- The root stack redirects unauthenticated users to `/login` and authenticated
-  users away from `(auth)`.
+- The root stack redirects unauthenticated users to `/welcome` on first launch
+  (stored once in the local flag `anaquran.welcome.v1`) and to `/login`
+  afterwards. Authenticated users are redirected away from `(auth)`.
+- `/welcome` is a single branded screen with the product summary and
+  **Sign in** / **Create account** actions. It is not a replica of the web
+  marketing page and makes no API calls. Signed-out users can reopen it from
+  the **About Ana Quran** link on the login screen.
 - Tab visibility is role-aware: Book is student-only, Requests is
   teacher/admin-only, People is admin-only.
 - Pushed screens use the native stack header and back gesture. Screens under an
@@ -122,6 +127,7 @@ Navigation rules:
 
 | Web feature | Mobile route |
 | --- | --- |
+| First-launch welcome / product introduction | `(auth)/welcome` |
 | Email/password sign-in, phone OTP | `(auth)/login` |
 | Student registration | `(auth)/signup` |
 | Password recovery | `(auth)/forgot-password` |
@@ -270,6 +276,45 @@ signed in on the device:
 
 ---
 
+## Developer tools: API debugger
+
+Hidden behind the app version on Profile so it never appears for normal users:
+
+- Tap the version label at the bottom of Profile seven times in quick
+  succession to toggle it. The choice is persisted under
+  `anaquran.api-debug.v1`.
+- While enabled, a floating **API** pill appears on every screen (including
+  sign-in). It opens a bottom sheet listing each request with method, path,
+  status, duration, and time.
+- Each entry expands to show the request and response JSON. Password, token,
+  OTP, and cookie fields are redacted; long strings are truncated.
+- The sheet is collapsible (chevron or backdrop) and has a recording switch, a
+  Clear action, and a live request count. Turning recording off removes the
+  pill; turn it back on with the seven-tap gesture.
+- Entries live in memory only and are cleared on sign-out, on disable, and when
+  the app process ends.
+
+Logging happens inside `apiFetch`, so every endpoint in `API_MAPPING.md` is
+covered without extra client code.
+
+---
+
+## Forms and the keyboard
+
+Every form field is a `TextField` that reports focus to the nearest
+`KeyboardAwareScrollView`. Both `Screen` and the lesson recap use that scroll
+view, so focusing any field scrolls it above the keyboard on iOS and Android.
+`Screen` also keeps a `KeyboardAvoidingView` on iOS for the submit buttons.
+
+Android builds are edge-to-edge (`edgeToEdgeEnabled=true`), so `adjustResize`
+no longer shrinks the window on Android 15+. The scroll view therefore reads
+the keyboard's top from `endCoordinates.screenY` and adds the keyboard height
+as bottom content padding, which guarantees enough scroll range on every
+version; the reveal is retried after layout settles. The lesson room is
+wrapped in the same component, covering the report and review forms.
+
+---
+
 ## Design system
 
 The app mirrors the web brand tokens in `src/theme/tokens.ts`:
@@ -347,23 +392,29 @@ Current automated status:
 
 - `npm run typecheck` — clean.
 - `npm run lint` — clean (Expo ESLint with React Compiler rules).
-- `npm test` — 15 unit tests passing for validation, status helpers, and
-  lesson selectors.
+- `npm test` — 19 unit tests passing for validation, status helpers, lesson
+  selectors, and reminder scheduling.
 - `npx expo-doctor` — 20/20 checks pass (dependencies, config, app metadata).
 - `npm run export:ios` and `npm run export:android` — production bundles
   generate without route or module errors.
 
 Manual device QA still matters because unit tests do not exercise native UI:
 
-1. Sign in with email and with a phone code; force-quit and confirm session
+1. Fresh install: confirm the welcome screen appears once, both actions work,
+   and it does not reappear after a relaunch. Reopen it from **About Ana
+   Quran** on the login screen.
+2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
-2. Student: browse teachers, request a slot, open the waiting screen, join
+3. Student: browse teachers, request a slot, open the waiting screen, join
    after the teacher appears, submit a review after the lesson ends.
-3. Teacher: publish a slot, confirm a request, start the room, submit a report
+4. Teacher: publish a slot, confirm a request, start the room, submit a report
    after the end time.
-4. Admin: approve a request, create/deactivate/reactivate an account, assign a
+5. Admin: approve a request, create/deactivate/reactivate an account, assign a
    teacher, read contact messages.
-5. Toggle light/dark/system, test large text, offline mode, and a small phone.
+6. Toggle light/dark/system, test large text, offline mode, and a small phone.
+7. Accept the notification prompt, book a lesson that starts in more than five
+   minutes, background the app, and confirm the reminder fires five minutes
+   before the start; tap it and confirm the lesson room opens.
 
 No automated end-to-end suite is committed.
 

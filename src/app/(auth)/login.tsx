@@ -328,6 +328,18 @@ export default function LoginScreen() {
           </AppText>
         </Pressable>
       </View>
+
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel="About Ana Quran"
+        onPress={() => router.replace("/welcome")}
+        hitSlop={8}
+        style={styles.about}
+      >
+        <AppText variant="caption" color="muted">
+          About Ana Quran
+        </AppText>
+      </Pressable>
     </AuthShell>
   );
 }
@@ -345,4 +357,5 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
+  about: { alignSelf: "center", marginTop: -4 },
 });

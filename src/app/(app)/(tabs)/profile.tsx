@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
+import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, isAdminRole } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import {
+  isApiDebugEnabled,
+  setApiDebugEnabled,
+  useApiDebugEnabled,
+} from "@/lib/api-debug";
 import type { ThemePreference } from "@/lib/storage";
 import type { UserRole } from "@/api/types";
 import { Screen } from "@/components/ui/screen";
@@ -75,6 +81,31 @@ export default function ProfileTab() {
   const { user, signOut } = useAuth();
   const { colors, preference, setPreference } = useTheme();
   const [signingOut, setSigningOut] = useState(false);
+  const debugEnabled = useApiDebugEnabled();
+  const versionTaps = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const version = Constants.expoConfig?.version ?? "1.0.0";
+
+  const handleVersionPress = () => {
+    versionTaps.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => {
+      versionTaps.current = 0;
+    }, 2000);
+
+    if (versionTaps.current < 7) return;
+    versionTaps.current = 0;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+
+    const next = !isApiDebugEnabled();
+    void setApiDebugEnabled(next);
+    Alert.alert(
+      "API debugger",
+      next
+        ? "Enabled. A floating API button now shows every request and response."
+        : "Disabled. The logged requests were cleared."
+    );
+  };
 
   if (!user) {
     return (
@@ -269,6 +300,22 @@ export default function ProfileTab() {
         loading={signingOut}
         style={styles.signOut}
       />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`App version ${version}`}
+        onPress={handleVersionPress}
+        style={styles.version}
+      >
+        <AppText variant="caption" color="muted" align="center">
+          Ana Quran v{version}
+        </AppText>
+        {debugEnabled ? (
+          <AppText variant="caption" color="brand" align="center">
+            API debugger enabled
+          </AppText>
+        ) : null}
+      </Pressable>
     </Screen>
   );
 }
@@ -301,4 +348,5 @@ const styles = StyleSheet.create({
   linkCopy: { flex: 1, gap: 1 },
   themeHint: { marginBottom: 12 },
   signOut: { marginTop: 24 },
+  version: { marginTop: 20, alignItems: "center", gap: 2, paddingVertical: 8 },
 });

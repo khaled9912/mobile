@@ -3,7 +3,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
+import { KeyboardAwareScrollView } from "./keyboard-aware-scroll-view";
 
 type Props = {
   children: ReactNode;
@@ -26,7 +26,7 @@ type Props = {
 export const Screen = ({
   children,
   scroll = true,
-  keyboard = false,
+  keyboard = true,
   refreshing = false,
   onRefresh,
   contentStyle,
@@ -36,16 +36,14 @@ export const Screen = ({
   const { colors } = useTheme();
 
   const body = scroll ? (
-    <ScrollView
+    <KeyboardAwareScrollView
       style={styles.flex}
       contentContainerStyle={[
         styles.content,
         { paddingBottom: footer ? 16 : 40 },
         contentStyle,
       ]}
-      keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
-      automaticallyAdjustKeyboardInsets={keyboard && Platform.OS === "ios"}
       showsVerticalScrollIndicator={false}
       refreshControl={
         onRefresh ? (
@@ -59,7 +57,7 @@ export const Screen = ({
       }
     >
       {children}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   ) : (
     <View style={[styles.flex, styles.content, contentStyle]}>{children}</View>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ComponentRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/providers/theme-provider";
+import { useKeyboardAwareField } from "./keyboard-aware-scroll-view";
 import { AppText } from "./app-text";
 
 type Props = TextInputProps & {
@@ -28,11 +29,13 @@ export const TextField = ({
   ...rest
 }: Props) => {
   const { colors, radius } = useTheme();
+  const keyboardAware = useKeyboardAwareField();
+  const fieldRef = useRef<ComponentRef<typeof View>>(null);
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
   return (
-    <View style={styles.wrapper}>
+    <View ref={fieldRef} style={styles.wrapper}>
       <AppText variant="label" style={styles.label}>
         {label}
       </AppText>
@@ -59,10 +62,12 @@ export const TextField = ({
           textAlignVertical={multiline ? "top" : "center"}
           onFocus={(event) => {
             setFocused(true);
+            if (fieldRef.current) keyboardAware?.focusField(fieldRef.current);
             rest.onFocus?.(event);
           }}
           onBlur={(event) => {
             setFocused(false);
+            if (fieldRef.current) keyboardAware?.blurField(fieldRef.current);
             rest.onBlur?.(event);
           }}
           style={[

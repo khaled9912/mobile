@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,7 +14,9 @@ import {
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
+import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
 import { queryClient } from "@/lib/query-client";
+import { getWelcomeSeen, subscribeWelcome } from "@/lib/welcome";
 import { BrandLockup } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
 
@@ -42,6 +44,7 @@ const BootOverlay = () => {
 const RootNavigator = () => {
   const { colors, scheme } = useTheme();
   const { user, status, hydrated } = useAuth();
+  const welcomeSeen = useSyncExternalStore(subscribeWelcome, getWelcomeSeen);
   const segments = useSegments();
   const segmentKey = segments.join("/");
   const inAuthGroup = segments[0] === "(auth)";
@@ -53,13 +56,13 @@ const RootNavigator = () => {
   useEffect(() => {
     if (!hydrated || status === "restoring") return;
     if (!user && !inAuthGroup) {
-      router.replace("/login");
+      router.replace(welcomeSeen ? "/login" : "/welcome");
       return;
     }
     if (user && (inAuthGroup || segmentKey === "")) {
       router.replace("/");
     }
-  }, [hydrated, status, user, inAuthGroup, segmentKey]);
+  }, [hydrated, status, user, welcomeSeen, inAuthGroup, segmentKey]);
 
   const navigationTheme = useMemo(() => {
     const base = scheme === "dark" ? DarkTheme : DefaultTheme;
@@ -104,6 +107,7 @@ const RootLayout = () => (
           <AuthProvider>
             <LessonReminderProvider>
               <RootNavigator />
+              <ApiDebugOverlay />
             </LessonReminderProvider>
           </AuthProvider>
         </AppThemeProvider>

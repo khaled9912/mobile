@@ -3,6 +3,7 @@ import type { UserProfile } from "@/api/types";
 
 const SESSION_KEY = "anaquran.session.v1";
 const THEME_KEY = "anaquran.theme.v1";
+const WELCOME_KEY = "anaquran.welcome.v1";
 
 export type CachedSession = {
   user: UserProfile;
@@ -61,5 +62,23 @@ export async function writeThemePreference(
     await SecureStore.setItemAsync(THEME_KEY, preference);
   } catch {
     // Preference persistence is best-effort.
+  }
+}
+
+export async function readWelcomeSeen(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(WELCOME_KEY)) === "1";
+  } catch {
+    // If the flag cannot be read, skip the welcome screen rather than
+    // showing it on every launch.
+    return true;
+  }
+}
+
+export async function writeWelcomeSeen(): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(WELCOME_KEY, "1");
+  } catch {
+    // Best-effort; worst case the welcome screen appears once more.
   }
 }

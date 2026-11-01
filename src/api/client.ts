@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config/env";
+import { beginApiDebug } from "@/lib/api-debug";
 
 export type ValidationErrors = Record<string, string[]>;
 
@@ -145,6 +146,14 @@ export async function apiFetch<T>(
     body = JSON.stringify(options.json);
   }
 
+  const debug = beginApiDebug({
+    method: options.method ?? "GET",
+    path,
+    request: options.formData
+      ? "[multipart form data]"
+      : (options.json ?? undefined),
+  });
+
   const controller = new AbortController();
   let timedOut = false;
   const timeout = setTimeout(() => {
@@ -166,11 +175,13 @@ export async function apiFetch<T>(
   } catch (error) {
     if (options.signal?.aborted) throw error;
     if (timedOut) {
+      debug?.fail("Request timed out");
       throw new ApiError(
         "The server took too long to respond. Please try again.",
         408
       );
     }
+    debug?.fail("Network unreachable");
     throw new ApiError(
       "Can't reach the academy server. Check your connection and try again.",
       0,
@@ -181,12 +192,17 @@ export async function apiFetch<T>(
     options.signal?.removeEventListener("abort", relayAbort);
   }
 
-  if (response.status === 204) return null as T;
+  if (response.status === 204) {
+    debug?.succeed(204, null);
+    return null as T;
+  }
 
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("json")
     ? await response.json().catch(() => null)
     : null;
+
+  debug?.succeed(response.status, payload);
 
   if (!response.ok) {
     if (

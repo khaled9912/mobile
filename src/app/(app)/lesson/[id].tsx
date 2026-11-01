@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -17,6 +16,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
 import { LessonFeedback } from "@/components/lesson/lesson-feedback";
+import { KeyboardAwareScrollView } from "@/components/ui/keyboard-aware-scroll-view";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -166,12 +166,12 @@ export default function LessonRoomScreen() {
   const renderContent = () => {
     if (!id) {
       return (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
           <ErrorView
             error={new Error("This lesson link is incomplete.")}
             title="Lesson unavailable"
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 
@@ -185,7 +185,7 @@ export default function LessonRoomScreen() {
 
     if (forbidden) {
       return (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
           <EmptyState
             icon="lock-closed-outline"
             title="Lesson unavailable"
@@ -194,24 +194,24 @@ export default function LessonRoomScreen() {
               <Button title="Back to schedule" size="sm" onPress={goBack} />
             }
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 
     if (error || !lesson) {
       return (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
           <ErrorView
             error={error ?? new Error("This lesson could not be found.")}
             onRetry={() => void lessonQuery.refetch()}
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 
     if (lesson.status === "cancelled") {
       return (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
           <EmptyState
             icon="close-circle-outline"
             title="Lesson cancelled"
@@ -220,13 +220,13 @@ export default function LessonRoomScreen() {
               <Button title="Back to schedule" size="sm" onPress={goBack} />
             }
           />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 
     if (ended && !showingRoom) {
       return (
-        <ScrollView
+        <KeyboardAwareScrollView
           contentContainerStyle={styles.scroll}
           refreshControl={
             <RefreshControl
@@ -255,13 +255,13 @@ export default function LessonRoomScreen() {
             </AppText>
           </Card>
           <LessonFeedback lesson={lesson} role={role} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 
     if (waitingForTeacher) {
       return (
-        <ScrollView
+        <KeyboardAwareScrollView
           contentContainerStyle={styles.scroll}
           refreshControl={
             <RefreshControl
@@ -311,7 +311,7 @@ export default function LessonRoomScreen() {
               onPress={() => void presenceQuery.refetch()}
             />
           </Card>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       );
     }
 

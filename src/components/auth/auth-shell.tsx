@@ -22,8 +22,10 @@ export const AuthShell = ({
 }: Props) => {
   const { colors, radius } = useTheme();
 
-  return (
-    <Screen keyboard contentStyle={styles.content}>
+  // The masthead sits outside the scroll view, so it stays visible while a
+  // long form (or the keyboard) scrolls the fields beneath it.
+  const header = (
+    <View style={[styles.header, { borderBottomColor: colors.border }]}>
       {showBack ? (
         <Pressable
           accessibilityRole="button"
@@ -35,9 +37,12 @@ export const AuthShell = ({
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
       ) : null}
-      <View style={styles.brand}>
-        <BrandLockup size={64} vertical />
-      </View>
+      <BrandLockup size={40} />
+    </View>
+  );
+
+  return (
+    <Screen keyboard contentStyle={styles.content} header={header}>
       <View
         style={[
           styles.card,
@@ -72,11 +77,24 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 20,
     paddingBottom: 40,
   },
-  back: { position: "absolute", top: 8, left: 16, padding: 8 },
-  brand: { alignItems: "center", marginBottom: 26 },
+  header: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  back: {
+    position: "absolute",
+    left: 8,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
   card: {
     borderWidth: StyleSheet.hairlineWidth * 2,
     padding: 22,

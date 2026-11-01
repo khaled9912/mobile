@@ -21,6 +21,8 @@ type Props = {
   contentStyle?: StyleProp<ViewStyle>;
   edges?: Edge[];
   footer?: ReactNode;
+  /** Fixed area above the scroll content, e.g. a masthead that stays visible. */
+  header?: ReactNode;
 };
 
 export const Screen = ({
@@ -32,6 +34,7 @@ export const Screen = ({
   contentStyle,
   edges = ["top", "left", "right"],
   footer,
+  header,
 }: Props) => {
   const { colors } = useTheme();
 
@@ -67,6 +70,9 @@ export const Screen = ({
       edges={edges}
       style={[styles.flex, { backgroundColor: colors.background }]}
     >
+      {header ? (
+        <View style={{ backgroundColor: colors.background }}>{header}</View>
+      ) : null}
       {keyboard ? (
         <KeyboardAvoidingView
           style={styles.flex}

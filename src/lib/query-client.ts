@@ -23,7 +23,7 @@ focusManager.setEventListener((handleFocus) => {
  * so an approval or status change made by another role appears without a manual
  * refresh. True push updates would need a server-side channel.
  */
-export const LIVE_SYNC_INTERVAL = 30_000;
+export const LIVE_SYNC_INTERVAL = 60_000;
 
 const shouldRetry = (failureCount: number, error: unknown) => {
   if (error instanceof ApiError) {

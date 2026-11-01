@@ -297,7 +297,7 @@ the stack keeps its native headers and swipe-back gestures.
 
 **Cross-role status.** The API has no push or streaming channel, so the app
 polls while it is in the foreground. `LIVE_SYNC_INTERVAL` in
-`src/lib/query-client.ts` (30s) is set on the queries whose state another role
+`src/lib/query-client.ts` (60s) is set on the queries whose state another role
 can change:
 
 - `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
@@ -311,7 +311,7 @@ Polling pauses automatically when the app is backgrounded (TanStack Query's
 focus manager) and resumes on return. Pull-to-refresh uses
 `src/hooks/use-pull-refresh.ts` instead of `isFetching`, so a background poll
 never flashes the refresh spinner. An approval therefore reaches the other role
-within about 30 seconds, or immediately on pull-to-refresh. Instant delivery
+within about a minute, or immediately on pull-to-refresh. Instant delivery
 would need a server-side push/SSE channel, which is out of scope while the API
 stays unchanged.
 

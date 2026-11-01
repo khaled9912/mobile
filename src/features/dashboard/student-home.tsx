@@ -2,7 +2,10 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import { getLessons } from "@/api/lessons";
-import { getAssignedTeacherAvailability, getMyLessonRequests } from "@/api/scheduling";
+import {
+  getAssignedWeeklyAvailability,
+  getMyChangeRequests,
+} from "@/api/scheduling";
 import { useAuth } from "@/providers/auth-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
@@ -11,15 +14,12 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard, InfoRow } from "@/components/ui/stat-card";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { RequestCard } from "@/components/lesson/request-card";
+import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { Avatar } from "@/components/ui/avatar";
 import { AppText } from "@/components/ui/app-text";
 import { Card } from "@/components/ui/card";
-import {
-  firstName,
-  openRequests,
-  upcomingLessons,
-} from "@/lib/lesson-selectors";
+import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import { formatWeeklySlot } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
@@ -30,28 +30,30 @@ export const StudentHome = () => {
     queryFn: getLessons,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const requestsQuery = useQuery({
-    queryKey: ["lesson-requests", "student"],
-    queryFn: getMyLessonRequests,
+  const changesQuery = useQuery({
+    queryKey: ["change-requests", "student"],
+    queryFn: getMyChangeRequests,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const teacherQuery = useQuery({
     queryKey: ["assigned-teacher"],
-    queryFn: getAssignedTeacherAvailability,
+    queryFn: getAssignedWeeklyAvailability,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   const lessons = lessonsQuery.data ?? [];
-  const requests = requestsQuery.data ?? [];
   const upcoming = upcomingLessons(lessons);
   const next = upcoming[0];
-  const pending = openRequests(requests);
+  const pendingChanges = (changesQuery.data ?? [])
+    .filter((change) => change.status === "pending")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const teacher = teacherQuery.data?.teacher ?? null;
+  const series = teacherQuery.data?.series ?? [];
   const completed = lessons.filter((lesson) => lesson.status === "completed");
   const { refreshing, onRefresh } = usePullRefresh(() =>
     Promise.all([
       lessonsQuery.refetch(),
-      requestsQuery.refetch(),
+      changesQuery.refetch(),
       teacherQuery.refetch(),
     ])
   );
@@ -61,21 +63,22 @@ export const StudentHome = () => {
       <PageHeader
         eyebrow="Student portal"
         title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-        subtitle="Your upcoming lessons, teacher, and requests in one place."
+        subtitle="Your weekly lessons, teacher, and time changes in one place."
       />
 
       {offlineSession ? (
         <View style={styles.block}>
           <Notice
             tone="warning"
-            message="You're offline. Sign-in and new requests will work again when you reconnect."
+            message="You're offline. Your saved lessons are shown; changes will sync when you reconnect."
           />
         </View>
       ) : null}
 
       <View style={styles.stats}>
         <StatCard label="Upcoming" value={upcoming.length} />
-        <StatCard label="Awaiting reply" value={pending.length} />
+        <StatCard label="Weekly times" value={series.length} />
+        <StatCard label="Changes" value={pendingChanges.length} />
         <StatCard label="Completed" value={completed.length} />
       </View>
 
@@ -115,11 +118,11 @@ export const StudentHome = () => {
         ) : (
           <EmptyState
             icon="calendar-outline"
-            title="No confirmed lessons yet"
-            body="Choose a teacher and an open time to request your first lesson."
+            title="No lessons booked yet"
+            body="Choose a teacher and pick your weekly times. Your first lesson is a trial."
             action={
               <Button
-                title="Book a lesson"
+                title="Book weekly lessons"
                 size="sm"
                 onPress={() => router.navigate("/book")}
               />
@@ -128,10 +131,10 @@ export const StudentHome = () => {
         )}
       </View>
 
-      {pending.length ? (
+      {pendingChanges.length ? (
         <View style={styles.section}>
           <SectionHeader
-            title="Pending requests"
+            title="Time changes"
             action={
               <Button
                 title="See all"
@@ -142,10 +145,10 @@ export const StudentHome = () => {
             }
           />
           <View style={styles.list}>
-            {pending.slice(0, 2).map((request) => (
-              <RequestCard
-                key={request.id}
-                request={request}
+            {pendingChanges.slice(0, 2).map((change) => (
+              <ChangeRequestCard
+                key={change.id}
+                request={change}
                 perspective="student"
               />
             ))}
@@ -175,10 +178,25 @@ export const StudentHome = () => {
                     : "Your assigned teacher"}
                 </AppText>
                 <AppText variant="caption" color="muted">
-                  {teacherQuery.data?.slots.length ?? 0} open times
+                  {series.length
+                    ? `${series.length} weekly time${series.length === 1 ? "" : "s"} booked`
+                    : "No weekly time yet"}
                 </AppText>
               </View>
             </View>
+            {series.length ? (
+              <View style={styles.series}>
+                {series.map((item) => (
+                  <AppText key={item.id} variant="caption" color="muted">
+                    {formatWeeklySlot(
+                      item.dayOfWeek,
+                      item.startsAtTime,
+                      item.endsAtTime
+                    )}
+                  </AppText>
+                ))}
+              </View>
+            ) : null}
             <View style={styles.rowActions}>
               <Button
                 title="View teacher"
@@ -187,7 +205,7 @@ export const StudentHome = () => {
                 onPress={() => router.push(`/teachers/${teacher.id}`)}
               />
               <Button
-                title="Book a lesson"
+                title={series.length ? "Add weekly time" : "Choose weekly times"}
                 size="sm"
                 onPress={() => router.navigate("/book")}
               />
@@ -197,7 +215,7 @@ export const StudentHome = () => {
           <EmptyState
             icon="person-add-outline"
             title="No teacher yet"
-            body="Choose an available teacher to request your first lesson. The academy can also help."
+            body="Choose an available teacher and book your first weekly lesson. The academy can also help."
             action={
               <Button
                 title="Find a teacher"
@@ -214,7 +232,7 @@ export const StudentHome = () => {
         <Card>
           <InfoRow
             label="Academy team"
-            value="Reschedules, billing, or account questions"
+            value="Time changes, billing, or account questions"
           />
           <View style={styles.rowActions}>
             <Button
@@ -237,5 +255,6 @@ const styles = StyleSheet.create({
   list: { gap: 10 },
   personRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   personCopy: { flex: 1, gap: 2 },
+  series: { marginTop: 12, gap: 3 },
   rowActions: { flexDirection: "row", gap: 10, marginTop: 14, flexWrap: "wrap" },
 });

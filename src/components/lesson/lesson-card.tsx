@@ -49,10 +49,13 @@ export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => 
             </AppText>
           ) : null}
         </View>
-        <Badge
-          label={lessonStatusLabel[lesson.status]}
-          tone={lessonStatusTone[lesson.status]}
-        />
+        <View style={styles.badges}>
+          {lesson.isTrial ? <Badge label="Trial" tone="info" /> : null}
+          <Badge
+            label={lessonStatusLabel[lesson.status]}
+            tone={lessonStatusTone[lesson.status]}
+          />
+        </View>
       </View>
 
       {perspective === "teacher" && lesson.status !== "cancelled" ? (
@@ -84,6 +87,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   copy: { flex: 1, gap: 2 },
+  badges: { alignItems: "flex-end", gap: 6 },
   title: { marginTop: 1 },
   subtitle: { marginTop: 2 },
   flag: { marginTop: 10 },

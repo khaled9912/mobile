@@ -12,6 +12,7 @@ import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { pastLessons, upcomingLessons } from "@/lib/lesson-selectors";
 import { isReportDue } from "@/lib/status";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 type Filter = "upcoming" | "past" | "all";
@@ -23,7 +24,11 @@ export default function ScheduleTab() {
   const isAdmin = isAdminRole(role);
   const [filter, setFilter] = useState<Filter>("upcoming");
 
-  const lessonsQuery = useQuery({ queryKey: ["lessons"], queryFn: getLessons });
+  const lessonsQuery = useQuery({
+    queryKey: ["lessons"],
+    queryFn: getLessons,
+    refetchInterval: LIVE_SYNC_INTERVAL,
+  });
 
   const list = useMemo(() => {
     const lessons = lessonsQuery.data ?? [];
@@ -31,6 +36,17 @@ export default function ScheduleTab() {
     if (filter === "past") return pastLessons(lessons);
     return [...lessons].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   }, [filter, lessonsQuery.data]);
+
+  // Offer "change time" once per weekly series, on its next lesson.
+  const firstOfSeries = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const lesson of upcomingLessons(lessonsQuery.data ?? [])) {
+      if (lesson.seriesId && !seen.has(lesson.seriesId)) {
+        seen.set(lesson.seriesId, lesson.id);
+      }
+    }
+    return seen;
+  }, [lessonsQuery.data]);
 
   const perspective = isTeacher ? "teacher" : isAdmin ? "admin" : "student";
   const { refreshing, onRefresh } = usePullRefresh(lessonsQuery.refetch);
@@ -50,10 +66,10 @@ export default function ScheduleTab() {
         title="Schedule"
         subtitle={
           isTeacher
-            ? "Every lesson confirmed for you, with reports still to write."
+            ? "Your weekly lessons and the reports still to write."
             : isAdmin
-              ? "All confirmed lessons across the academy."
-              : "Your confirmed lessons and their lesson rooms."
+              ? "All booked lessons across the academy."
+              : "Your weekly lessons and their lesson rooms."
         }
       />
 
@@ -96,6 +112,17 @@ export default function ScheduleTab() {
                     variant="secondary"
                     onPress={() => router.push(`/lesson/${lesson.id}`)}
                   />
+                ) : isStudent &&
+                  lesson.seriesId &&
+                  firstOfSeries.get(lesson.seriesId) === lesson.id ? (
+                  <Button
+                    title="Change weekly time"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() =>
+                      router.push(`/change-time/${lesson.seriesId}`)
+                    }
+                  />
                 ) : undefined
               }
             />
@@ -112,21 +139,21 @@ export default function ScheduleTab() {
             }
             body={
               isStudent
-                ? "Book a lesson with a teacher to get started."
+                ? "Book weekly lessons with a teacher to get started."
                 : isTeacher
-                  ? "Publish availability so students can request a time."
-                  : "Confirmed lessons will appear here."
+                  ? "Publish your weekly availability so students can book."
+                  : "Booked lessons will appear here."
             }
             action={
               isStudent ? (
                 <Button
-                  title="Book a lesson"
+                  title="Book weekly lessons"
                   size="sm"
                   onPress={() => router.navigate("/book")}
                 />
               ) : isTeacher ? (
                 <Button
-                  title="Manage availability"
+                  title="Manage weekly availability"
                   size="sm"
                   onPress={() => router.push("/availability")}
                 />

@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
-import { getAdminLessonApprovals } from "@/api/scheduling";
+import { getAdminChangeRequests } from "@/api/scheduling";
 import { getLessons } from "@/api/lessons";
 import { getStudents, getTeachers } from "@/api/people";
 import { useAuth } from "@/providers/auth-provider";
@@ -13,7 +13,7 @@ import { AppText } from "@/components/ui/app-text";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard } from "@/components/ui/stat-card";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { RequestCard } from "@/components/lesson/request-card";
+import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
@@ -25,9 +25,9 @@ export const AdminHome = () => {
     queryFn: getLessons,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const approvalsQuery = useQuery({
-    queryKey: ["lesson-requests", "pending-admin"],
-    queryFn: getAdminLessonApprovals,
+  const changesQuery = useQuery({
+    queryKey: ["change-requests", "admin", "pending"],
+    queryFn: () => getAdminChangeRequests("pending"),
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const studentsQuery = useQuery({
@@ -40,12 +40,12 @@ export const AdminHome = () => {
   });
 
   const lessons = lessonsQuery.data ?? [];
-  const approvals = approvalsQuery.data ?? [];
+  const changes = changesQuery.data ?? [];
   const upcoming = upcomingLessons(lessons);
   const { refreshing, onRefresh } = usePullRefresh(() =>
     Promise.all([
       lessonsQuery.refetch(),
-      approvalsQuery.refetch(),
+      changesQuery.refetch(),
       studentsQuery.refetch(),
       teachersQuery.refetch(),
     ])
@@ -56,11 +56,11 @@ export const AdminHome = () => {
       <PageHeader
         eyebrow="Academy administration"
         title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-        subtitle="Approve lessons, monitor the schedule, and keep the academy running."
+        subtitle="Review time change requests, monitor the weekly schedule, and keep the academy running."
       />
 
       <View style={styles.stats}>
-        <StatCard label="Awaiting approval" value={approvals.length} />
+        <StatCard label="Changes waiting" value={changes.length} />
         <StatCard label="Upcoming lessons" value={upcoming.length} />
         <StatCard label="Students" value={studentsQuery.data?.length ?? 0} />
         <StatCard label="Teachers" value={teachersQuery.data?.length ?? 0} />
@@ -68,7 +68,7 @@ export const AdminHome = () => {
 
       <View style={styles.section}>
         <SectionHeader
-          title="Approval queue"
+          title="Time change queue"
           action={
             <Button
               title="Open queue"
@@ -78,21 +78,21 @@ export const AdminHome = () => {
             />
           }
         />
-        {approvalsQuery.isLoading ? (
+        {changesQuery.isLoading ? (
           <AppText variant="small" color="muted">
-            Loading approvals…
+            Loading change requests…
           </AppText>
-        ) : approvalsQuery.isError ? (
+        ) : changesQuery.isError ? (
           <ErrorView
-            error={approvalsQuery.error}
-            onRetry={() => void approvalsQuery.refetch()}
+            error={changesQuery.error}
+            onRetry={() => void changesQuery.refetch()}
           />
-        ) : approvals.length ? (
+        ) : changes.length ? (
           <View style={styles.list}>
-            {approvals.slice(0, 3).map((request) => (
-              <RequestCard
-                key={request.id}
-                request={request}
+            {changes.slice(0, 3).map((change) => (
+              <ChangeRequestCard
+                key={change.id}
+                request={change}
                 perspective="admin"
               />
             ))}
@@ -101,7 +101,7 @@ export const AdminHome = () => {
           <EmptyState
             icon="shield-checkmark-outline"
             title="Nothing waiting"
-            body="Requests confirmed by teachers appear here for final approval."
+            body="Students asking to move a weekly lesson appear here. Check the new time with the teacher before approving."
           />
         )}
       </View>
@@ -132,7 +132,7 @@ export const AdminHome = () => {
           <EmptyState
             icon="calendar-outline"
             title="No upcoming lessons"
-            body="Confirmed lessons will appear in the academy schedule."
+            body="Booked weekly lessons will appear in the academy schedule."
           />
         )}
       </View>

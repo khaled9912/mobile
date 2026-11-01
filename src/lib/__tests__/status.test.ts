@@ -5,7 +5,6 @@ import {
   isReportDue,
   lessonStatusLabel,
   progressLabel,
-  requestStatusLabel,
 } from "../status";
 
 const lesson = (overrides: Partial<Lesson>): Lesson => ({
@@ -21,6 +20,8 @@ const lesson = (overrides: Partial<Lesson>): Lesson => ({
   actualEndedAt: null,
   report: null,
   review: null,
+  seriesId: null,
+  isTrial: false,
   ...overrides,
 });
 
@@ -77,8 +78,7 @@ describe("lesson status helpers", () => {
 });
 
 describe("status labels", () => {
-  it("maps request and lesson statuses", () => {
-    expect(requestStatusLabel.pending_admin).toBe("Awaiting academy");
+  it("maps lesson statuses and progress", () => {
     expect(lessonStatusLabel.in_progress).toBe("Live now");
     expect(progressLabel.needs_attention).toBe("Needs attention");
   });

@@ -40,9 +40,9 @@ const ALL_TABS: TabDef[] = [
   {
     key: "requests",
     route: "/requests",
-    label: "Requests",
-    icon: "mail-outline",
-    activeIcon: "mail",
+    label: "Changes",
+    icon: "swap-horizontal-outline",
+    activeIcon: "swap-horizontal",
   },
   {
     key: "schedule",
@@ -79,8 +79,9 @@ const sectionTab = (
       return "home";
     case "lesson":
     case "availability":
-    case "student-availability":
       return "schedule";
+    case "change-time":
+      return "requests";
     case "profile":
     case "contact":
       return "profile";
@@ -99,17 +100,14 @@ export const PersistentTabBar = () => {
   const segments: string[] = useSegments();
 
   const isStudent = role === "student";
-  const isTeacher = role === "teacher";
   const isAdmin = isAdminRole(role);
 
   const tabs = ALL_TABS.filter((tab) => {
     if (tab.key === "book") return isStudent;
-    if (tab.key === "requests") return isTeacher || isAdmin;
+    if (tab.key === "requests") return isStudent || isAdmin;
     if (tab.key === "people") return isAdmin;
     return true;
-  }).map((tab) =>
-    tab.key === "requests" && isAdmin ? { ...tab, label: "Approvals" } : tab
-  );
+  });
 
   const tabSegment = segments[1] === "(tabs)" ? (segments[2] ?? "index") : null;
   const activeTab: TabKey =

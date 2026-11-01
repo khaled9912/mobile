@@ -1,22 +1,20 @@
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
-import {
-  getIncomingLessonRequests,
-  getMyAvailability,
-} from "@/api/scheduling";
+import { getMyAvailabilityRules } from "@/api/scheduling";
 import { getLessons } from "@/api/lessons";
 import { useAuth } from "@/providers/auth-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { AppText } from "@/components/ui/app-text";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard } from "@/components/ui/stat-card";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { RequestCard } from "@/components/lesson/request-card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import { formatWeeklySlot } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { isReportDue } from "@/lib/status";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
@@ -28,37 +26,21 @@ export const TeacherHome = () => {
     queryFn: getLessons,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const requestsQuery = useQuery({
-    queryKey: ["lesson-requests", "teacher"],
-    queryFn: getIncomingLessonRequests,
+  const rulesQuery = useQuery({
+    queryKey: ["availability-rules", "teacher"],
+    queryFn: getMyAvailabilityRules,
     refetchInterval: LIVE_SYNC_INTERVAL,
-  });
-  const availabilityQuery = useQuery({
-    queryKey: ["availability", "teacher"],
-    queryFn: getMyAvailability,
   });
 
   const lessons = lessonsQuery.data ?? [];
-  const requests = requestsQuery.data ?? [];
-  const slots = availabilityQuery.data ?? [];
+  const rules = rulesQuery.data ?? [];
   const upcoming = upcomingLessons(lessons);
-  const pending = requests.filter(
-    (request) => request.status === "pending_teacher"
-  );
+  const booked = rules.filter((rule) => rule.status === "booked").length;
   const reportsDue = lessons
     .filter(isReportDue)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const openSlots = slots.filter(
-    (slot) =>
-      slot.status === "available" &&
-      new Date(slot.startsAt).getTime() > availabilityQuery.dataUpdatedAt
-  );
   const { refreshing, onRefresh } = usePullRefresh(() =>
-    Promise.all([
-      lessonsQuery.refetch(),
-      requestsQuery.refetch(),
-      availabilityQuery.refetch(),
-    ])
+    Promise.all([lessonsQuery.refetch(), rulesQuery.refetch()])
   );
 
   return (
@@ -66,14 +48,14 @@ export const TeacherHome = () => {
       <PageHeader
         eyebrow="Teacher portal"
         title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-        subtitle="Your teaching day, pending requests, and lesson reports."
+        subtitle="Your teaching week, weekly availability, and lesson reports."
       />
 
       <View style={styles.stats}>
         <StatCard label="Upcoming lessons" value={upcoming.length} />
-        <StatCard label="Requests" value={pending.length} />
+        <StatCard label="Weekly slots" value={rules.length} />
+        <StatCard label="Booked slots" value={booked} />
         <StatCard label="Reports due" value={reportsDue.length} />
-        <StatCard label="Open slots" value={openSlots.length} />
       </View>
 
       <View style={styles.section}>
@@ -118,10 +100,10 @@ export const TeacherHome = () => {
           <EmptyState
             icon="calendar-outline"
             title="No upcoming lessons"
-            body="Publish availability so students can request a time."
+            body="Announce your weekly times so students can book them."
             action={
               <Button
-                title="Manage availability"
+                title="Manage weekly availability"
                 size="sm"
                 onPress={() => router.push("/availability")}
               />
@@ -171,50 +153,68 @@ export const TeacherHome = () => {
 
       <View style={styles.section}>
         <SectionHeader
-          title="Lesson requests"
+          title="Your weekly times"
           action={
             <Button
-              title="Review all"
+              title="Manage"
               variant="ghost"
               size="sm"
-              onPress={() => router.navigate("/requests")}
+              onPress={() => router.push("/availability")}
             />
           }
         />
-        {requestsQuery.isLoading ? (
+        {rulesQuery.isLoading ? (
           <AppText variant="small" color="muted">
-            Loading requests…
+            Loading your weekly times…
           </AppText>
-        ) : pending.length ? (
+        ) : rules.length ? (
           <View style={styles.list}>
-            {pending.slice(0, 2).map((request) => (
-              <RequestCard
-                key={request.id}
-                request={request}
-                perspective="teacher"
-              />
+            {rules.slice(0, 4).map((rule) => (
+              <Card key={rule.id}>
+                <View style={styles.ruleRow}>
+                  <View style={styles.rulecopy}>
+                    <AppText variant="label">
+                      {formatWeeklySlot(
+                        rule.dayOfWeek,
+                        rule.startsAtTime,
+                        rule.endsAtTime
+                      )}
+                    </AppText>
+                    <AppText variant="caption" color="muted">
+                      {rule.status === "booked"
+                        ? "Booked by a student"
+                        : "Open for students"}
+                    </AppText>
+                  </View>
+                  <Badge
+                    label={rule.status === "booked" ? "Booked" : "Open"}
+                    tone={rule.status === "booked" ? "success" : "neutral"}
+                  />
+                </View>
+              </Card>
             ))}
           </View>
         ) : (
           <EmptyState
-            icon="mail-open-outline"
-            title="No pending requests"
-            body="New student requests will appear here for you to confirm."
+            icon="time-outline"
+            title="No weekly times yet"
+            body="Publish the days and hours you teach. Students book any open time and it repeats every week."
+            action={
+              <Button
+                title="Publish weekly availability"
+                size="sm"
+                onPress={() => router.push("/availability")}
+              />
+            }
           />
         )}
       </View>
 
       <View style={styles.quickLinks}>
         <Card onPress={() => router.push("/availability")}>
-          <AppText variant="h3">Manage availability</AppText>
+          <AppText variant="h3">Manage weekly availability</AppText>
           <AppText variant="small" color="muted" style={styles.linkBody}>
-            Publish open lesson times for students to request.
-          </AppText>
-        </Card>
-        <Card onPress={() => router.push("/student-availability")}>
-          <AppText variant="h3">Student preferences</AppText>
-          <AppText variant="small" color="muted" style={styles.linkBody}>
-            See times students have offered and propose a lesson.
+            Announce the days and times students can book every week.
           </AppText>
         </Card>
       </View>
@@ -234,6 +234,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   reportCopy: { flex: 1, gap: 2 },
+  ruleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  rulecopy: { flex: 1, gap: 2 },
   quickLinks: { marginTop: 26, gap: 12 },
   linkBody: { marginTop: 4 },
 });

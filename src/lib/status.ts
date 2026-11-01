@@ -1,31 +1,6 @@
-import type {
-  Lesson,
-  LessonProgress,
-  LessonRequestStatus,
-  LessonStatus,
-} from "@/api/types";
-
-export const requestStatusLabel: Record<LessonRequestStatus, string> = {
-  pending_teacher: "Awaiting teacher",
-  pending_student: "Needs your reply",
-  pending_admin: "Awaiting academy",
-  approved: "Approved",
-  rejected: "Declined",
-  cancelled: "Cancelled",
-  expired: "Expired",
-};
+import type { Lesson, LessonProgress, LessonStatus } from "@/api/types";
 
 export type Tone = "neutral" | "info" | "success" | "warning" | "danger";
-
-export const requestStatusTone: Record<LessonRequestStatus, Tone> = {
-  pending_teacher: "info",
-  pending_student: "warning",
-  pending_admin: "info",
-  approved: "success",
-  rejected: "danger",
-  cancelled: "neutral",
-  expired: "neutral",
-};
 
 export const lessonStatusLabel: Record<LessonStatus, string> = {
   scheduled: "Scheduled",

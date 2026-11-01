@@ -6,7 +6,6 @@ const TabLayout = () => {
   const { colors } = useTheme();
   const { role } = useAuth();
   const isStudent = role === "student";
-  const isTeacher = role === "teacher";
   const isAdmin = isAdminRole(role);
 
   // The visible bar lives in (app)/_layout so it also covers stack screens.
@@ -25,7 +24,7 @@ const TabLayout = () => {
       />
       <Tabs.Screen
         name="requests"
-        options={{ href: isTeacher || isAdmin ? undefined : null }}
+        options={{ href: isStudent || isAdmin ? undefined : null }}
       />
       <Tabs.Screen name="schedule" />
       <Tabs.Screen name="people" options={{ href: isAdmin ? undefined : null }} />

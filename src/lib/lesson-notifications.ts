@@ -14,7 +14,7 @@ const ensureChannel = async () => {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(LESSON_CHANNEL_ID, {
     name: "Lesson reminders",
-    description: "A reminder five minutes before each lesson",
+    description: "Reminders five minutes before each lesson and at its start",
     importance: AndroidImportance.HIGH,
     sound: "default",
     vibrationPattern: [0, 250, 250, 250],
@@ -67,7 +67,7 @@ const runSync = async (reminders: LessonReminder[]) => {
     for (const reminder of reminders) {
       try {
         await Notifications.scheduleNotificationAsync({
-          identifier: `${IDENTIFIER_PREFIX}${reminder.lessonId}`,
+          identifier: `${IDENTIFIER_PREFIX}${reminder.lessonId}:${reminder.kind}`,
           content: {
             title: reminder.title,
             body: reminder.body,

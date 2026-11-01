@@ -30,9 +30,9 @@ const openLesson = (lessonId: string) => {
 };
 
 /**
- * Keeps one local notification per upcoming lesson on this device, five
- * minutes before the start. Students, teachers, and admins each see the
- * lessons the API returns for their own account.
+ * Keeps two local notifications per upcoming lesson on this device: five
+ * minutes before the start and again at the start. Students, teachers, and
+ * admins each see the lessons the API returns for their own account.
  */
 export const LessonReminderProvider = ({ children }: { children: ReactNode }) => {
   const { user, status } = useAuth();

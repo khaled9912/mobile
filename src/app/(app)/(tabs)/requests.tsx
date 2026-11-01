@@ -1,7 +1,6 @@
-import { useAuth } from "@/providers/auth-provider";
-import { StudentRequests } from "@/features/requests/student-requests";
-import { TeacherRequests } from "@/features/requests/teacher-requests";
-import { AdminApprovals } from "@/features/requests/admin-approvals";
+import { useAuth, isAdminRole } from "@/providers/auth-provider";
+import { StudentChangeRequests } from "@/features/requests/student-change-requests";
+import { AdminChangeQueue } from "@/features/requests/admin-change-queue";
 import { Screen } from "@/components/ui/screen";
 import { LoadingView } from "@/components/ui/states";
 
@@ -15,7 +14,12 @@ export default function RequestsTab() {
       </Screen>
     );
   }
-  if (role === "teacher") return <TeacherRequests />;
-  if (role === "admin" || role === "super_admin") return <AdminApprovals />;
-  return <StudentRequests />;
+  if (isAdminRole(role)) return <AdminChangeQueue />;
+  if (role === "student") return <StudentChangeRequests />;
+
+  return (
+    <Screen>
+      <LoadingView />
+    </Screen>
+  );
 }

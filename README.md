@@ -101,7 +101,7 @@ src/
       ...
   api/                 Typed API client and DTOs (the only network layer)
   components/          UI primitives, lesson components, auth shell
-  features/            Role dashboards and request list features
+  features/            Role dashboards and change-request list features
   hooks/               use-online-status
   lib/                 Formatting, status logic, selectors, validation, storage, query client
   providers/           Auth, theme, and lesson-reminder providers
@@ -119,7 +119,7 @@ Navigation rules:
   marketing page and makes no API calls. Signed-out users can reopen it from
   the **About Ana Quran** link on the login screen.
 - Tab visibility is role-aware: Book is student-only, Requests is
-  teacher/admin-only, People is admin-only.
+  student/admin-only (weekly time changes), People is admin-only.
 - Pushed screens use the native stack header and back gesture. Screens under an
   existing header pass `edges={["left", "right"]}` to avoid a double top inset.
 
@@ -133,13 +133,13 @@ Navigation rules:
 | Password recovery | `(auth)/forgot-password` |
 | Student portal dashboard | `(app)/(tabs)/index` |
 | Teacher search / course browsing equivalent | `(app)/(tabs)/book` → `(app)/teachers/[id]` |
-| Enrollment equivalent (lesson request) | Teacher profile → Request |
+| Enrollment equivalent (instant weekly booking) | Teacher profile → pick weekly times |
 | Schedule / upcoming sessions | `(app)/(tabs)/schedule` |
 | Live classroom | `(app)/lesson/[id]` |
 | Lesson reports | `(app)/profile/reports` + report form in lesson |
-| Teacher availability | `(app)/availability` |
-| Student-offered times (teacher view) | `(app)/student-availability` |
-| Request approvals | `(app)/(tabs)/requests` |
+| Teacher weekly availability | `(app)/availability` |
+| Student weekly time change | `(app)/change-time/[seriesId]` (from Home or Requests) |
+| Admin time-change queue | `(app)/(tabs)/requests` |
 | Admin dashboard | `(app)/(tabs)/index` (admin variant) |
 | Admin students/teachers/assignments | `(app)/(tabs)/people`, `people/new`, `people/assign` |
 | Contact form | `(app)/contact` |
@@ -152,12 +152,11 @@ Navigation rules:
 | --- | --- | --- | --- |
 | Home | ✓ | ✓ | ✓ |
 | Book | ✓ | — | — |
-| Requests | — | ✓ | ✓ (Approvals) |
+| Requests | ✓ (mine) | — | ✓ (queue) |
 | Schedule | ✓ | ✓ | ✓ |
 | People | — | — | ✓ |
 | Profile | ✓ | ✓ | ✓ |
 | Availability | — | ✓ | — |
-| Student preferences | — | ✓ | — |
 | Contact messages | — | — | ✓ |
 
 The API enforces these roles independently; hidden tabs are not the security
@@ -231,10 +230,9 @@ Everything else is a full list filtered client-side.
 The app loads `https://{JITSI_DOMAIN}/external_api.js` in a WebView and joins
 the room `rayan-academy-{lessonId}`.
 
-- The teacher sees the join gate first; joining starts a 15-second heartbeat to
-  `POST /api/lessons/{id}/presence`. The server expires presence after 45 s.
-- Students poll `GET /api/lessons/{id}/presence` every 5 s and only get the join
-  button after the teacher is present. A "Check now" action is available.
+- The join button unlocks at `startsAt` for every participant; before then the
+  screen shows a countdown and the room stays closed. There is no presence check,
+  so neither side waits for the other to arrive.
 - Join modes: camera + microphone, microphone only, or watch/listen only.
   Camera and microphone permissions are requested with the native prompts
   declared in `app.config.ts`.
@@ -247,21 +245,21 @@ Known Jitsi limitations in this client:
 - Screen sharing is not available inside the native WebView; the toolbar is
   limited to microphone, camera, chat, and hangup. Whiteboard, polls,
   reactions, and virtual backgrounds are disabled.
-- The room is unlisted but not authenticated. The teacher-presence gate is an
+- The room is unlisted but not authenticated. The start-time gate is an
   application rule, not a Jitsi security boundary.
 - `meet.jit.si` limits calls to about 95 minutes and is shared infrastructure.
   Production should point `EXPO_PUBLIC_JITSI_DOMAIN` at a self-hosted Jitsi
   deployment (see the repository deployment notes).
 - The Jitsi UI is English-only and unbranded by request.
-- Media does not pass through the ASP.NET API; only presence and lesson data do.
+- Media does not pass through the ASP.NET API; only lesson data does.
 
 ---
 
 ## Lesson reminders
 
-`src/providers/lesson-reminder-provider.tsx` schedules one local notification
-per upcoming lesson, five minutes before `startsAt`, for whichever account is
-signed in on the device:
+`src/providers/lesson-reminder-provider.tsx` schedules two local notifications
+per upcoming lesson — five minutes before `startsAt` and again at `startsAt` —
+for whichever account is signed in on the device:
 
 - The source is the existing `GET /api/lessons`: students and teachers see their
   own lessons, admins see every lesson, so each role is reminded without a new
@@ -272,7 +270,8 @@ signed in on the device:
   `lesson-reminders`; declare `SCHEDULE_EXACT_ALARM` if exact delivery matters
   (the app already does).
 - Tapping a reminder opens `/lesson/{id}`.
-- At most 60 reminders are pending (iOS caps pending notifications at 64).
+- At most 60 reminders are pending across both kinds (iOS caps pending
+  notifications at 64).
   Sign-out cancels every pending lesson reminder.
 - Delivery is per device and needs that account to have opened the app at least
   once since the lesson was booked. There is no server push — the API has no
@@ -288,8 +287,9 @@ visible on every internal screen (teacher profile, availability, settings,
 forms) instead of only on the five tab roots. The Expo Router tab bar is hidden;
 the stack keeps its native headers and swipe-back gestures.
 
-- Tabs are role-filtered: Home, Book (`student`), Requests (`teacher`, labelled
-  Approvals for admins), Schedule, People (`admin`), Profile.
+- Tabs are role-filtered: Home, Book (`student`), Requests (students see their
+own time changes, admins see the queue), Schedule, People (`admin`), Profile.
+  Teachers have no request screen at all.
 - Screens inside a section keep their tab highlighted via `sectionTab()`
   (e.g. `/teachers/[id]` highlights Book, `/profile/edit` highlights Profile).
 - Fullscreen lesson rooms hide the bar; the offline banner offsets itself by
@@ -302,16 +302,16 @@ can change:
 
 - `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
   reminders all update together) and `["lessons", id]` in the lesson room.
-- `["lesson-requests", …]` for student, teacher and admin approval lists,
-  including the teacher directory page.
-- `["availability","teacher"]` and `["student-availability","teacher"]` so
-  bookings and new student preferences disappear or appear without a refresh.
+- `["change-requests", …]` for the student's own requests and the admin queue.
+- `["teacher-directory"]`, `["assigned-teacher"]`, `["series"]` and
+  `["availability-rules","teacher"]` so a booking, a published rule, or an
+  admin change appears for the other role without a refresh.
 
 Polling pauses automatically when the app is backgrounded (TanStack Query's
 focus manager) and resumes on return. Pull-to-refresh uses
 `src/hooks/use-pull-refresh.ts` instead of `isFetching`, so a background poll
-never flashes the refresh spinner. An approval therefore reaches the other role
-within about a minute, or immediately on pull-to-refresh. Instant delivery
+never flashes the refresh spinner. A booking or an approved change therefore
+reaches the other role within about a minute, or immediately on pull-to-refresh. Instant delivery
 would need a server-side push/SSE channel, which is out of scope while the API
 stays unchanged.
 
@@ -446,12 +446,12 @@ Manual device QA still matters because unit tests do not exercise native UI:
    Quran** on the login screen.
 2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
-3. Student: browse teachers, request a slot, open the waiting screen, join
-   after the teacher appears, submit a review after the lesson ends.
-4. Teacher: publish a slot, confirm a request, start the room, submit a report
-   after the end time.
-5. Admin: approve a request, create/deactivate/reactivate an account, assign a
-   teacher, read contact messages.
+3. Student: browse teachers, book one or more weekly times, request a time
+   change, join the room at the start time, submit a review after the lesson.
+4. Teacher: announce weekly rules, start the room, submit a report after the end
+   time.
+5. Admin: approve or decline a time-change request, create/deactivate/reactivate
+   an account, assign a teacher, read contact messages.
 6. Toggle light/dark/system, test large text, offline mode, and a small phone.
 7. Accept the notification prompt, book a lesson that starts in more than five
    minutes, background the app, and confirm the reminder fires five minutes
@@ -467,11 +467,11 @@ No automated end-to-end suite is committed.
   to each device (see above); the API has no push endpoint.
 - Course/program catalog, enrollment, payments, or billing.
 - In-app chat outside the Jitsi room.
-- Attendance history (only live teacher presence exists).
+- Attendance history (no endpoint exists).
 - Group classes (lessons are one teacher and one student).
 - Mobile lesson rescheduling/cancellation; those remain web-only.
-- Student self-service availability and admin-on-behalf availability; the API
-  supports both, but mobile has no screen for them.
+- Admin-on-behalf weekly rules and one-off slot management; the API supports
+  both, but mobile keeps them web-only.
 - Editing another user's name, email, or password from the admin screens;
   mobile only activates/deactivates accounts.
 

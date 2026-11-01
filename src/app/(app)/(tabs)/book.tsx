@@ -2,54 +2,64 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import {
-  getAssignedTeacherAvailability,
-  getMyLessonRequests,
+  getAssignedWeeklyAvailability,
+  getMyChangeRequests,
   getTeacherDirectory,
 } from "@/api/scheduling";
 import { useAuth } from "@/providers/auth-provider";
+import { useTheme } from "@/providers/theme-provider";
 import { Screen } from "@/components/ui/screen";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
-import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
-import { openRequests } from "@/lib/lesson-selectors";
+import { formatWeeklyTimeRange, WEEKDAY_SHORT } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
+const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
+
 export default function BookScreen() {
   const { role } = useAuth();
+  const { colors, radius } = useTheme();
   const directoryQuery = useQuery({
     queryKey: ["teacher-directory"],
     queryFn: getTeacherDirectory,
-    enabled: role === "student",
-  });
-  const requestsQuery = useQuery({
-    queryKey: ["lesson-requests", "student"],
-    queryFn: getMyLessonRequests,
     enabled: role === "student",
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const assignedQuery = useQuery({
     queryKey: ["assigned-teacher"],
-    queryFn: getAssignedTeacherAvailability,
+    queryFn: getAssignedWeeklyAvailability,
+    enabled: role === "student",
+    refetchInterval: LIVE_SYNC_INTERVAL,
+  });
+  const changesQuery = useQuery({
+    queryKey: ["change-requests", "student"],
+    queryFn: getMyChangeRequests,
     enabled: role === "student",
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   const teachers = directoryQuery.data ?? [];
-  const open = openRequests(requestsQuery.data ?? []);
-  const assignedId = assignedQuery.data?.teacher?.id ?? null;
+  const assigned = assignedQuery.data;
+  const assignedTeacher = assigned?.teacher ?? null;
+  const series = assigned?.series ?? [];
+  const pendingChanges = (changesQuery.data ?? []).filter(
+    (change) => change.status === "pending"
+  );
+  const pendingChange = pendingChanges[0];
   const { refreshing, onRefresh } = usePullRefresh(() =>
     Promise.all([
       directoryQuery.refetch(),
-      requestsQuery.refetch(),
       assignedQuery.refetch(),
+      changesQuery.refetch(),
     ])
   );
 
@@ -58,100 +68,214 @@ export default function BookScreen() {
       <Screen refreshing={refreshing} onRefresh={onRefresh}>
         <PageHeader
           eyebrow="Student portal"
-          title="Choose your teacher"
-          subtitle="Pick a teacher and an open time. Your teacher confirms first, then the academy approves the lesson."
+          title="Book your weekly lessons"
+          subtitle="Pick any weekly times that suit you. Once booked, the time is yours every week — no approval needed."
         />
 
-        {open.length ? (
+        {pendingChange ? (
           <View style={styles.block}>
             <Notice
               tone="warning"
-              title="Request already in progress"
-              message={`You have a lesson request awaiting approval for ${formatDateTime(open[0].startsAt)}. You can request another lesson once this one is resolved.`}
+              title="Time change awaiting review"
+              message="The academy is checking your requested time with the teacher. Your current weekly time stays booked until they respond."
             />
           </View>
         ) : null}
 
-        {directoryQuery.isLoading || requestsQuery.isLoading ? (
-          <LoadingView label="Loading teacher profiles…" />
-        ) : directoryQuery.isError ? (
-          <ErrorView
-            error={directoryQuery.error}
-            onRetry={() => void directoryQuery.refetch()}
-          />
-        ) : teachers.length ? (
-          <View style={styles.list}>
-            {teachers.map((entry) => {
-              const nextSlot = entry.slots[0];
-              return (
-                <Card
-                  key={entry.teacher.id}
-                  onPress={() => router.push(`/teachers/${entry.teacher.id}`)}
-                  accessibilityLabel={`Open ${entry.teacher.fullName}'s profile`}
-                >
-                  <View style={styles.row}>
-                    <Avatar
-                      name={entry.teacher.fullName}
-                      avatarUrl={entry.teacher.avatarUrl}
-                      size={52}
+        {assignedTeacher ? (
+          <View style={styles.assigned}>
+            <SectionHeader title="Your teacher" />
+            <Card
+              onPress={() =>
+                router.push(`/teachers/${assignedTeacher.id}`)
+              }
+              accessibilityLabel={`Open ${assignedTeacher.fullName}'s profile`}
+            >
+              <View style={styles.row}>
+                <Avatar
+                  name={assignedTeacher.fullName}
+                  avatarUrl={assignedTeacher.avatarUrl}
+                  size={52}
+                />
+                <View style={styles.copy}>
+                  <AppText variant="h3">{assignedTeacher.fullName}</AppText>
+                  {assigned && assigned.averageRating != null ? (
+                    <StarRating
+                      value={assigned.averageRating}
+                      size={13}
+                      showValue
                     />
-                    <View style={styles.copy}>
-                      <View style={styles.nameRow}>
-                        <AppText variant="h3">
-                          {entry.teacher.fullName}
-                        </AppText>
-                        {entry.teacher.id === assignedId ? (
-                          <Badge label="Your teacher" tone="success" />
-                        ) : null}
-                      </View>
-                      <View style={styles.ratingRow}>
-                        {entry.reviewCount > 0 &&
-                        entry.averageRating != null ? (
-                          <>
-                            <StarRating
-                              value={entry.averageRating}
-                              size={13}
-                              showValue
-                            />
-                            <AppText variant="caption" color="muted">
-                              ({entry.reviewCount})
-                            </AppText>
-                          </>
-                        ) : (
-                          <AppText variant="caption" color="muted">
-                            New teacher
-                          </AppText>
-                        )}
-                      </View>
-                      <AppText variant="caption" color="muted">
-                        {entry.slots.length
-                          ? `${entry.slots.length} open time${entry.slots.length === 1 ? "" : "s"}`
-                          : "No open times right now"}
-                      </AppText>
-                    </View>
-                  </View>
-                  {nextSlot ? (
-                    <View style={styles.nextSlot}>
-                      <AppText variant="caption" color="muted">
-                        Next available
-                      </AppText>
-                      <AppText variant="small" weight="600">
-                        {relativeDay(nextSlot.startsAt)} ·{" "}
-                        {formatTimeRange(nextSlot.startsAt, nextSlot.endsAt)}
-                      </AppText>
-                    </View>
                   ) : null}
-                </Card>
-              );
-            })}
+                  <AppText variant="caption" color="muted">
+                    {series.length
+                      ? `${series.length} weekly time${
+                          series.length === 1 ? "" : "s"
+                        } booked`
+                      : "No weekly time booked yet"}
+                  </AppText>
+                </View>
+              </View>
+            </Card>
+
+            {series.length ? (
+              <View style={styles.series}>
+                {series.map((item) => (
+                  <Card key={item.id}>
+                    <View style={styles.row}>
+                      <View
+                        style={[
+                          styles.dayChip,
+                          { backgroundColor: colors.brandSoft, borderRadius: radius.md },
+                        ]}
+                      >
+                        <AppText variant="caption" weight="700" color="link">
+                          {WEEKDAY_SHORT[item.dayOfWeek]}
+                        </AppText>
+                      </View>
+                      <View style={styles.copy}>
+                        <AppText variant="body" weight="600">
+                          {formatWeeklyTimeRange(
+                            item.startsAtTime,
+                            item.endsAtTime
+                          )}
+                        </AppText>
+                        <AppText variant="caption" color="muted">
+                          Repeats every {WEEKDAY_SHORT[item.dayOfWeek]} ·{" "}
+                          {item.timeZoneId.replace(/_/g, " ")}
+                        </AppText>
+                      </View>
+                      <Button
+                        title="Change"
+                        size="sm"
+                        variant="secondary"
+                        disabled={pendingChanges.some(
+                          (change) => change.seriesId === item.id
+                        )}
+                        onPress={() => router.push(`/change-time/${item.id}`)}
+                      />
+                    </View>
+                  </Card>
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="calendar-outline"
+                title="No weekly time yet"
+                body={`Open ${assignedTeacher.fullName}'s profile, then pick the weekly times that suit you.`}
+                action={
+                  <Button
+                    title="Choose weekly times"
+                    size="sm"
+                    onPress={() =>
+                      router.push(`/teachers/${assignedTeacher.id}`)
+                    }
+                  />
+                }
+              />
+            )}
+            {series.length ? (
+              <Button
+                title="Add another weekly time"
+                size="sm"
+                variant="secondary"
+                onPress={() => router.push(`/teachers/${assignedTeacher.id}`)}
+              />
+            ) : null}
           </View>
-        ) : (
-          <EmptyState
-            icon="people-outline"
-            title="No teachers are listed"
-            body="No teacher is accepting lesson requests right now. Please contact the academy."
+        ) : null}
+
+        <View style={styles.directory}>
+          <SectionHeader
+            title={assignedTeacher ? "Other teachers" : "Choose your teacher"}
           />
-        )}
+          {directoryQuery.isLoading || assignedQuery.isLoading ? (
+            <LoadingView label="Loading teacher profiles…" />
+          ) : directoryQuery.isError ? (
+            <ErrorView
+              error={directoryQuery.error}
+              onRetry={() => void directoryQuery.refetch()}
+            />
+          ) : teachers.length ? (
+            <View style={styles.list}>
+              {teachers.map((entry) => {
+                const open = entry.slots.filter(
+                  (slot) => slot.status === "available"
+                );
+                const days = DAY_ORDER.filter((day) =>
+                  open.some((slot) => slot.dayOfWeek === day)
+                );
+                return (
+                  <Card
+                    key={entry.teacher.id}
+                    onPress={() => router.push(`/teachers/${entry.teacher.id}`)}
+                    accessibilityLabel={`Open ${entry.teacher.fullName}'s profile`}
+                  >
+                    <View style={styles.row}>
+                      <Avatar
+                        name={entry.teacher.fullName}
+                        avatarUrl={entry.teacher.avatarUrl}
+                        size={52}
+                      />
+                      <View style={styles.copy}>
+                        <View style={styles.nameRow}>
+                          <AppText variant="h3">
+                            {entry.teacher.fullName}
+                          </AppText>
+                          {entry.teacher.id === assignedTeacher?.id ? (
+                            <Badge label="Your teacher" tone="success" />
+                          ) : null}
+                        </View>
+                        <View style={styles.ratingRow}>
+                          {entry.reviewCount > 0 &&
+                          entry.averageRating != null ? (
+                            <>
+                              <StarRating
+                                value={entry.averageRating}
+                                size={13}
+                                showValue
+                              />
+                              <AppText variant="caption" color="muted">
+                                ({entry.reviewCount})
+                              </AppText>
+                            </>
+                          ) : (
+                            <AppText variant="caption" color="muted">
+                              New teacher
+                            </AppText>
+                          )}
+                        </View>
+                        <AppText variant="caption" color="muted">
+                          {open.length
+                            ? `${open.length} weekly time${
+                                open.length === 1 ? "" : "s"
+                              } available`
+                            : "No weekly times right now"}
+                        </AppText>
+                      </View>
+                    </View>
+                    {days.length ? (
+                      <View style={styles.days}>
+                        {days.map((day) => (
+                          <Badge
+                            key={day}
+                            label={WEEKDAY_SHORT[day]}
+                            tone="neutral"
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </View>
+          ) : (
+            <EmptyState
+              icon="people-outline"
+              title="No teachers are listed"
+              body="No teacher has announced weekly times yet. Please check back soon."
+            />
+          )}
+        </View>
       </Screen>
     </RoleGate>
   );
@@ -159,6 +283,9 @@ export default function BookScreen() {
 
 const styles = StyleSheet.create({
   block: { marginBottom: 16 },
+  assigned: { marginTop: 22, gap: 12 },
+  series: { gap: 10 },
+  directory: { marginTop: 28, gap: 12 },
   list: { gap: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: 14 },
   copy: { flex: 1, gap: 3 },
@@ -169,5 +296,11 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   ratingRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  nextSlot: { marginTop: 14, gap: 2 },
+  days: { flexDirection: "row", gap: 6, marginTop: 12, flexWrap: "wrap" },
+  dayChip: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

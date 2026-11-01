@@ -38,8 +38,8 @@ const AppLayout = () => {
             options={{ title: "My availability" }}
           />
           <Stack.Screen
-            name="student-availability"
-            options={{ title: "Student availability" }}
+            name="change-time/[seriesId]"
+            options={{ title: "Change weekly time" }}
           />
           <Stack.Screen name="profile/edit" options={{ title: "Edit profile" }} />
           <Stack.Screen

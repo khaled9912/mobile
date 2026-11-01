@@ -44,6 +44,71 @@ export const formatTime = (value: string) => {
 export const formatTimeRange = (startsAt: string, endsAt: string) =>
   `${formatTime(startsAt)} – ${formatTime(endsAt)}`;
 
+export const WEEKDAY_LABELS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export const WEEKDAY_SHORT = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
+
+export const weekdayLabel = (dayOfWeek: number) =>
+  WEEKDAY_LABELS[dayOfWeek] ?? "";
+
+/** Formats a weekly "HH:mm" value without inventing a date. */
+export const formatTimeOfDay = (value: string) => {
+  const [hours, minutes] = value.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "—";
+  return dateTimeFormatter(timeOptions).format(
+    new Date(2000, 0, 1, hours, minutes)
+  );
+};
+
+export const formatWeeklyTimeRange = (
+  startsAtTime: string,
+  endsAtTime: string
+) => `${formatTimeOfDay(startsAtTime)} – ${formatTimeOfDay(endsAtTime)}`;
+
+export const formatWeeklySlot = (
+  dayOfWeek: number,
+  startsAtTime: string,
+  endsAtTime: string
+) =>
+  `${weekdayLabel(dayOfWeek)} · ${formatWeeklyTimeRange(
+    startsAtTime,
+    endsAtTime
+  )}`;
+
+/** A Date carrying only the time of day, for native time pickers. */
+export const dateFromTimeOfDay = (value: string, fallback = "17:00") => {
+  const [hours, minutes] = (value || fallback).split(":").map(Number);
+  const date = new Date();
+  date.setHours(
+    Number.isFinite(hours) ? hours : 17,
+    Number.isFinite(minutes) ? minutes : 0,
+    0,
+    0
+  );
+  return date;
+};
+
+export const timeOfDayFromDate = (date: Date) =>
+  `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes()
+  ).padStart(2, "0")}`;
+
 export const formatDayLabel = (value: string) => {
   const date = parseDate(value);
   if (Number.isNaN(date.getTime())) return "—";

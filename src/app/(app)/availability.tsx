@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { ApiError } from "@/api/client";
 import {
-  deleteAvailability,
-  getMyAvailability,
-  publishAvailability,
+  deleteWeeklyAvailability,
+  getMyAvailabilityRules,
+  publishWeeklyAvailability,
 } from "@/api/scheduling";
-import type { AvailabilitySlotStatus } from "@/api/types";
+import type { WeeklyRule } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
@@ -16,193 +16,188 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DateTimeField } from "@/components/ui/date-time-field";
 import { Notice } from "@/components/ui/notice";
+import { TimeOfDayField } from "@/components/ui/time-of-day-field";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { RoleGate } from "@/components/ui/role-gate";
 import {
-  formatDateTime,
-  formatLongDate,
-  formatTimeRange,
-  relativeDay,
+  WEEKDAY_SHORT,
+  dateFromTimeOfDay,
+  formatWeeklyTimeRange,
+  timeOfDayFromDate,
+  weekdayLabel,
 } from "@/lib/format";
-import type { Tone } from "@/lib/status";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
+const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
+const DEFAULT_DAYS = [6, 0, 1, 2, 3, 4];
 const MAX_SLOT_MINUTES = 240;
 
-const durations = [30, 45, 60, 90, 120, 180, 240] as const;
-
-const durationLabel = (minutes: number) => {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = minutes / 60;
-  return Number.isInteger(hours)
-    ? `${hours} hour${hours === 1 ? "" : "s"}`
-    : `${hours} hours`;
-};
-
-const slotStatusLabel: Record<AvailabilitySlotStatus, string> = {
-  available: "Open",
-  requested: "Requested",
-  booked: "Booked",
-  unavailable: "Unavailable",
-};
-
-const slotStatusTone: Record<AvailabilitySlotStatus, Tone> = {
-  available: "success",
-  requested: "warning",
-  booked: "info",
-  unavailable: "neutral",
-};
-
-const nextHalfHour = () => {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
-  date.setMinutes(date.getMinutes() < 30 ? 30 : 0, 0, 0);
-  if (date.getMinutes() === 0 && date <= new Date()) {
-    date.setHours(date.getHours() + 1);
-  }
-  return date;
-};
+const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
 export default function TeacherAvailabilityScreen() {
   const queryClient = useQueryClient();
   const { colors, radius } = useTheme();
-  const [start, setStart] = useState(nextHalfHour);
-  const [duration, setDuration] = useState<number>(60);
+  const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
+  const [start, setStart] = useState(() => dateFromTimeOfDay("17:00"));
+  const [end, setEnd] = useState(() => dateFromTimeOfDay("18:00"));
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const slotsQuery = useQuery({
-    queryKey: ["availability", "teacher"],
-    queryFn: getMyAvailability,
+  const timeZoneId =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  const rulesQuery = useQuery({
+    queryKey: ["availability-rules", "teacher"],
+    queryFn: getMyAvailabilityRules,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const { refreshing, onRefresh } = usePullRefresh(slotsQuery.refetch);
+  const { refreshing, onRefresh } = usePullRefresh(rulesQuery.refetch);
 
-  const end = useMemo(
-    () => new Date(start.getTime() + duration * 60 * 1000),
-    [start, duration]
+  const rules = useMemo(
+    () =>
+      [...(rulesQuery.data ?? [])].sort(
+        (a, b) =>
+          DAY_ORDER.indexOf(a.dayOfWeek) - DAY_ORDER.indexOf(b.dayOfWeek) ||
+          a.startsAtTime.localeCompare(b.startsAtTime)
+      ),
+    [rulesQuery.data]
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["availability"] });
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["availability-rules"] });
+    await queryClient.invalidateQueries({ queryKey: ["assigned-teacher"] });
+    await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
+    await queryClient.invalidateQueries({ queryKey: ["teacher-profile"] });
+  };
 
   const publish = useMutation({
-    mutationFn: (input: { startsAt: string; endsAt: string }) =>
-      publishAvailability(input.startsAt, input.endsAt),
-    onSuccess: async (slot) => {
+    mutationFn: () =>
+      publishWeeklyAvailability({
+        daysOfWeek: days,
+        startsAtTime: timeOfDayFromDate(start),
+        endsAtTime: timeOfDayFromDate(end),
+        timeZoneId,
+      }),
+    onSuccess: async (created) => {
       setFormError(null);
       setNotice(
-        `Published ${formatDateTime(slot.startsAt)} – ${formatTimeRange(
-          slot.startsAt,
-          slot.endsAt
-        )}.`
+        `Announced ${created.length} weekly ${
+          created.length === 1 ? "time" : "times"
+        }. Students can book them now.`
       );
-      setStart(new Date(slot.endsAt));
       await invalidate();
-      await queryClient.invalidateQueries({
-        queryKey: ["teacher-directory"],
-      });
     },
     onError: (error) => {
       setNotice(null);
       setFormError(
         error instanceof ApiError
           ? error.message
-          : "Unable to publish this slot. Please try again."
+          : "Unable to announce these times. Please try again."
       );
     },
   });
 
   const remove = useMutation({
-    mutationFn: (slotId: string) => deleteAvailability(slotId),
+    mutationFn: (ruleId: string) => deleteWeeklyAvailability(ruleId),
     onSuccess: async () => {
       setFormError(null);
-      setNotice("Slot removed.");
+      setNotice("Weekly time removed.");
       await invalidate();
-      await queryClient.invalidateQueries({
-        queryKey: ["teacher-directory"],
-      });
     },
     onError: (error) =>
       setFormError(
         error instanceof ApiError
           ? error.message
-          : "Unable to remove this slot. Please try again."
+          : "Unable to remove this time. Please try again."
       ),
   });
 
-  const slots = [...(slotsQuery.data ?? [])].sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt)
-  );
+  const toggleDay = (day: number) => {
+    setNotice(null);
+    setDays((current) =>
+      current.includes(day)
+        ? current.filter((value) => value !== day)
+        : [...current, day]
+    );
+  };
 
   const submit = () => {
     setNotice(null);
     setFormError(null);
-    if (start.getTime() <= Date.now()) {
-      setFormError("Choose a start time in the future.");
+    if (!days.length) {
+      setFormError("Choose at least one weekday.");
+      return;
+    }
+    const duration = minutesOf(end) - minutesOf(start);
+    if (duration <= 0) {
+      setFormError("The end time must be after the start time.");
       return;
     }
     if (duration > MAX_SLOT_MINUTES) {
-      setFormError("A slot can last up to 4 hours.");
+      setFormError("A weekly slot can last up to 4 hours.");
       return;
     }
-    publish.mutate({
-      startsAt: start.toISOString(),
-      endsAt: end.toISOString(),
-    });
+    publish.mutate();
   };
 
-  const confirmRemove = (slotId: string, label: string) => {
+  const confirmRemove = (rule: WeeklyRule) => {
     Alert.alert(
-      "Remove this slot?",
-      `${label} will no longer be offered to students.`,
+      "Remove this weekly time?",
+      `${weekdayLabel(rule.dayOfWeek)} · ${formatWeeklyTimeRange(
+        rule.startsAtTime,
+        rule.endsAtTime
+      )} will no longer be offered.`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => remove.mutate(slotId),
+          onPress: () => remove.mutate(rule.id),
         },
       ]
     );
   };
 
+  const summary = days.length
+    ? `${days
+        .slice()
+        .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
+        .map((day) => WEEKDAY_SHORT[day])
+        .join(", ")} · ${timeOfDayFromDate(start)} – ${timeOfDayFromDate(end)}`
+    : "Choose the days you teach.";
+
   return (
     <RoleGate roles={["teacher"]}>
-      <Screen edges={["left", "right"]} refreshing={refreshing} onRefresh={onRefresh}>
+      <Screen
+        edges={["left", "right"]}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      >
         <PageHeader
           eyebrow="Teacher portal"
-          title="Manage availability"
-          subtitle="Publish the exact lesson times your students can request. Only open slots can be removed."
+          title="Weekly availability"
+          subtitle="Announce the weekly times you teach. A student's booking is instant and repeats every week."
         />
 
         <Card>
-          <SectionHeader title="Publish a time slot" />
+          <SectionHeader title="Announce weekly times" />
           <View style={styles.form}>
-            <DateTimeField
-              label="Starts at"
-              value={start}
-              onChange={setStart}
-              minimumDate={new Date()}
-              hint="Times are shown in your device's time zone."
-            />
-
-            <View style={styles.durationBlock}>
-              <AppText variant="label">Duration</AppText>
-              <View style={styles.durationRow} accessibilityRole="radiogroup">
-                {durations.map((minutes) => {
-                  const selected = minutes === duration;
+            <View style={styles.dayBlock}>
+              <AppText variant="label">Days</AppText>
+              <View style={styles.dayRow} accessibilityRole="group">
+                {DAY_ORDER.map((day) => {
+                  const selected = days.includes(day);
                   return (
                     <Pressable
-                      key={minutes}
-                      accessibilityRole="radio"
-                      accessibilityLabel={durationLabel(minutes)}
-                      accessibilityState={{ selected }}
-                      onPress={() => setDuration(minutes)}
+                      key={day}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={weekdayLabel(day)}
+                      accessibilityState={{ checked: selected }}
+                      onPress={() => toggleDay(day)}
                       style={({ pressed }) => [
-                        styles.durationChip,
+                        styles.dayChip,
                         {
                           borderRadius: radius.pill,
                           borderColor: selected ? colors.brand : colors.border,
@@ -218,27 +213,47 @@ export default function TeacherAvailabilityScreen() {
                         weight="700"
                         color={selected ? "link" : "muted"}
                       >
-                        {durationLabel(minutes)}
+                        {WEEKDAY_SHORT[day]}
                       </AppText>
                     </Pressable>
                   );
                 })}
               </View>
+              <AppText variant="caption" color="muted">
+                A student books the whole window as one weekly lesson.
+              </AppText>
+            </View>
+
+            <View style={styles.timeRow}>
+              <View style={styles.timeField}>
+                <TimeOfDayField
+                  label="Starts at"
+                  value={start}
+                  onChange={setStart}
+                />
+              </View>
+              <View style={styles.timeField}>
+                <TimeOfDayField label="Ends at" value={end} onChange={setEnd} />
+              </View>
             </View>
 
             <View style={styles.summary}>
-              <Ionicons name="time-outline" size={17} color={colors.muted} />
-              <AppText variant="small" color="muted">
-                {formatLongDate(start.toISOString())} ·{" "}
-                {formatTimeRange(start.toISOString(), end.toISOString())}
-              </AppText>
+              <Ionicons name="repeat-outline" size={17} color={colors.muted} />
+              <View style={styles.summaryCopy}>
+                <AppText variant="small" weight="600">
+                  {summary}
+                </AppText>
+                <AppText variant="caption" color="muted">
+                  Repeats every week · times are in {timeZoneId}
+                </AppText>
+              </View>
             </View>
 
             {formError ? <Notice tone="error" message={formError} /> : null}
             {notice ? <Notice tone="success" message={notice} /> : null}
 
             <Button
-              title="Publish availability"
+              title="Announce availability"
               onPress={submit}
               loading={publish.isPending}
               icon="add-circle-outline"
@@ -247,76 +262,74 @@ export default function TeacherAvailabilityScreen() {
         </Card>
 
         <View style={styles.listSection}>
-          <SectionHeader title={`Published slots (${slots.length})`} />
-          {slotsQuery.isLoading ? (
+          <SectionHeader title={`Announced times (${rules.length})`} />
+          {rulesQuery.isLoading ? (
             <LoadingView label="Loading your availability…" />
-          ) : slotsQuery.isError ? (
+          ) : rulesQuery.isError ? (
             <ErrorView
-              error={slotsQuery.error}
-              onRetry={() => void slotsQuery.refetch()}
+              error={rulesQuery.error}
+              onRetry={() => void rulesQuery.refetch()}
             />
-          ) : slots.length ? (
+          ) : rules.length ? (
             <View style={styles.list}>
-              {slots.map((slot) => {
-                const deleting =
-                  remove.isPending && remove.variables === slot.id;
+              {DAY_ORDER.map((day) => {
+                const dayRules = rules.filter((rule) => rule.dayOfWeek === day);
+                if (!dayRules.length) return null;
                 return (
-                  <Card key={slot.id}>
-                    <View style={styles.slotRow}>
-                      <View style={styles.slotCopy}>
-                        <AppText variant="caption" color="gold" weight="700">
-                          {relativeDay(slot.startsAt).toUpperCase()}
-                        </AppText>
-                        <AppText variant="h3">
-                          {formatTimeRange(slot.startsAt, slot.endsAt)}
-                        </AppText>
-                        <AppText variant="caption" color="muted">
-                          {formatLongDate(slot.startsAt)}
-                        </AppText>
-                      </View>
-                      <Badge
-                        label={slotStatusLabel[slot.status]}
-                        tone={slotStatusTone[slot.status]}
-                      />
-                    </View>
-                    {slot.status === "available" ? (
-                      <View style={styles.slotActions}>
-                        <Button
-                          title={deleting ? "Removing…" : "Remove"}
-                          variant="danger"
-                          size="sm"
-                          icon="trash-outline"
-                          loading={deleting}
-                          disabled={remove.isPending}
-                          onPress={() =>
-                            confirmRemove(
-                              slot.id,
-                              `${formatDateTime(slot.startsAt)} – ${formatTimeRange(
-                                slot.startsAt,
-                                slot.endsAt
-                              )}`
-                            )
-                          }
-                        />
-                      </View>
-                    ) : (
-                      <AppText variant="caption" color="muted" style={styles.locked}>
-                        {slot.status === "requested"
-                          ? "A student has requested this time."
-                          : slot.status === "booked"
-                            ? "This slot became a lesson."
-                            : "This slot is not offered."}
-                      </AppText>
-                    )}
-                  </Card>
+                  <View key={day} style={styles.dayGroup}>
+                    <AppText variant="caption" color="gold" weight="700">
+                      {weekdayLabel(day).toUpperCase()}
+                    </AppText>
+                    {dayRules.map((rule) => {
+                      const booked = rule.status === "booked";
+                      const removing =
+                        remove.isPending && remove.variables === rule.id;
+                      return (
+                        <Card key={rule.id}>
+                          <View style={styles.ruleRow}>
+                            <View style={styles.ruleCopy}>
+                              <AppText variant="h3">
+                                {formatWeeklyTimeRange(
+                                  rule.startsAtTime,
+                                  rule.endsAtTime
+                                )}
+                              </AppText>
+                              <AppText variant="caption" color="muted">
+                                {booked
+                                  ? "Booked by a student — repeats weekly."
+                                  : "Open for a student to book."}
+                              </AppText>
+                            </View>
+                            <Badge
+                              label={booked ? "Booked" : "Open"}
+                              tone={booked ? "info" : "success"}
+                            />
+                          </View>
+                          {booked ? null : (
+                            <View style={styles.ruleActions}>
+                              <Button
+                                title={removing ? "Removing…" : "Remove"}
+                                variant="danger"
+                                size="sm"
+                                icon="trash-outline"
+                                loading={removing}
+                                disabled={remove.isPending}
+                                onPress={() => confirmRemove(rule)}
+                              />
+                            </View>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </View>
                 );
               })}
             </View>
           ) : (
             <EmptyState
               icon="calendar-outline"
-              title="No availability published"
-              body="Publish a time above so students can request a lesson with you."
+              title="No weekly times announced"
+              body="Announce your days and hours above. Students can then book a time instantly."
             />
           )}
         </View>
@@ -327,23 +340,26 @@ export default function TeacherAvailabilityScreen() {
 
 const styles = StyleSheet.create({
   form: { gap: 16 },
-  durationBlock: { gap: 8 },
-  durationRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  durationChip: {
+  dayBlock: { gap: 8 },
+  dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  dayChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
+  timeRow: { flexDirection: "row", gap: 12 },
+  timeField: { flex: 1 },
   summary: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryCopy: { flex: 1, gap: 2 },
   listSection: { marginTop: 28, gap: 12 },
-  list: { gap: 10 },
-  slotRow: {
+  list: { gap: 18 },
+  dayGroup: { gap: 8 },
+  ruleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   },
-  slotCopy: { flex: 1, gap: 2 },
-  slotActions: { marginTop: 12, flexDirection: "row" },
-  locked: { marginTop: 12 },
+  ruleCopy: { flex: 1, gap: 2 },
+  ruleActions: { marginTop: 12, flexDirection: "row" },
 });

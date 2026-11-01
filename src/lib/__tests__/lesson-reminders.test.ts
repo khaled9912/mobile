@@ -19,31 +19,48 @@ const lesson = (overrides: Partial<Lesson>): Lesson => ({
   actualEndedAt: null,
   report: null,
   review: null,
+  seriesId: null,
+  isTrial: false,
   ...overrides,
 });
 
 const now = Date.parse("2026-01-05T09:00:00.000Z");
 
 describe("buildLessonReminders", () => {
-  it("fires five minutes before the lesson starts", () => {
+  it("fires five minutes before the lesson and again at the start", () => {
     const reminders = buildLessonReminders([lesson({})], "student", now);
 
-    expect(reminders).toHaveLength(1);
+    expect(reminders).toHaveLength(2);
+    expect(reminders.map((r) => r.kind)).toEqual(["lead", "start"]);
     expect(reminders[0].lessonId).toBe("lesson-1");
     expect(reminders[0].title).toBe("Lesson in 5 minutes");
     expect(reminders[0].triggerAt.getTime()).toBe(
       Date.parse("2026-01-05T10:00:00.000Z") - REMINDER_LEAD_MS
     );
+    expect(reminders[1].title).toBe("Lesson starting now");
+    expect(reminders[1].triggerAt.getTime()).toBe(
+      Date.parse("2026-01-05T10:00:00.000Z")
+    );
   });
 
-  it("ignores cancelled lessons, finished lessons and lessons already inside the lead time", () => {
+  it("keeps the start reminder when the lead time has already passed", () => {
+    const reminders = buildLessonReminders(
+      [lesson({ startsAt: "2026-01-05T09:03:00.000Z", endsAt: "2026-01-05T10:00:00.000Z" })],
+      "student",
+      now
+    );
+
+    expect(reminders.map((r) => r.kind)).toEqual(["start"]);
+  });
+
+  it("ignores cancelled lessons, finished lessons and lessons already started", () => {
     const reminders = buildLessonReminders(
       [
         lesson({ id: "cancelled", status: "cancelled" }),
         lesson({ id: "completed", status: "completed" }),
         lesson({
-          id: "too-soon",
-          startsAt: "2026-01-05T09:04:00.000Z",
+          id: "started",
+          startsAt: "2026-01-05T08:59:00.000Z",
           endsAt: "2026-01-05T10:00:00.000Z",
         }),
         lesson({
@@ -57,10 +74,12 @@ describe("buildLessonReminders", () => {
       now
     );
 
-    expect(reminders.map((r) => r.lessonId)).toEqual(["valid"]);
+    expect(new Set(reminders.map((r) => r.lessonId))).toEqual(
+      new Set(["valid"])
+    );
   });
 
-  it("sorts by start time and caps the pending notifications", () => {
+  it("sorts by trigger time and caps the pending notifications", () => {
     const lessons = Array.from({ length: MAX_LESSON_REMINDERS + 5 }, (_, i) =>
       lesson({
         id: `lesson-${i}`,
@@ -73,7 +92,12 @@ describe("buildLessonReminders", () => {
 
     expect(reminders).toHaveLength(MAX_LESSON_REMINDERS);
     expect(reminders[0].lessonId).toBe("lesson-0");
-    expect(reminders.at(-1)?.lessonId).toBe(`lesson-${MAX_LESSON_REMINDERS - 1}`);
+    expect(reminders[0].kind).toBe("lead");
+    for (let i = 1; i < reminders.length; i += 1) {
+      expect(reminders[i].triggerAt.getTime()).toBeGreaterThanOrEqual(
+        reminders[i - 1].triggerAt.getTime()
+      );
+    }
   });
 
   it("names the other participant for each role", () => {

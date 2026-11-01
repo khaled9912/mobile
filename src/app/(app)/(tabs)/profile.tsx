@@ -229,21 +229,13 @@ export default function ProfileTab() {
       <SectionHeader title="Shortcuts" />
       <Card padded={false}>
         {isTeacher ? (
-          <>
-            <LinkRow
-              icon="calendar-outline"
-              title="My availability"
-              subtitle="Publish the times students can request"
-              onPress={() => router.push("/availability")}
-            />
-            <LinkRow
-              icon="people-outline"
-              title="Student preferences"
-              subtitle="Times your assigned students have declared"
-              onPress={() => router.push("/student-availability")}
-              last
-            />
-          </>
+          <LinkRow
+            icon="calendar-outline"
+            title="My availability"
+            subtitle="Publish the weekly times students can book"
+            onPress={() => router.push("/availability")}
+            last
+          />
         ) : isStudent ? (
           <>
             <LinkRow

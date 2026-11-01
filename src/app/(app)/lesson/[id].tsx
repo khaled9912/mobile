@@ -39,6 +39,11 @@ export default function LessonRoomScreen() {
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const { role, user } = useAuth();
   const { colors } = useTheme();
+  const isSupport = role === "admin" || role === "super_admin";
+  const displayName = user?.fullName ?? "Guest";
+  const roomDisplayName = isSupport
+    ? `${displayName} (Academy support)`
+    : displayName;
   const insets = useSafeAreaInsets();
 
   const [joined, setJoined] = useState(false);
@@ -274,7 +279,7 @@ export default function LessonRoomScreen() {
       <View style={[styles.stage, { paddingBottom: insets.bottom }]}>
         <JitsiRoom
           room={`rayan-academy-${lesson.id}`}
-          displayName={user?.fullName ?? "Guest"}
+          displayName={roomDisplayName}
           onJoined={() => setJoined(true)}
           onClose={handleClose}
         />

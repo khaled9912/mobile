@@ -82,7 +82,7 @@ function readValidationErrors(payload: unknown): ValidationErrors | undefined {
   return entries.length ? Object.fromEntries(entries) : undefined;
 }
 
-type UnauthorizedListener = () => void;
+type UnauthorizedListener = () => void | Promise<void>;
 const unauthorizedListeners = new Set<UnauthorizedListener>();
 
 export const onUnauthorized = (listener: UnauthorizedListener) => {
@@ -93,7 +93,7 @@ export const onUnauthorized = (listener: UnauthorizedListener) => {
 };
 
 const notifyUnauthorized = () => {
-  for (const listener of unauthorizedListeners) listener();
+  for (const listener of unauthorizedListeners) void listener();
 };
 
 // Endpoints where a 401 is an expected answer rather than an expired session.

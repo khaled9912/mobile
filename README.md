@@ -179,11 +179,15 @@ The API issues an `HttpOnly`, `Secure`, `SameSite=Lax` cookie named
   the theme preference, encrypted at rest with
   `WHEN_UNLOCKED_THIS_DEVICE_ONLY`.
 - On launch the app paints from the cache immediately, then revalidates with
-  `GET /api/auth/me`. `401` clears the cache and returns to sign-in. A network
-  failure keeps the cached identity in an explicitly flagged offline session.
-- Any non-auth `401` triggers one global handler that clears the cache, clears
-  TanStack Query, and redirects to sign-in. Expected `401`s (wrong password,
-  expired reset code) are handled inline.
+  `GET /api/auth/me`. `401` clears the cache and returns to sign-in, but a
+  cached session gets one 900 ms retry first: Android creates its cookie store
+  lazily, so the very first request of a cold start can be sent without cookies
+  and would otherwise look like an expired session. A network failure keeps the
+  cached identity in an explicitly flagged offline session.
+- Any non-auth `401` is confirmed with `GET /api/auth/me` before the session is
+  cleared. A one-off rejection no longer signs the user out; if the API cannot
+  confirm (offline or server error), the cached session is kept. Expected
+  `401`s (wrong password, expired reset code) are handled inline.
 - Sign-out calls `POST /api/auth/logout` best-effort, then always clears local
   state.
 

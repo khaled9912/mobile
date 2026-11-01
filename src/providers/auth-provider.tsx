@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [offlineSession, setOfflineSession] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const mounted = useRef(true);
+  const confirmingSession = useRef<Promise<UserProfile | null> | null>(null);
 
   const clearLocalSession = useCallback(() => {
     setUser(null);
@@ -91,7 +92,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  useEffect(() => onUnauthorized(clearLocalSession), [clearLocalSession]);
+  // A single 401 is not proof that the cookie is gone: Android stores cookies
+  // through the WebView cookie manager, which is created lazily on the first
+  // request after a cold start and can lose that race. Confirm with /auth/me
+  // before ending the session, and never end it when the API is unreachable.
+  const confirmSession = useCallback(() => {
+    if (!confirmingSession.current) {
+      confirmingSession.current = getCurrentUser().finally(() => {
+        confirmingSession.current = null;
+      });
+    }
+    return confirmingSession.current;
+  }, []);
+
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        void (async () => {
+          try {
+            const fresh = await confirmSession();
+            if (fresh) applySession(fresh);
+            else clearLocalSession();
+          } catch {
+            // Confirmation needs the network; keep the cached session and let
+            // the next request decide.
+          }
+        })();
+      }),
+    [applySession, clearLocalSession, confirmSession]
+  );
 
   useEffect(() => {
     let active = true;
@@ -110,8 +139,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setRevalidating(true);
       try {
-        const fresh = await getCurrentUser();
+        let fresh = await getCurrentUser();
         if (!active) return;
+        if (!fresh && cached) {
+          // The Android cookie store initialises in the background, so the
+          // very first request of a cold start can be sent without cookies.
+          // Retry once before treating the cached session as expired.
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          if (!active) return;
+          fresh = await getCurrentUser();
+        }
         if (!fresh) {
           // No cookie (or it expired): the cached preview must not persist.
           setUser(null);

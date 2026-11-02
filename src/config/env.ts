@@ -17,7 +17,7 @@ const readJitsiDomain = () => {
   const fromEnv = process.env.EXPO_PUBLIC_JITSI_DOMAIN?.trim();
   const fromConfig =
     typeof extra.jitsiDomain === "string" ? extra.jitsiDomain.trim() : "";
-  return (fromEnv || fromConfig || "meet.jit.si")
+  return (fromEnv || fromConfig || "meet.143-47-237-128.sslip.io")
     .replace(/^https?:\/\//i, "")
     .replace(/\/+$/, "");
 };

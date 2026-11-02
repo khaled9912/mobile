@@ -14,6 +14,7 @@ import {
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
+import { LessonCallProvider } from "@/providers/lesson-call-provider";
 import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
 import { queryClient } from "@/lib/query-client";
 import { getWelcomeSeen, subscribeWelcome } from "@/lib/welcome";
@@ -106,7 +107,9 @@ const RootLayout = () => (
         <AppThemeProvider>
           <AuthProvider>
             <LessonReminderProvider>
-              <RootNavigator />
+              <LessonCallProvider>
+                <RootNavigator />
+              </LessonCallProvider>
               <ApiDebugOverlay />
             </LessonReminderProvider>
           </AuthProvider>

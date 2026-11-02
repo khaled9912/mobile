@@ -1,0 +1,87 @@
+diff --git a/node_modules/@jitsi/react-native-sdk/android/src/main/java/org/jitsi/meet/sdk/PictureInPictureModule.java b/node_modules/@jitsi/react-native-sdk/android/src/main/java/org/jitsi/meet/sdk/PictureInPictureModule.java
+index 4a95846..d11a196 100644
+--- a/node_modules/@jitsi/react-native-sdk/android/src/main/java/org/jitsi/meet/sdk/PictureInPictureModule.java
++++ b/node_modules/@jitsi/react-native-sdk/android/src/main/java/org/jitsi/meet/sdk/PictureInPictureModule.java
+@@ -20,6 +20,7 @@ import android.annotation.TargetApi;
+ import android.app.Activity;
+ import android.app.ActivityManager;
+ import android.app.PictureInPictureParams;
++import android.os.Build;
+ import android.util.Rational;
+ 
+ import com.facebook.react.bridge.Promise;
+@@ -132,6 +133,24 @@ class PictureInPictureModule extends ReactContextBaseJavaModule {
+     @ReactMethod
+     public void setPictureInPictureEnabled(Boolean enabled) {
+         this.isEnabled = enabled;
++
++        // Android 12+ can enter PiP on its own when the user presses Home. The
++        // SDK only enters PiP from the hardware back button, so publish the
++        // params here to keep the room preview visible when the app is
++        // backgrounded.
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++            Activity currentActivity = getCurrentActivity();
++
++            if (currentActivity != null) {
++                PictureInPictureParams params
++                    = new PictureInPictureParams.Builder()
++                        .setAspectRatio(new Rational(1, 1))
++                        .setAutoEnterEnabled(enabled)
++                        .build();
++
++                currentActivity.setPictureInPictureParams(params);
++            }
++        }
+     }
+ 
+     public boolean isPictureInPictureSupported() {
+diff --git a/node_modules/@jitsi/react-native-sdk/index.d.ts b/node_modules/@jitsi/react-native-sdk/index.d.ts
+new file mode 100644
+index 0000000..bef209c
+--- /dev/null
++++ b/node_modules/@jitsi/react-native-sdk/index.d.ts
+@@ -0,0 +1,31 @@
++import type { ComponentType } from "react";
++import type { StyleProp, ViewStyle } from "react-native";
++
++export interface JitsiEventListeners {
++  onAudioMutedChanged?: (muted: boolean) => void;
++  onConferenceJoined?: () => void;
++  onConferenceLeft?: () => void;
++  onConferenceWillJoin?: () => void;
++  onEnterPictureInPicture?: () => void;
++  onReadyToClose?: () => void;
++  onScreenShareToggled?: (event: { sharing: boolean }) => void;
++  onVideoMutedChanged?: (muted: boolean) => void;
++}
++
++export interface JitsiUserInfo {
++  avatarURL?: string;
++  displayName?: string;
++  email?: string;
++}
++
++export interface JitsiMeetingProps {
++  room: string;
++  serverURL?: string;
++  config?: Record<string, unknown>;
++  flags?: Record<string, boolean>;
++  userInfo?: JitsiUserInfo;
++  eventListeners?: JitsiEventListeners;
++  style?: StyleProp<ViewStyle>;
++}
++
++export const JitsiMeeting: ComponentType<JitsiMeetingProps>;
+diff --git a/node_modules/@jitsi/react-native-sdk/package.json b/node_modules/@jitsi/react-native-sdk/package.json
+index 230268a..7eba412 100644
+--- a/node_modules/@jitsi/react-native-sdk/package.json
++++ b/node_modules/@jitsi/react-native-sdk/package.json
+@@ -101,5 +101,6 @@
+     ],
+     "overrides": {
+         "hermes-compiler": "0.16.0"
+-    }
++    },
++    "types": "index.d.ts"
+ }
+\ No newline at end of file

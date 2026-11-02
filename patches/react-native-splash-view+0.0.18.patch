@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-splash-view/android/src/newarch/java/com/splashview/SplashViewModuleNew.kt b/node_modules/react-native-splash-view/android/src/newarch/java/com/splashview/SplashViewModuleNew.kt
+index 3833ee7..d687566 100644
+--- a/node_modules/react-native-splash-view/android/src/newarch/java/com/splashview/SplashViewModuleNew.kt
++++ b/node_modules/react-native-splash-view/android/src/newarch/java/com/splashview/SplashViewModuleNew.kt
+@@ -10,7 +10,7 @@ class SplashViewModuleNew(reactContext: ReactApplicationContext) :
+   override fun getName() = NAME
+ 
+   override fun showSplash() {
+-    currentActivity?.let { SplashView.showSplashView(it) }
++    getCurrentActivity()?.let { SplashView.showSplashView(it) }
+   }
+ 
+   override fun hideSplash() {

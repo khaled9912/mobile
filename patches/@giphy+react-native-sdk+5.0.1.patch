@@ -1,0 +1,76 @@
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridView.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridView.mm
+index 7af29af..28004cf 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridView.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridView.mm
+@@ -8,7 +8,7 @@
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/Props.h>
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/RCTComponentViewHelpers.h>
+ 
+-#import "RCTFabricComponentsPlugins.h"
++#import <React/RCTFabricComponentsPlugins.h>
+ 
+ #if __has_include("giphy_react_native_sdk/giphy_react_native_sdk-Swift.h")
+ #import <giphy_react_native_sdk/giphy_react_native_sdk-Swift.h>
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridViewManager.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridViewManager.mm
+index 0549911..3fde8b5 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridViewManager.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyGridViewManager.mm
+@@ -1,6 +1,6 @@
+ #import <React/RCTViewManager.h>
+ #import <React/RCTUIManager.h>
+-#import "RCTBridge.h"
++#import <React/RCTBridge.h>
+ 
+ #ifdef RCT_NEW_ARCH_ENABLED
+ #import <React/RCTConversions.h>
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaView.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaView.mm
+index 05e1e5c..c7eddc9 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaView.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaView.mm
+@@ -7,7 +7,7 @@
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/Props.h>
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/RCTComponentViewHelpers.h>
+ 
+-#import "RCTFabricComponentsPlugins.h"
++#import <React/RCTFabricComponentsPlugins.h>
+ 
+ #if __has_include("giphy_react_native_sdk/giphy_react_native_sdk-Swift.h")
+ #import <giphy_react_native_sdk/giphy_react_native_sdk-Swift.h>
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaViewManager.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaViewManager.mm
+index 81ce933..6d4446e 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaViewManager.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyMediaViewManager.mm
+@@ -2,7 +2,7 @@
+ 
+ #import <React/RCTViewManager.h>
+ #import <React/RCTUIManager.h>
+-#import "RCTBridge.h"
++#import <React/RCTBridge.h>
+ 
+ #if __has_include("giphy_react_native_sdk/giphy_react_native_sdk-Swift.h")
+ #import <giphy_react_native_sdk/giphy_react_native_sdk-Swift.h>
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoView.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoView.mm
+index ecd0b19..166bfad 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoView.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoView.mm
+@@ -8,7 +8,7 @@
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/Props.h>
+ #import <react/renderer/components/GiphyReactNativeSDKSpec/RCTComponentViewHelpers.h>
+ 
+-#import "RCTFabricComponentsPlugins.h"
++#import <React/RCTFabricComponentsPlugins.h>
+ 
+ #if __has_include("giphy_react_native_sdk/giphy_react_native_sdk-Swift.h")
+ #import <giphy_react_native_sdk/giphy_react_native_sdk-Swift.h>
+diff --git a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoViewManager.mm b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoViewManager.mm
+index 35e8a7a..39ea95f 100644
+--- a/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoViewManager.mm
++++ b/node_modules/@giphy/react-native-sdk/ios/RTNGiphyVideoViewManager.mm
+@@ -1,6 +1,6 @@
+ #import <React/RCTViewManager.h>
+ #import <React/RCTUIManager.h>
+-#import "RCTBridge.h"
++#import <React/RCTBridge.h>
+ 
+ #if __has_include("giphy_react_native_sdk/giphy_react_native_sdk-Swift.h")
+ #import <giphy_react_native_sdk/giphy_react_native_sdk-Swift.h>

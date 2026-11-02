@@ -1,0 +1,87 @@
+diff --git a/node_modules/react-native-worklets-core/ios/Worklets.mm b/node_modules/react-native-worklets-core/ios/Worklets.mm
+index 403d88b..057048d 100644
+--- a/node_modules/react-native-worklets-core/ios/Worklets.mm
++++ b/node_modules/react-native-worklets-core/ios/Worklets.mm
+@@ -1,10 +1,16 @@
+ #import "Worklets.h"
+ 
+-#import <React/RCTBridge+Private.h>
++#import <objc/runtime.h>
+ #import <React/RCTBridge.h>
++#import <React/RCTBridgeProxy.h>
++#import <React/RCTBridgeProxy+Cxx.h>
+ #import <React/RCTUtils.h>
+ #import <ReactCommon/RCTTurboModule.h>
+ 
++@interface RCTBridgeProxy (WorkletsRuntime)
++- (void *)runtime;
++@end
++
+ @implementation Worklets
+ 
+ @synthesize bridge = _bridge;
+@@ -27,6 +33,10 @@ + (BOOL)requiresMainQueueSetup {
+ 
+ void installApi(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+                 facebook::jsi::Runtime *runtime) {
++  if (runtime->global().hasProperty(*runtime, "Worklets")) {
++    return;
++  }
++
+   // Initialize the default worklet context
+   RNWorklet::JsiWorkletContext::getDefaultInstance()->initialize(
+       "default", runtime, [=](std::function<void()> &&f) {
+@@ -37,30 +47,36 @@ void installApi(std::shared_ptr<facebook::react::CallInvoker> callInvoker,
+   RNWorklet::JsiWorkletApi::installApi(*runtime);
+ }
+ 
+-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
+-  RCTCxxBridge *cxxBridge = (RCTCxxBridge *)_bridge;
+-  if (cxxBridge.runtime != nullptr) {
+-    auto callInvoker = cxxBridge.jsCallInvoker;
+-    facebook::jsi::Runtime *jsRuntime =
+-        (facebook::jsi::Runtime *)cxxBridge.runtime;
+-
+-    installApi(callInvoker, jsRuntime);
+-    return @true;
++// RN 0.88 runs the New Architecture only: TurboModules receive an
++// RCTBridgeProxy instead of a RCTCxxBridge, so the runtime and call invoker
++// come from the proxy.
++static BOOL installApiFromBridge(RCTBridge *bridge) {
++  if (bridge == nil || object_getClass(bridge) != [RCTBridgeProxy class]) {
++    return NO;
++  }
++
++  RCTBridgeProxy *proxy = (RCTBridgeProxy *)bridge;
++  void *jsRuntime = [proxy runtime];
++  auto callInvoker = proxy.jsCallInvoker;
++
++  if (jsRuntime == nullptr || callInvoker == nullptr) {
++    return NO;
+   }
+-  return @false;
++
++  installApi(callInvoker,
++             reinterpret_cast<facebook::jsi::Runtime *>(jsRuntime));
++  return YES;
++}
++
++RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(install) {
++  return installApiFromBridge(_bridge) ? @true : @false;
+ }
+ 
+ // Don't compile this code when we build for the old architecture.
+ #ifdef RCT_NEW_ARCH_ENABLED
+ - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
+     (const facebook::react::ObjCTurboModule::InitParams &)params {
+-  // Call installApi with c++ brigde or something similar.
+-  RCTCxxBridge *cxxBridge = (RCTCxxBridge *)_bridge;
+-  auto callInvoker = cxxBridge.jsCallInvoker;
+-  facebook::jsi::Runtime *jsRuntime =
+-      (facebook::jsi::Runtime *)cxxBridge.runtime;
+-
+-  installApi(callInvoker, jsRuntime);
++  installApiFromBridge(_bridge);
+ 
+   return std::make_shared<facebook::react::NativeWorkletsSpecJSI>(params);
+ }

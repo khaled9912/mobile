@@ -1,0 +1,40 @@
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
+index de76b97..29de686 100644
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
+@@ -933,19 +933,29 @@ private func withEncodedValue(
+   _ body: (borrowing facebook.jsi.Value) -> Void
+ ) rethrows {
+   try withUnsafeTemporaryAllocation(of: facebook.jsi.Value.self, capacity: 1) { buffer in
+-    // The isolated closure below runs synchronously on this thread.
+-    nonisolated(unsafe) let slot = buffer.baseAddress!
+-    expo.emplaceUndefined(slot)
++    // Swift 6.2 flags the raw pointer as task-isolated when the actor-isolated
++    // closure captures it. The closure runs synchronously on this thread, which
++    // the box makes explicit to the compiler.
++    let slot = SlotPointerBox(buffer.baseAddress!)
++    expo.emplaceUndefined(slot.pointer)
+     defer {
+-      expo.destroyValues(slot, 1)
++      expo.destroyValues(slot.pointer, 1)
+     }
+     // The runtime can't be deallocated during a call on its JavaScript thread, so it's borrowed without
+     // a retain.
+     try runtime._withUnsafeGuaranteedRef { runtime in
+       try JavaScriptActor.assumeIsolated {
+-        try encode(JavaScriptValue.Slot(slot), runtime)
++        try encode(JavaScriptValue.Slot(slot.pointer), runtime)
+       }
+     }
+-    body(slot.pointee)
++    body(slot.pointer.pointee)
++  }
++}
++
++private final class SlotPointerBox: @unchecked Sendable {
++  let pointer: UnsafeMutablePointer<facebook.jsi.Value>
++
++  init(_ pointer: UnsafeMutablePointer<facebook.jsi.Value>) {
++    self.pointer = pointer
+   }
+ }

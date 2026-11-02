@@ -6,13 +6,10 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { Camera } from "expo-camera";
-import {
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-} from "expo-audio";
+import { requestRecordingPermissionsAsync } from "expo-audio";
+import { JitsiMeeting } from "@jitsi/react-native-sdk";
 import { JITSI_DOMAIN } from "@/config/env";
 import { useTheme } from "@/providers/theme-provider";
 import { AppText } from "@/components/ui/app-text";
@@ -27,132 +24,90 @@ type Props = {
 };
 
 const STAGE_BG = "#05080a";
+const SERVER_URL = `https://${JITSI_DOMAIN}/`;
 
-const escapeForScript = (value: unknown) =>
-  JSON.stringify(value).replace(/</g, "\\u003c");
+// Mirrors the web room's toolbar so both clients offer the same controls,
+// including the screen share button (native ReplayKit / MediaProjection).
+const TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "chat", "hangup"];
 
-/**
- * Mirrors the web Jitsi config so both clients land in the same room with the
- * same chrome and the same starting mute state.
- */
-const buildHtml = (
-  domain: string,
-  room: string,
-  displayName: string,
-  mode: JoinMode
-) => {
-  const options = {
-    roomName: room,
-    width: "100%",
-    height: "100%",
-    userInfo: { displayName },
-    configOverwrite: {
-      prejoinPageEnabled: false,
-      prejoinConfig: { enabled: false },
-      enableWelcomePage: false,
-      disableDeepLinking: true,
-      deeplinking: { disabled: true },
-      requireDisplayName: false,
-      hideLoginButton: true,
-      startWithAudioMuted: mode === "view-only",
-      startWithVideoMuted: mode !== "audio-video",
-      enableInsecureRoomNameWarning: false,
-      // Screen sharing is not available inside a native WebView.
-      toolbarButtons: ["microphone", "camera", "chat", "hangup"],
-      disableReactions: true,
-      disablePolls: true,
-      disableWhiteboard: true,
-      disableVirtualBackground: true,
-      hideConferenceSubject: true,
-      hideConferenceTimer: true,
-      notifications: [],
-    },
-    interfaceConfigOverwrite: {
-      SHOW_JITSI_WATERMARK: false,
-      SHOW_BRAND_WATERMARK: false,
-      SHOW_POWERED_BY: false,
-      MOBILE_APP_PROMO: false,
-      DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-      DEFAULT_BACKGROUND: "#000000",
-    },
-  };
+const buildConfig = (mode: JoinMode) => ({
+  prejoinPageEnabled: false,
+  prejoinConfig: { enabled: false, hideDisplayName: true },
+  requireDisplayName: false,
+  enableWelcomePage: false,
+  disableDeepLinking: true,
+  deeplinking: { disabled: true },
+  hideLoginButton: true,
+  startWithAudioMuted: mode === "view-only",
+  startWithVideoMuted: mode !== "audio-video",
+  enableInsecureRoomNameWarning: false,
+  toolbarButtons: TOOLBAR_BUTTONS,
+  disableReactions: true,
+  disablePolls: true,
+  disableWhiteboard: true,
+  disableVirtualBackground: true,
+  hideConferenceSubject: true,
+  hideConferenceTimer: true,
+});
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<style>
-  html, body { height: 100%; margin: 0; background: ${STAGE_BG}; overflow: hidden; }
-  #meet { height: 100%; width: 100%; }
-</style>
-</head>
-<body>
-<div id="meet"></div>
-<script src="https://${domain}/external_api.js"></script>
-<script>
-(function () {
-  function post(payload) {
-    try {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-      }
-    } catch (error) {}
-  }
-  try {
-    var options = ${escapeForScript(options)};
-    options.parentNode = document.getElementById("meet");
-    var api = new JitsiMeetExternalAPI(${escapeForScript(domain)}, options);
-    api.addEventListener("videoConferenceJoined", function () {
-      post({ type: "joined" });
-    });
-    api.addEventListener("videoConferenceLeft", function () {
-      post({ type: "left" });
-    });
-    api.addEventListener("readyToClose", function () {
-      post({ type: "closed" });
-    });
-    api.addEventListener("errorOccurred", function (event) {
-      var message = event && event.error && event.error.message;
-      post({ type: "error", message: typeof message === "string" ? message : "" });
-    });
-  } catch (error) {
-    post({ type: "load-error" });
-  }
-})();
-</script>
-</body>
-</html>`;
+// The conference keeps running in the background so a screen share is not
+// interrupted when the app is sent to the background.
+const FLAGS = {
+  "ios.screensharing.enabled": true,
+  "android.screensharing.enabled": true,
+  "pip.enabled": true,
+  "prejoinpage.enabled": false,
 };
 
-export const JitsiRoom = ({ room, displayName, onJoined, onClose }: Props) => {
+export const JitsiRoom = ({
+  room,
+  displayName,
+  onJoined,
+  onClose,
+}: Props) => {
   const { colors, radius } = useTheme();
   const [mode, setMode] = useState<JoinMode | null>(null);
   const [pendingMode, setPendingMode] = useState<JoinMode | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"connecting" | "joined" | "error">(
-    "connecting"
-  );
-  const [attempt, setAttempt] = useState(0);
-  const audioConfigured = useRef(false);
-  const onJoinedRef = useRef(onJoined);
+  const closedRef = useRef(false);
+  const joinedRef = useRef(false);
+  // The SDK registers listeners once on mount, so read the latest callbacks
+  // through refs instead of freezing the values from the first render.
   const onCloseRef = useRef(onClose);
-
+  const onJoinedRef = useRef(onJoined);
   useEffect(() => {
-    onJoinedRef.current = onJoined;
     onCloseRef.current = onClose;
-  }, [onJoined, onClose]);
+    onJoinedRef.current = onJoined;
+  }, [onClose, onJoined]);
 
-  useEffect(
-    () => () => {
-      if (!audioConfigured.current) return;
-      void setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-        interruptionMode: "mixWithOthers",
-      }).catch(() => {});
-    },
-    []
+  const close = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    onCloseRef.current();
+  }, []);
+
+  const handleJoined = useCallback(() => {
+    if (joinedRef.current) return;
+    joinedRef.current = true;
+    onJoinedRef.current?.();
+  }, []);
+
+  const eventListeners = useMemo(
+    () => ({
+      onConferenceJoined: handleJoined,
+      onReadyToClose: close,
+    }),
+    [close, handleJoined]
+  );
+
+  const config = useMemo(
+    () => (mode ? buildConfig(mode) : undefined),
+    [mode]
+  );
+
+  const userInfo = useMemo(
+    () => ({ displayName, avatarURL: "", email: "" }),
+    [displayName]
   );
 
   const requestDevices = async (nextMode: JoinMode) => {
@@ -188,49 +143,10 @@ export const JitsiRoom = ({ room, displayName, onJoined, onClose }: Props) => {
       }
     }
 
-    try {
-      await setAudioModeAsync({
-        allowsRecording: nextMode !== "view-only",
-        playsInSilentMode: true,
-        shouldRouteThroughEarpiece: false,
-        interruptionMode: "doNotMix",
-      });
-      audioConfigured.current = true;
-    } catch {
-      // The room still works with default audio settings.
-    }
-
-    setStatus("connecting");
+    closedRef.current = false;
+    joinedRef.current = false;
     setMode(nextMode);
   };
-
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    let payload: unknown;
-    try {
-      payload = JSON.parse(event.nativeEvent.data);
-    } catch {
-      return;
-    }
-    if (!payload || typeof payload !== "object") return;
-    const type = (payload as { type?: unknown }).type;
-
-    if (type === "joined") {
-      setStatus((current) => {
-        if (current !== "joined") onJoinedRef.current?.();
-        return "joined";
-      });
-    } else if (type === "left" || type === "closed") {
-      onCloseRef.current();
-    } else if (type === "error" || type === "load-error") {
-      setStatus("error");
-    }
-  }, []);
-
-  const html = useMemo(
-    () =>
-      mode ? buildHtml(JITSI_DOMAIN, room, displayName, mode) : "",
-    [mode, room, displayName]
-  );
 
   if (!mode) {
     const busy = pendingMode !== null;
@@ -251,7 +167,8 @@ export const JitsiRoom = ({ room, displayName, onJoined, onClose }: Props) => {
             style={styles.gateCopy}
           >
             Allow camera and microphone so your teacher can see and hear you.
-            This is a private, unlisted lesson room — do not share it.
+            This is a private, unlisted lesson room — share the link only with
+            someone you trust.
           </AppText>
 
           <View style={styles.gateButtons}>
@@ -331,6 +248,21 @@ export const JitsiRoom = ({ room, displayName, onJoined, onClose }: Props) => {
             </Pressable>
           </View>
 
+          <View style={styles.shareHint}>
+            <Ionicons
+              name="phone-portrait-outline"
+              size={14}
+              color="rgba(255,255,255,0.62)"
+            />
+            <AppText
+              variant="caption"
+              color="rgba(255,255,255,0.62)"
+              style={styles.shareHintText}
+            >
+              Screen sharing keeps running when you switch to another app.
+            </AppText>
+          </View>
+
           {permissionError ? (
             <View style={styles.errorBox}>
               <AppText variant="small" color="#f7c9c2">
@@ -373,80 +305,23 @@ export const JitsiRoom = ({ room, displayName, onJoined, onClose }: Props) => {
 
   return (
     <View style={styles.stage}>
-      <WebView
-        key={attempt}
-        source={{ html, baseUrl: `https://${JITSI_DOMAIN}` }}
-        originWhitelist={["*"]}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        mediaCapturePermissionGrantType="grant"
-        setSupportMultipleWindows={false}
-        style={styles.webview}
-        containerStyle={styles.webview}
-        onMessage={handleMessage}
-        onError={() => setStatus("error")}
-        onHttpError={() => setStatus("error")}
-        allowsBackForwardNavigationGestures={false}
-        bounces={false}
-        overScrollMode="never"
+      <JitsiMeeting
+        key={`${room}:${mode}`}
+        room={room}
+        serverURL={SERVER_URL}
+        config={config}
+        flags={FLAGS}
+        userInfo={userInfo}
+        eventListeners={eventListeners}
+        style={styles.meeting}
       />
-
-      {status === "connecting" ? (
-        <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator size="large" color="#ffffff" />
-          <AppText variant="small" color="rgba(255,255,255,0.82)">
-            Connecting to your lesson room…
-          </AppText>
-        </View>
-      ) : null}
-
-      {status === "error" ? (
-        <View style={styles.overlay}>
-          <Ionicons name="cloud-offline-outline" size={30} color="#ffffff" />
-          <AppText variant="h3" color="#ffffff" align="center">
-            Could not load the lesson room
-          </AppText>
-          <AppText
-            variant="small"
-            color="rgba(255,255,255,0.72)"
-            align="center"
-            style={styles.gateCopy}
-          >
-            Check your connection and try again. If it keeps failing, contact the
-            academy.
-          </AppText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Try loading the room again"
-            onPress={() => {
-              setStatus("connecting");
-              setAttempt((value) => value + 1);
-            }}
-            style={({ pressed }) => [
-              styles.stageButton,
-              styles.stageButtonOutline,
-              {
-                borderRadius: radius.md,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <Ionicons name="refresh" size={17} color="#ffffff" />
-            <AppText variant="button" color="#ffffff">
-              Try again
-            </AppText>
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   stage: { flex: 1, backgroundColor: STAGE_BG },
-  webview: { flex: 1, backgroundColor: STAGE_BG },
+  meeting: { flex: 1, backgroundColor: STAGE_BG },
   gate: {
     flex: 1,
     alignItems: "center",
@@ -481,6 +356,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
   },
   stageButtonQuiet: { backgroundColor: "transparent" },
+  shareHint: {
+    width: "100%",
+    maxWidth: 360,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  shareHintText: { flexShrink: 1 },
   errorBox: {
     width: "100%",
     maxWidth: 360,
@@ -496,13 +381,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.14)",
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingHorizontal: 24,
-    backgroundColor: STAGE_BG,
   },
 });

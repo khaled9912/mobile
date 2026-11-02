@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  Share,
   StyleSheet,
   View,
 } from "react-native";
@@ -14,7 +15,7 @@ import { ApiError } from "@/api/client";
 import { getLessonById } from "@/api/lessons";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
-import { JitsiRoom } from "@/components/lesson/jitsi-room";
+import { useLessonCall } from "@/providers/lesson-call-provider";
 import { LessonFeedback } from "@/components/lesson/lesson-feedback";
 import { KeyboardAwareScrollView } from "@/components/ui/keyboard-aware-scroll-view";
 import { AppText } from "@/components/ui/app-text";
@@ -23,10 +24,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
+import { JITSI_DOMAIN } from "@/config/env";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import {
-  isLessonEnded,
   lessonStatusLabel,
   lessonStatusTone,
 } from "@/lib/status";
@@ -45,9 +46,7 @@ export default function LessonRoomScreen() {
     ? `${displayName} (Academy support)`
     : displayName;
   const insets = useSafeAreaInsets();
-
-  const [joined, setJoined] = useState(false);
-  const closing = useRef(false);
+  const { call, joined, startCall, endCallForLesson } = useLessonCall();
 
   const lessonQuery = useQuery({
     queryKey: ["lessons", id],
@@ -58,11 +57,11 @@ export default function LessonRoomScreen() {
   const { refreshing, onRefresh } = usePullRefresh(lessonQuery.refetch);
 
   const lesson = lessonQuery.data;
-  const ended = lesson ? isLessonEnded(lesson) : false;
 
-  // The room stays closed until the scheduled start. Waking up exactly at that
-  // moment lets the room mount without the user refreshing.
+  // Waking up at the scheduled start and end keeps the room accurate without
+  // the user refreshing.
   const startsAtMs = lesson ? new Date(lesson.startsAt).getTime() : null;
+  const endsAtMs = lesson ? new Date(lesson.endsAt).getTime() : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (startsAtMs === null) return;
@@ -71,33 +70,73 @@ export default function LessonRoomScreen() {
     const timer = setTimeout(() => setNow(Date.now()), remaining + 500);
     return () => clearTimeout(timer);
   }, [startsAtMs]);
+  useEffect(() => {
+    if (endsAtMs === null) return;
+    const remaining = endsAtMs - Date.now();
+    if (remaining <= 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), remaining + 500);
+    return () => clearTimeout(timer);
+  }, [endsAtMs]);
   const beforeStart = startsAtMs !== null && now < startsAtMs;
+  const afterEnd = endsAtMs !== null && now >= endsAtMs;
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace("/schedule");
   }, []);
 
-  const handleClose = useCallback(() => {
-    if (closing.current) return;
-    closing.current = true;
-    goBack();
-  }, [goBack]);
+  const shareRoom = useCallback(async () => {
+    if (!lesson) return;
+    const url = `https://${JITSI_DOMAIN}/rayan-academy-${lesson.id}`;
+    try {
+      await Share.share({
+        title: "Ana Quran lesson room",
+        message: `Join my Ana Quran lesson room: ${url}`,
+        url,
+      });
+    } catch {
+      // The share sheet was dismissed.
+    }
+  }, [lesson]);
 
-  // Once someone has joined, a refetch that crosses the end time must not rip
-  // the live call away from them.
+  const callJoined = call?.lessonId === lesson?.id && joined;
+
+  // The clock alone decides when the room is open. A lesson marked ended early
+  // stays joinable until its scheduled end so either side can rejoin after a
+  // dropped call.
   const showingRoom =
     Boolean(lesson) &&
     lesson!.status !== "cancelled" &&
     !beforeStart &&
-    (!ended || joined);
+    (!afterEnd || callJoined);
+
+  useEffect(() => {
+    if (!lesson || !showingRoom) return;
+    const room = `rayan-academy-${lesson.id}`;
+    startCall({
+      lessonId: lesson.id,
+      room,
+      displayName: roomDisplayName,
+      title: "Lesson room",
+      subtitle: `${formatDateTime(lesson.startsAt)} · ${lesson.teacherName} with ${lesson.studentName}`,
+      shareUrl: `https://${JITSI_DOMAIN}/${room}`,
+    });
+  }, [lesson, roomDisplayName, showingRoom, startCall]);
+
+  // A cancelled lesson, or one that ended before anyone joined, closes the room.
+  useEffect(() => {
+    if (!lesson) return;
+    if (lesson.status === "cancelled" || (afterEnd && !callJoined)) {
+      endCallForLesson(lesson.id);
+    }
+  }, [afterEnd, callJoined, endCallForLesson, lesson]);
 
   const error = lessonQuery.error;
   const forbidden =
     error instanceof ApiError && (error.status === 403 || error.status === 404);
 
   const title =
-    lesson && ended && !showingRoom ? "Lesson recap" : "Lesson room";
+    lesson && afterEnd && !showingRoom ? "Lesson recap" : "Lesson room";
   const subtitle = lesson
     ? `${formatDateTime(lesson.startsAt)} · ${lesson.teacherName} with ${lesson.studentName}`
     : "Joining your private lesson room.";
@@ -160,6 +199,20 @@ export default function LessonRoomScreen() {
             color={showingRoom ? "#ffffff" : colors.muted}
           />
         )}
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Share lesson room link"
+        hitSlop={12}
+        disabled={!lesson}
+        onPress={() => void shareRoom()}
+        style={[styles.headerButton, { opacity: lesson ? 1 : 0.4 }]}
+      >
+        <Ionicons
+          name="share-outline"
+          size={21}
+          color={showingRoom ? "#ffffff" : colors.muted}
+        />
       </Pressable>
     </View>
   );
@@ -240,7 +293,7 @@ export default function LessonRoomScreen() {
       );
     }
 
-    if (ended && !showingRoom) {
+    if (afterEnd && !showingRoom) {
       return (
         <KeyboardAwareScrollView
           contentContainerStyle={styles.scroll}
@@ -275,16 +328,9 @@ export default function LessonRoomScreen() {
       );
     }
 
-    return (
-      <View style={[styles.stage, { paddingBottom: insets.bottom }]}>
-        <JitsiRoom
-          room={`rayan-academy-${lesson.id}`}
-          displayName={roomDisplayName}
-          onJoined={() => setJoined(true)}
-          onClose={handleClose}
-        />
-      </View>
-    );
+    // The call itself lives in the root LessonCallProvider so it survives
+    // navigation; this screen only backgrounds it while the room is open.
+    return <View style={[styles.stage, { paddingBottom: insets.bottom }]} />;
   };
 
   const darkStage = showingRoom;

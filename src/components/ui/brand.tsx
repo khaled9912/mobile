@@ -11,10 +11,19 @@ const PAGE_RIGHT =
   "M 139.5 164 C 161 165 195 168 213 176 C 218 177.5 221 181 221 186 L 221 266 C 221 276 225 282 231 285 C 201 291 167 295 139.5 292 Z";
 const SPINE = "M 139.5 171 L 139.5 290";
 
-export const BrandMark = ({ size = 48 }: { size?: number }) => {
+export const BrandMark = ({
+  size = 48,
+  color,
+  fill: fillColor,
+}: {
+  size?: number;
+  /** Override the stroke, e.g. white over the video stage. */
+  color?: string;
+  fill?: string;
+}) => {
   const { colors, scheme } = useTheme();
-  const stroke = scheme === "dark" ? "#bfe3c6" : "#217a34";
-  const fill = scheme === "dark" ? colors.card : "#f2faf3";
+  const stroke = color ?? (scheme === "dark" ? "#bfe3c6" : "#217a34");
+  const fill = fillColor ?? (scheme === "dark" ? colors.card : "#f2faf3");
 
   return (
     <Svg

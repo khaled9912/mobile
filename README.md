@@ -21,7 +21,7 @@ production data.
 | Data | TanStack Query 5 |
 | Validation | Local validators (`src/lib/validation.ts`) + server validation errors |
 | Secure storage | `expo-secure-store` (identity cache and theme only) |
-| Live lessons | Jitsi External API in `react-native-webview` |
+| Live lessons | Native `@jitsi/react-native-sdk` (`JitsiMeeting`) |
 | Media | `expo-camera`, `expo-audio`, `expo-image-picker`, `expo-image-manipulator` |
 | Notifications | `expo-notifications` (local lesson reminders only) |
 | Connectivity | `@react-native-community/netinfo` |
@@ -37,8 +37,22 @@ production data.
 - The API must be reachable over HTTPS. Defaults target
   `https://anaquran.runasp.net`.
 
+`patches/` carries compatibility fixes applied by `patch-package` on
+`npm install`: Jitsi SDK types, RN 0.88 compilation of the Jitsi worklets fork,
+`react-native-splash-view` and the GIPHY SDK, and a Swift 6.2 diagnostic in
+`expo-modules-jsi` that Xcode 26.2 raises. Remove them only after upgrading
+those packages to versions that include the fixes. `.npmrc` enables
+`legacy-peer-deps` because the Jitsi SDK pins exact peer versions that the
+Expo SDK does not satisfy.
+
 `ios/` and `android/` are **not** committed. Expo generates them from
 `app.config.ts` (Continuous Native Generation). Never edit them by hand.
+`plugins/withLessonScreenShare.js` runs during prebuild and adds the iOS
+broadcast extension, the Android media-projection service and permissions, and
+the PiP manifest flag. Run `npx expo prebuild --clean` after changing that
+plugin or any native dependency. `npm install` applies the `patch-package`
+fixes for the Jitsi SDK and `react-native-splash-view` via the `postinstall`
+script, so native generation must happen after a completed install.
 
 ---
 
@@ -58,7 +72,7 @@ QR code with Expo Go.
 
 ```dotenv
 EXPO_PUBLIC_API_URL=https://anaquran.runasp.net
-EXPO_PUBLIC_JITSI_DOMAIN=meet.jit.si
+EXPO_PUBLIC_JITSI_DOMAIN=meet.143-47-237-128.sslip.io
 ```
 
 - Values are read from `EXPO_PUBLIC_*` first, then from `app.config.ts`'s
@@ -104,7 +118,7 @@ src/
   features/            Role dashboards and change-request list features
   hooks/               use-online-status
   lib/                 Formatting, status logic, selectors, validation, storage, query client
-  providers/           Auth, theme, and lesson-reminder providers
+  providers/           Auth, theme, lesson-reminder, and lesson-call providers
   theme/               Design tokens (light and dark)
 ```
 
@@ -227,29 +241,58 @@ Everything else is a full list filtered client-side.
 
 ## Live lessons (Jitsi)
 
-The app loads `https://{JITSI_DOMAIN}/external_api.js` in a WebView and joins
-the room `rayan-academy-{lessonId}`.
+The app renders the native Jitsi SDK (`@jitsi/react-native-sdk`) and joins the
+room `rayan-academy-{lessonId}` on the self-hosted server.
 
 - The join button unlocks at `startsAt` for every participant; before then the
   screen shows a countdown and the room stays closed. There is no presence check,
   so neither side waits for the other to arrive.
 - Join modes: camera + microphone, microphone only, or watch/listen only.
   Camera and microphone permissions are requested with the native prompts
-  declared in `app.config.ts`.
+  declared in `app.config.ts` before the SDK mounts.
+- The toolbar carries microphone, camera, screen share (`desktop`), chat, and
+  hangup. Whiteboard, polls, reactions, virtual backgrounds, and the prejoin
+  page are disabled so the native room matches the web room.
+- Screen sharing is native, not a link share:
+  - iOS uses ReplayKit through the `BroadcastExtension` target that
+    `plugins/withLessonScreenShare.js` adds during prebuild. The system picker
+    lists it as **Ana Quran Screen Share**. Capture keeps running while the app
+    is backgrounded, backed by the `audio`, `voip`, and `fetch` background modes.
+    ReplayKit broadcast requires a physical iPhone or iPad; the simulator cannot
+    start a broadcast.
+  - Android uses MediaProjection (`ScreenCapturePickerView`) with a foreground
+    media-projection service, so the share survives leaving the app. `minSdk` is
+    raised to 26 by the same plugin.
+- While the call is active on Android, PiP keeps the room visible over other
+  apps: Android 12+ enters it automatically when the user presses Home, and the
+  system back gesture enters it on Android 8–11. iOS has no PiP module in this
+  SDK version: the call and screen share continue while the app is backgrounded,
+  but iOS does not float a room preview.
+- The lesson header's share action opens the native share sheet with the room
+  URL (`https://{JITSI_DOMAIN}/rayan-academy-{lessonId}`); the in-call header
+  exposes the same share action. This is a link share separate from screen
+  sharing.
+- The `JitsiMeeting` view is mounted once in the root `LessonCallProvider`, not
+  in the lesson screen. Switching tabs, opening another screen, or pressing back
+  does not end the call: it docks as a mini player with Open, share, and leave
+  actions. Only the in-call leave button, Jitsi's hangup, or signing out ends it.
+- The Ana Quran mark is overlaid at the top-left of both the full room and the
+  mini player.
 - After the lesson ends, an already-joined call is not interrupted. Returning
   later shows a recap with the report/review form instead of the room.
 - Cancelled lessons never open the room.
 
 Known Jitsi limitations in this client:
 
-- Screen sharing is not available inside the native WebView; the toolbar is
-  limited to microphone, camera, chat, and hangup. Whiteboard, polls,
-  reactions, and virtual backgrounds are disabled.
+- Screen sharing needs a native build (`npx expo run:ios` / `run:android` or
+  EAS). Expo Go cannot load the Jitsi native SDK.
 - The room is unlisted but not authenticated. The start-time gate is an
   application rule, not a Jitsi security boundary.
-- `meet.jit.si` limits calls to about 95 minutes and is shared infrastructure.
-  Production should point `EXPO_PUBLIC_JITSI_DOMAIN` at a self-hosted Jitsi
-  deployment (see the repository deployment notes).
+- The app must join the **same** self-hosted Jitsi as the web app; the default
+  is baked into `app.config.ts`. `meet.jit.si` is not an option: since 2023 it
+  requires an account before it will create a room, so anonymous lesson joins
+  fail there. When the deployment hostname changes, update the default and
+  rebuild — `EXPO_PUBLIC_*` values are baked into the JS bundle.
 - The Jitsi UI is English-only and unbranded by request.
 - Media does not pass through the ASP.NET API; only lesson data does.
 
@@ -293,7 +336,8 @@ own time changes, admins see the queue), Schedule, People (`admin`), Profile.
 - Screens inside a section keep their tab highlighted via `sectionTab()`
   (e.g. `/teachers/[id]` highlights Book, `/profile/edit` highlights Profile).
 - Fullscreen lesson rooms hide the bar; the offline banner offsets itself by
-  `TAB_BAR_CONTENT_HEIGHT` when the bar is present.
+  `TAB_BAR_CONTENT_HEIGHT` when the bar is present. A call left running outside
+  the lesson screen floats above the bar as a mini player.
 
 **Cross-role status.** The API has no push or streaming channel, so the app
 polls while it is in the foreground. `LIVE_SYNC_INTERVAL` in
@@ -403,9 +447,22 @@ npx eas-cli@latest submit --platform android
 Identifiers in `app.config.ts`:
 
 - iOS bundle: `com.anaquran.academy`
+- iOS broadcast extension: `com.anaquran.academy.broadcast`
+- iOS app group: `group.com.anaquran.academy`
 - Android package: `com.anaquran.academy`
 - URL scheme: `anaquran`
 - Orientation: portrait; tablets supported on iOS.
+
+The broadcast extension and app group must exist in the Apple Developer portal
+before device builds. Register the app group `group.com.anaquran.academy` and
+enable it for both the app id and the extension id
+`com.anaquran.academy.broadcast`, then use automatic signing. A simulator build
+compiles both targets but cannot run the ReplayKit broadcast; test screen
+sharing on a physical iPhone or iPad.
+
+Android builds require `minSdkVersion 26` (set by the plugin) and compile the
+Jitsi SDK's WebRTC module. Run `npx expo prebuild --clean` after install so the
+manifest, `minSdkVersion`, and `WebRTCModuleOptions` changes are present.
 
 Production API/Jitsi values are compiled into `app.config.ts` `extra`. To point
 a build at staging, set `EXPO_PUBLIC_API_URL` and

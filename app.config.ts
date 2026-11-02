@@ -6,8 +6,11 @@ import type { ExpoConfig } from "expo/config";
  */
 const apiUrl =
   process.env.EXPO_PUBLIC_API_URL?.trim() || "https://anaquran.runasp.net";
+// Must be the self-hosted Jitsi the web app uses. meet.jit.si requires an
+// account before it will create a room, so anonymous lesson joins fail there.
 const jitsiDomain =
-  process.env.EXPO_PUBLIC_JITSI_DOMAIN?.trim() || "meet.jit.si";
+  process.env.EXPO_PUBLIC_JITSI_DOMAIN?.trim() ||
+  "meet.143-47-237-128.sslip.io";
 
 const config: ExpoConfig = {
   name: "Ana Quran",
@@ -102,6 +105,7 @@ const config: ExpoConfig = {
         defaultChannel: "lesson-reminders",
       },
     ],
+    "./plugins/withLessonScreenShare",
   ],
   extra: {
     apiUrl,

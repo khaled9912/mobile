@@ -230,13 +230,21 @@ export default function ProfileTab() {
       <SectionHeader title="Shortcuts" />
       <Card padded={false}>
         {isTeacher ? (
-          <LinkRow
-            icon="calendar-outline"
-            title="My availability"
-            subtitle="Publish the weekly times students can book"
-            onPress={() => router.push("/availability")}
-            last
-          />
+          <>
+            <LinkRow
+              icon="calendar-outline"
+              title="My availability"
+              subtitle="Publish the weekly times students can book"
+              onPress={() => router.push("/availability")}
+            />
+            <LinkRow
+              icon="card-outline"
+              title="Monthly earnings"
+              subtitle="Completed lessons, EGP payout, and your transfer details"
+              onPress={() => router.push("/earnings")}
+              last
+            />
+          </>
         ) : isStudent ? (
           <>
             <LinkRow
@@ -250,6 +258,12 @@ export default function ProfileTab() {
               title="My schedule"
               subtitle="Upcoming and past lessons"
               onPress={() => router.navigate("/schedule")}
+            />
+            <LinkRow
+              icon="card-outline"
+              title="Monthly payment"
+              subtitle="Lessons due, the dollar account, and payment status"
+              onPress={() => router.push("/payments")}
               last
             />
           </>

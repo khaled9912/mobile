@@ -136,6 +136,10 @@ Navigation rules:
   student/admin-only (weekly time changes), People is admin-only.
 - Pushed screens use the native stack header and back gesture. Screens under an
   existing header pass `edges={["left", "right"]}` to avoid a double top inset.
+- Android system back (button or edge swipe) walks the stack and the visited tab
+  history before exiting. The app opts out of predictive back because Expo
+  Router's default stack does not consume that gesture and Android would finish
+  the activity instead of popping history.
 
 ### Web → mobile screen map
 
@@ -156,6 +160,7 @@ Navigation rules:
 | Admin time-change queue | `(app)/(tabs)/requests` |
 | Admin dashboard | `(app)/(tabs)/index` (admin variant) |
 | Admin students/teachers/assignments | `(app)/(tabs)/people`, `people/new`, `people/assign` |
+| Admin: manage a teacher's weekly rules | `(app)/people/availability/[teacherId]` (from People → Teachers) |
 | Contact form | `(app)/contact` |
 | Admin contact inbox | `(app)/contact-submissions` |
 | Profile and settings | `(app)/(tabs)/profile`, `profile/edit`, `profile/password` |
@@ -170,7 +175,7 @@ Navigation rules:
 | Schedule | ✓ | ✓ | ✓ |
 | People | — | — | ✓ |
 | Profile | ✓ | ✓ | ✓ |
-| Availability | — | ✓ | — |
+| Availability | — | ✓ (own) | ✓ (on a teacher's behalf) |
 | Contact messages | — | — | ✓ |
 
 The API enforces these roles independently; hidden tabs are not the security
@@ -235,7 +240,9 @@ TanStack Query defaults (`src/lib/query-client.ts`):
   manager and the offline banner.
 
 Only the report feed is paginated (`skip`/`take`, 10 per page, `hasMore`).
-Everything else is a full list filtered client-side.
+Everything else is fetched as a full list and windowed client-side: Schedule's
+Upcoming filter reveals one local lesson day at a time, Past keeps the last
+seven days, and completed lessons load four at a time.
 
 ---
 
@@ -307,11 +314,15 @@ for whichever account is signed in on the device:
 - The source is the existing `GET /api/lessons`: students and teachers see their
   own lessons, admins see every lesson, so each role is reminded without a new
   endpoint.
-- Only `scheduled` lessons are included. Reminders are rebuilt whenever the
-  lesson list changes, so reschedules and cancellations follow automatically.
-- The permission prompt appears once after sign-in. On Android the channel is
-  `lesson-reminders`; declare `SCHEDULE_EXACT_ALARM` if exact delivery matters
-  (the app already does).
+- Only `scheduled` lessons are included. The scheduler reconciles rather than
+  rebuilds: pending alarms that still match the lesson list are left alone, so
+  a delayed Android alarm is not cancelled before it fires. Reschedules and
+  cancellations do replace or remove their own reminders.
+- The notification permission prompt appears once after sign-in. Android also
+  asks once, in-app, for the **Alarms & reminders** special permission because
+  Android 14+ denies `SCHEDULE_EXACT_ALARM` to new installs; without it
+  reminders still schedule but may arrive late. The channel is
+  `lesson-reminders`.
 - Tapping a reminder opens `/lesson/{id}`.
 - At most 60 reminders are pending across both kinds (iOS caps pending
   notifications at 64).
@@ -508,11 +519,29 @@ Manual device QA still matters because unit tests do not exercise native UI:
 4. Teacher: announce weekly rules, start the room, submit a report after the end
    time.
 5. Admin: approve or decline a time-change request, create/deactivate/reactivate
-   an account, assign a teacher, read contact messages.
-6. Toggle light/dark/system, test large text, offline mode, and a small phone.
-7. Accept the notification prompt, book a lesson that starts in more than five
-   minutes, background the app, and confirm the reminder fires five minutes
-   before the start; tap it and confirm the lesson room opens.
+   an account, assign a teacher, manage a teacher's weekly rules from People,
+   read contact messages.
+6. Time zones: set the device to a US or UK zone while the teacher is in another
+   zone and confirm the Book, teacher profile, Home, and change-time screens show
+   converted times and the "Times shown in your time zone" note; teacher and
+   admin screens still show the teacher's clock.
+7. Schedule: confirm Upcoming initially shows only the nearest lesson day and
+   **Load more** adds the next lesson day each time (the button names that
+   day); Past shows only the last 7 days, and Cancelled only lessons within a
+   week either side of today; completed lessons load four at a time with
+   **Load more completed lessons** adding older history.
+8. Join a lesson, switch to another tab, and confirm the call continues in the
+   mini player with the logo and share/leave actions; reopen it without
+   rejoining.
+9. Toggle light/dark/system, test large text, offline mode, and a small phone.
+10. Accept the notification prompt (and, on Android 14+, allow **Alarms &
+    reminders** when asked), book a lesson that starts in more than five
+    minutes, background the app, and confirm the reminder fires five minutes
+    before the start; tap it and confirm the lesson room opens. Reopen the app
+    before the start and confirm the pending reminder is not lost.
+11. Android: press back or swipe from the screen edge on a detail screen and
+    after switching tabs; confirm it walks back through the screens and visited
+    tabs and only exits from the Home tab.
 
 No automated end-to-end suite is committed.
 
@@ -527,8 +556,10 @@ No automated end-to-end suite is committed.
 - Attendance history (no endpoint exists).
 - Group classes (lessons are one teacher and one student).
 - Mobile lesson rescheduling/cancellation; those remain web-only.
-- Admin-on-behalf weekly rules and one-off slot management; the API supports
-  both, but mobile keeps them web-only.
+- One-off slot management on a teacher's behalf; weekly rules are supported in
+  mobile, but one-off slots remain web-only.
+- Schedule history older than the past week is reachable only through the
+  completed-lesson **Load more** control, not as a full archive.
 - Editing another user's name, email, or password from the admin screens;
   mobile only activates/deactivates accounts.
 

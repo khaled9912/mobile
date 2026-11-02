@@ -104,6 +104,37 @@ export const deleteWeeklyAvailability = (ruleId: string) =>
     { method: "DELETE" }
   );
 
+// Admin publishing on a teacher's behalf.
+export const getTeacherAvailabilityAsAdmin = (teacherId: string) =>
+  apiFetch<WeeklyRule[]>(
+    `/api/admin/teachers/${encodeURIComponent(teacherId)}/availability-rules`
+  );
+
+export const publishTeacherAvailabilityAsAdmin = (
+  teacherId: string,
+  input: {
+    daysOfWeek: number[];
+    startsAtTime: string;
+    endsAtTime: string;
+    timeZoneId: string;
+  }
+) =>
+  apiFetch<WeeklyRule[]>(
+    `/api/admin/teachers/${encodeURIComponent(teacherId)}/availability-rules`,
+    { method: "POST", json: input }
+  );
+
+export const deleteTeacherAvailabilityAsAdmin = (
+  teacherId: string,
+  ruleId: string
+) =>
+  apiFetch<null>(
+    `/api/admin/teachers/${encodeURIComponent(
+      teacherId
+    )}/availability-rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE" }
+  );
+
 // Admin queue for student time-change requests.
 export const getAdminChangeRequests = (status?: ChangeRequestStatus) =>
   apiFetch<LessonChangeRequest[]>(

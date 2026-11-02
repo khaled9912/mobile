@@ -27,6 +27,11 @@ import {
   formatWeeklyTimeRange,
   weekdayLabel,
 } from "@/lib/format";
+import {
+  getViewerTimeZone,
+  toViewerWeeklyTime,
+} from "@/lib/weekly-time";
+import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
@@ -81,16 +86,22 @@ export default function TeacherProfileScreen() {
   });
 
   const teacher = teacherQuery.data;
+  const viewerTimeZone = getViewerTimeZone();
 
   const grouped = useMemo(() => {
-    const rules = teacher?.slots ?? [];
+    const entries = (teacher?.slots ?? []).map((rule) => ({
+      rule,
+      local: toViewerWeeklyTime(rule, viewerTimeZone),
+    }));
     return DAY_ORDER.map((day) => ({
       day,
-      rules: rules
-        .filter((rule) => rule.dayOfWeek === day)
-        .sort((a, b) => a.startsAtTime.localeCompare(b.startsAtTime)),
+      rules: entries
+        .filter((entry) => entry.local.dayOfWeek === day)
+        .sort((a, b) =>
+          a.local.startsAtTime.localeCompare(b.local.startsAtTime)
+        ),
     })).filter((group) => group.rules.length > 0);
-  }, [teacher?.slots]);
+  }, [teacher?.slots, viewerTimeZone]);
 
   const toggle = (rule: WeeklyRule) => {
     setNotice("");
@@ -107,7 +118,14 @@ export default function TeacherProfileScreen() {
     if (!selected.length || !teacher) return;
     const labels = (teacher.slots ?? [])
       .filter((rule) => selected.includes(rule.id))
-      .map((rule) => formatWeeklySlot(rule.dayOfWeek, rule.startsAtTime, rule.endsAtTime))
+      .map((rule) => {
+        const local = toViewerWeeklyTime(rule, viewerTimeZone);
+        return formatWeeklySlot(
+          local.dayOfWeek,
+          local.startsAtTime,
+          local.endsAtTime
+        );
+      })
       .join("\n");
     Alert.alert(
       `Book ${selected.length} weekly ${
@@ -188,33 +206,40 @@ export default function TeacherProfileScreen() {
             {teacher.series.length ? (
               <View style={styles.section}>
                 <SectionHeader title="Your weekly times" />
+                <TimeZoneNote
+                  zone={viewerTimeZone}
+                  sourceZone={teacher.series[0]?.timeZoneId}
+                />
                 <View style={styles.list}>
-                  {teacher.series.map((series) => (
-                    <Card key={series.id}>
-                      <View style={styles.ruleRow}>
-                        <View style={styles.ruleCopy}>
-                          <AppText variant="h3">
-                            {formatWeeklySlot(
-                              series.dayOfWeek,
-                              series.startsAtTime,
-                              series.endsAtTime
-                            )}
-                          </AppText>
-                          <AppText variant="caption" color="muted">
-                            Repeats every week. Ask the academy to move it.
-                          </AppText>
+                  {teacher.series.map((series) => {
+                    const local = toViewerWeeklyTime(series, viewerTimeZone);
+                    return (
+                      <Card key={series.id}>
+                        <View style={styles.ruleRow}>
+                          <View style={styles.ruleCopy}>
+                            <AppText variant="h3">
+                              {formatWeeklySlot(
+                                local.dayOfWeek,
+                                local.startsAtTime,
+                                local.endsAtTime
+                              )}
+                            </AppText>
+                            <AppText variant="caption" color="muted">
+                              Repeats every week. Ask the academy to move it.
+                            </AppText>
+                          </View>
+                          <Button
+                            title="Change time"
+                            size="sm"
+                            variant="secondary"
+                            onPress={() =>
+                              router.push(`/change-time/${series.id}`)
+                            }
+                          />
                         </View>
-                        <Button
-                          title="Change time"
-                          size="sm"
-                          variant="secondary"
-                          onPress={() =>
-                            router.push(`/change-time/${series.id}`)
-                          }
-                        />
-                      </View>
-                    </Card>
-                  ))}
+                      </Card>
+                    );
+                  })}
                 </View>
               </View>
             ) : null}
@@ -233,12 +258,19 @@ export default function TeacherProfileScreen() {
               />
               {grouped.length ? (
                 <View style={styles.list}>
+                  <TimeZoneNote
+                    zone={viewerTimeZone}
+                    sourceZone={
+                      teacher.slots[0]?.timeZoneId ??
+                      teacher.series[0]?.timeZoneId
+                    }
+                  />
                   {grouped.map((group) => (
                     <View key={group.day} style={styles.dayGroup}>
                       <AppText variant="caption" color="gold" weight="700">
                         {weekdayLabel(group.day).toUpperCase()}
                       </AppText>
-                      {group.rules.map((rule) => {
+                      {group.rules.map(({ rule, local }) => {
                         const chosen = selected.includes(rule.id);
                         const open = rule.status === "available";
                         const yours = rule.status === "yours";
@@ -247,9 +279,9 @@ export default function TeacherProfileScreen() {
                             key={rule.id}
                             accessibilityRole="checkbox"
                             accessibilityLabel={formatWeeklySlot(
-                              rule.dayOfWeek,
-                              rule.startsAtTime,
-                              rule.endsAtTime
+                              local.dayOfWeek,
+                              local.startsAtTime,
+                              local.endsAtTime
                             )}
                             accessibilityState={{
                               checked: chosen,
@@ -295,8 +327,8 @@ export default function TeacherProfileScreen() {
                             <View style={styles.ruleCopy}>
                               <AppText variant="h3">
                                 {formatWeeklyTimeRange(
-                                  rule.startsAtTime,
-                                  rule.endsAtTime
+                                  local.startsAtTime,
+                                  local.endsAtTime
                                 )}
                               </AppText>
                               <AppText variant="caption" color="muted">

@@ -399,6 +399,23 @@ export default function PeopleTab() {
                         }
                       />
                     ) : null}
+                    {tab === "teachers" ? (
+                      <Button
+                        title="Weekly availability"
+                        variant="secondary"
+                        size="sm"
+                        icon="calendar-outline"
+                        onPress={() =>
+                          router.push({
+                            pathname: "/people/availability/[teacherId]",
+                            params: {
+                              teacherId: person.id,
+                              name: person.fullName,
+                            },
+                          })
+                        }
+                      />
+                    ) : null}
                     <Button
                       title={
                         busy

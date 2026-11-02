@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   stat: { flex: 1, minWidth: 140, gap: 4 },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
     paddingVertical: 6,

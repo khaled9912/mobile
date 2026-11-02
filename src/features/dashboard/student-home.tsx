@@ -20,11 +20,14 @@ import { AppText } from "@/components/ui/app-text";
 import { Card } from "@/components/ui/card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
 import { formatWeeklySlot } from "@/lib/format";
+import { getViewerTimeZone, toViewerWeeklyTime } from "@/lib/weekly-time";
+import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export const StudentHome = () => {
   const { user, offlineSession } = useAuth();
+  const viewerTimeZone = getViewerTimeZone();
   const lessonsQuery = useQuery({
     queryKey: ["lessons"],
     queryFn: getLessons,
@@ -186,15 +189,22 @@ export const StudentHome = () => {
             </View>
             {series.length ? (
               <View style={styles.series}>
-                {series.map((item) => (
-                  <AppText key={item.id} variant="caption" color="muted">
-                    {formatWeeklySlot(
-                      item.dayOfWeek,
-                      item.startsAtTime,
-                      item.endsAtTime
-                    )}
-                  </AppText>
-                ))}
+                <TimeZoneNote
+                  zone={viewerTimeZone}
+                  sourceZone={series[0]?.timeZoneId}
+                />
+                {series.map((item) => {
+                  const local = toViewerWeeklyTime(item, viewerTimeZone);
+                  return (
+                    <AppText key={item.id} variant="caption" color="muted">
+                      {formatWeeklySlot(
+                        local.dayOfWeek,
+                        local.startsAtTime,
+                        local.endsAtTime
+                      )}
+                    </AppText>
+                  );
+                })}
               </View>
             ) : null}
             <View style={styles.rowActions}>
@@ -234,11 +244,12 @@ export const StudentHome = () => {
             label="Academy team"
             value="Time changes, billing, or account questions"
           />
-          <View style={styles.rowActions}>
+          <View style={styles.helpAction}>
             <Button
               title="Contact us"
               variant="secondary"
               size="sm"
+              fullWidth
               onPress={() => router.push("/contact")}
             />
           </View>
@@ -257,4 +268,5 @@ const styles = StyleSheet.create({
   personCopy: { flex: 1, gap: 2 },
   series: { marginTop: 12, gap: 3 },
   rowActions: { flexDirection: "row", gap: 10, marginTop: 14, flexWrap: "wrap" },
+  helpAction: { marginTop: 14 },
 });

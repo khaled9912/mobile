@@ -20,14 +20,19 @@ import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatWeeklyTimeRange, WEEKDAY_SHORT } from "@/lib/format";
+import {
+  getViewerTimeZone,
+  toViewerWeeklyTime,
+  viewerWeekdays,
+} from "@/lib/weekly-time";
+import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
-
-const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
 
 export default function BookScreen() {
   const { role } = useAuth();
   const { colors, radius } = useTheme();
+  const viewerTimeZone = getViewerTimeZone();
   const directoryQuery = useQuery({
     queryKey: ["teacher-directory"],
     queryFn: getTeacherDirectory,
@@ -118,45 +123,58 @@ export default function BookScreen() {
             </Card>
 
             {series.length ? (
-              <View style={styles.series}>
-                {series.map((item) => (
-                  <Card key={item.id}>
-                    <View style={styles.row}>
-                      <View
-                        style={[
-                          styles.dayChip,
-                          { backgroundColor: colors.brandSoft, borderRadius: radius.md },
-                        ]}
-                      >
-                        <AppText variant="caption" weight="700" color="link">
-                          {WEEKDAY_SHORT[item.dayOfWeek]}
-                        </AppText>
-                      </View>
-                      <View style={styles.copy}>
-                        <AppText variant="body" weight="600">
-                          {formatWeeklyTimeRange(
-                            item.startsAtTime,
-                            item.endsAtTime
-                          )}
-                        </AppText>
-                        <AppText variant="caption" color="muted">
-                          Repeats every {WEEKDAY_SHORT[item.dayOfWeek]} ·{" "}
-                          {item.timeZoneId.replace(/_/g, " ")}
-                        </AppText>
-                      </View>
-                      <Button
-                        title="Change"
-                        size="sm"
-                        variant="secondary"
-                        disabled={pendingChanges.some(
-                          (change) => change.seriesId === item.id
-                        )}
-                        onPress={() => router.push(`/change-time/${item.id}`)}
-                      />
-                    </View>
-                  </Card>
-                ))}
-              </View>
+              <>
+                <TimeZoneNote
+                  zone={viewerTimeZone}
+                  sourceZone={series[0]?.timeZoneId}
+                />
+                <View style={styles.series}>
+                  {series.map((item) => {
+                    const local = toViewerWeeklyTime(item, viewerTimeZone);
+                    return (
+                      <Card key={item.id}>
+                        <View style={styles.row}>
+                          <View
+                            style={[
+                              styles.dayChip,
+                              {
+                                backgroundColor: colors.brandSoft,
+                                borderRadius: radius.md,
+                              },
+                            ]}
+                          >
+                            <AppText variant="caption" weight="700" color="link">
+                              {WEEKDAY_SHORT[local.dayOfWeek]}
+                            </AppText>
+                          </View>
+                          <View style={styles.copy}>
+                            <AppText variant="body" weight="600">
+                              {formatWeeklyTimeRange(
+                                local.startsAtTime,
+                                local.endsAtTime
+                              )}
+                            </AppText>
+                            <AppText variant="caption" color="muted">
+                              Repeats every {WEEKDAY_SHORT[local.dayOfWeek]}
+                            </AppText>
+                          </View>
+                          <Button
+                            title="Change"
+                            size="sm"
+                            variant="secondary"
+                            disabled={pendingChanges.some(
+                              (change) => change.seriesId === item.id
+                            )}
+                            onPress={() =>
+                              router.push(`/change-time/${item.id}`)
+                            }
+                          />
+                        </View>
+                      </Card>
+                    );
+                  })}
+                </View>
+              </>
             ) : (
               <EmptyState
                 icon="calendar-outline"
@@ -201,9 +219,7 @@ export default function BookScreen() {
                 const open = entry.slots.filter(
                   (slot) => slot.status === "available"
                 );
-                const days = DAY_ORDER.filter((day) =>
-                  open.some((slot) => slot.dayOfWeek === day)
-                );
+                const days = viewerWeekdays(open, viewerTimeZone);
                 return (
                   <Card
                     key={entry.teacher.id}

@@ -37,6 +37,8 @@ const AppLayout = () => {
             name="availability"
             options={{ title: "My availability" }}
           />
+          <Stack.Screen name="payments" options={{ title: "Monthly payment" }} />
+          <Stack.Screen name="earnings" options={{ title: "Monthly earnings" }} />
           <Stack.Screen
             name="change-time/[seriesId]"
             options={{ title: "Change weekly time" }}
@@ -67,6 +69,10 @@ const AppLayout = () => {
           <Stack.Screen
             name="people/support"
             options={{ title: "Support team" }}
+          />
+          <Stack.Screen
+            name="people/availability/[teacherId]"
+            options={{ title: "Weekly availability" }}
           />
           <Stack.Screen
             name="contact-submissions"

@@ -7,6 +7,7 @@ const shortDateTimeOptions: Intl.DateTimeFormatOptions = {
   month: "short",
   hour: "numeric",
   minute: "2-digit",
+  hour12: true,
 };
 
 const longDateOptions: Intl.DateTimeFormatOptions = {
@@ -19,9 +20,20 @@ const longDateOptions: Intl.DateTimeFormatOptions = {
 const timeOptions: Intl.DateTimeFormatOptions = {
   hour: "numeric",
   minute: "2-digit",
+  hour12: true,
 };
 
 export const parseDate = (value: string) => new Date(value);
+
+/** Formats an academy month key ("2026-11") for labels. */
+export const formatMonthKey = (value: string) => {
+  const [year, month] = value.split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+};
 
 export const formatDateTime = (value: string) => {
   const date = parseDate(value);

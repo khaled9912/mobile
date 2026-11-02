@@ -4,10 +4,13 @@ import { router } from "expo-router";
 import type { Lesson } from "@/api/types";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
 import {
+  isLessonLive,
   isReportDue,
   lessonStatusLabel,
   lessonStatusTone,
 } from "@/lib/status";
+import { useNow } from "@/hooks/use-now";
+import { useTheme } from "@/providers/theme-provider";
 import { Card } from "@/components/ui/card";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +23,9 @@ type Props = {
 };
 
 export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => {
+  const { colors, radius } = useTheme();
+  const now = useNow();
+  const live = isLessonLive(lesson, now);
   const person =
     perspective === "teacher"
       ? lesson.studentName
@@ -30,16 +36,37 @@ export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => 
   return (
     <Card
       onPress={() => router.push(`/lesson/${lesson.id}`)}
-      accessibilityLabel={`${formatDateTime(lesson.startsAt)} with ${person}`}
+      accessibilityLabel={`${formatDateTime(lesson.startsAt)} with ${person}${live ? ", live now" : ""}`}
+      style={live ? { borderColor: colors.success } : undefined}
     >
       <View style={styles.topRow}>
         <View style={styles.copy}>
           <AppText variant="caption" color="gold" weight="700">
             {relativeDay(lesson.startsAt).toUpperCase()}
           </AppText>
-          <AppText variant="h3" style={styles.title}>
-            {formatTimeRange(lesson.startsAt, lesson.endsAt)}
-          </AppText>
+          <View style={styles.timeRow}>
+            <AppText variant="h3" style={styles.title}>
+              {formatTimeRange(lesson.startsAt, lesson.endsAt)}
+            </AppText>
+            {live ? (
+              <View
+                style={[
+                  styles.livePill,
+                  {
+                    backgroundColor: colors.successSoft,
+                    borderRadius: radius.pill,
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.liveDot, { backgroundColor: colors.success }]}
+                />
+                <AppText variant="caption" weight="700" color={colors.success}>
+                  Live now
+                </AppText>
+              </View>
+            ) : null}
+          </View>
           <AppText variant="small" color="muted" style={styles.subtitle}>
             {perspective === "teacher" ? "Student" : "Teacher"}: {person}
           </AppText>
@@ -51,10 +78,12 @@ export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => 
         </View>
         <View style={styles.badges}>
           {lesson.isTrial ? <Badge label="Trial" tone="info" /> : null}
-          <Badge
-            label={lessonStatusLabel[lesson.status]}
-            tone={lessonStatusTone[lesson.status]}
-          />
+          {live ? null : (
+            <Badge
+              label={lessonStatusLabel[lesson.status]}
+              tone={lessonStatusTone[lesson.status]}
+            />
+          )}
         </View>
       </View>
 
@@ -89,6 +118,20 @@ const styles = StyleSheet.create({
   copy: { flex: 1, gap: 2 },
   badges: { alignItems: "flex-end", gap: 6 },
   title: { marginTop: 1 },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3 },
   subtitle: { marginTop: 2 },
   flag: { marginTop: 10 },
   action: { marginTop: 14 },

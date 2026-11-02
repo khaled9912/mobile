@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +26,12 @@ import {
   WEEKDAY_LABELS,
   WEEKDAY_SHORT,
 } from "@/lib/format";
+import {
+  getViewerTimeZone,
+  toViewerWeeklySlotLabel,
+  toViewerWeeklyTime,
+} from "@/lib/weekly-time";
+import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
@@ -46,6 +52,10 @@ export default function ChangeTimeScreen() {
   });
   const series = (seriesQuery.data ?? []).find((item) => item.id === seriesId);
   const teacherId = series?.teacherId ?? "";
+  const viewerTimeZone = getViewerTimeZone();
+  const seriesLocal = series
+    ? toViewerWeeklyTime(series, viewerTimeZone)
+    : null;
 
   const teacherQuery = useQuery({
     queryKey: ["teacher-profile", teacherId],
@@ -63,16 +73,15 @@ export default function ChangeTimeScreen() {
     (change) => change.status === "pending" && change.seriesId === seriesId
   );
 
-  const available = useMemo(() => {
-    const rules = teacherQuery.data?.slots ?? [];
-    return rules
-      .filter((rule) => rule.status === "available")
-      .sort(
-        (a, b) =>
-          (DAY_ORDER.indexOf(a.dayOfWeek) - DAY_ORDER.indexOf(b.dayOfWeek)) ||
-          a.startsAtTime.localeCompare(b.startsAtTime)
-      );
-  }, [teacherQuery.data]);
+  const available = (teacherQuery.data?.slots ?? [])
+    .filter((rule) => rule.status === "available")
+    .map((rule) => ({ rule, local: toViewerWeeklyTime(rule, viewerTimeZone) }))
+    .sort(
+      (a, b) =>
+        DAY_ORDER.indexOf(a.local.dayOfWeek) -
+          DAY_ORDER.indexOf(b.local.dayOfWeek) ||
+        a.local.startsAtTime.localeCompare(b.local.startsAtTime)
+    );
 
   const submit = useMutation({
     mutationFn: (ruleId: string) =>
@@ -101,25 +110,29 @@ export default function ChangeTimeScreen() {
     },
   });
 
-  const renderRule = (rule: WeeklyRule) => {
+  const renderRule = ({
+    rule,
+    local,
+  }: {
+    rule: WeeklyRule;
+    local: ReturnType<typeof toViewerWeeklyTime>;
+  }) => {
     const isSelected = selected === rule.id;
     return (
       <Card
         key={rule.id}
         onPress={() => setSelected(isSelected ? null : rule.id)}
         accessibilityLabel={`${formatWeeklySlot(
-          rule.dayOfWeek,
-          rule.startsAtTime,
-          rule.endsAtTime
+          local.dayOfWeek,
+          local.startsAtTime,
+          local.endsAtTime
         )}`}
       >
         <View style={styles.ruleRow}>
           <View style={styles.rulecopy}>
-            <AppText variant="h3">
-              {WEEKDAY_LABELS[rule.dayOfWeek]}
-            </AppText>
+            <AppText variant="h3">{WEEKDAY_LABELS[local.dayOfWeek]}</AppText>
             <AppText variant="small" color="muted">
-              {formatWeeklyTimeRange(rule.startsAtTime, rule.endsAtTime)}
+              {formatWeeklyTimeRange(local.startsAtTime, local.endsAtTime)}
             </AppText>
           </View>
           <Badge
@@ -131,13 +144,12 @@ export default function ChangeTimeScreen() {
     );
   };
 
-  const grouped = available.reduce<Record<number, WeeklyRule[]>>(
-    (acc, rule) => {
-      (acc[rule.dayOfWeek] ??= []).push(rule);
-      return acc;
-    },
-    {}
-  );
+  const grouped = available.reduce<
+    Record<number, (typeof available)[number][]>
+  >((acc, entry) => {
+    (acc[entry.local.dayOfWeek] ??= []).push(entry);
+    return acc;
+  }, {});
 
   return (
     <RoleGate roles={["student"]}>
@@ -163,10 +175,14 @@ export default function ChangeTimeScreen() {
             <Notice
               tone="warning"
               title="A change is already being reviewed"
-              message={`You asked to move this weekly time to ${formatWeeklySlot(
-                pending.requestedDayOfWeek,
-                pending.requestedStartsAtTime,
-                pending.requestedEndsAtTime
+              message={`You asked to move this weekly time to ${toViewerWeeklySlotLabel(
+                {
+                  dayOfWeek: pending.requestedDayOfWeek,
+                  startsAtTime: pending.requestedStartsAtTime,
+                  endsAtTime: pending.requestedEndsAtTime,
+                  timeZoneId: pending.timeZoneId,
+                },
+                viewerTimeZone
               )}. Wait for the academy to respond first.`}
             />
           </View>
@@ -198,15 +214,21 @@ export default function ChangeTimeScreen() {
             <Card>
               <AppText variant="h3">
                 {formatWeeklySlot(
-                  series.dayOfWeek,
-                  series.startsAtTime,
-                  series.endsAtTime
+                  seriesLocal?.dayOfWeek ?? series.dayOfWeek,
+                  seriesLocal?.startsAtTime ?? series.startsAtTime,
+                  seriesLocal?.endsAtTime ?? series.endsAtTime
                 )}
               </AppText>
               <AppText variant="caption" color="muted">
                 With {series.teacherName} · repeats every{" "}
-                {WEEKDAY_SHORT[series.dayOfWeek]}
+                {WEEKDAY_SHORT[seriesLocal?.dayOfWeek ?? series.dayOfWeek]}
               </AppText>
+              <View style={styles.note}>
+                <TimeZoneNote
+                  zone={viewerTimeZone}
+                  sourceZone={series.timeZoneId}
+                />
+              </View>
             </Card>
 
             <View style={styles.section}>
@@ -219,18 +241,26 @@ export default function ChangeTimeScreen() {
                   onRetry={() => void teacherQuery.refetch()}
                 />
               ) : available.length ? (
-                <View style={styles.list}>
-                  {DAY_ORDER.filter((day) => grouped[day]?.length).map(
-                    (day) => (
-                      <View key={day} style={styles.day}>
-                        <AppText variant="label" color="muted">
-                          {WEEKDAY_LABELS[day]}
-                        </AppText>
-                        {grouped[day].map(renderRule)}
-                      </View>
-                    )
-                  )}
-                </View>
+                <>
+                  <TimeZoneNote
+                    zone={viewerTimeZone}
+                    sourceZone={
+                      available[0]?.rule.timeZoneId ?? series.timeZoneId
+                    }
+                  />
+                  <View style={styles.list}>
+                    {DAY_ORDER.filter((day) => grouped[day]?.length).map(
+                      (day) => (
+                        <View key={day} style={styles.day}>
+                          <AppText variant="label" color="muted">
+                            {WEEKDAY_LABELS[day]}
+                          </AppText>
+                          {grouped[day].map(renderRule)}
+                        </View>
+                      )
+                    )}
+                  </View>
+                </>
               ) : (
                 <EmptyState
                   icon="time-outline"
@@ -273,6 +303,7 @@ const styles = StyleSheet.create({
   section: { marginTop: 24, gap: 12 },
   list: { gap: 18 },
   day: { gap: 8 },
+  note: { marginTop: 10 },
   ruleRow: {
     flexDirection: "row",
     alignItems: "center",

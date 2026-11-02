@@ -10,12 +10,21 @@ import { Segmented } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { pastLessons, upcomingLessons } from "@/lib/lesson-selectors";
-import { isReportDue } from "@/lib/status";
+import { AppText } from "@/components/ui/app-text";
+import {
+  cancelledLessons,
+  COMPLETED_PAGE_SIZE,
+  countCompletedLessons,
+  pastLessons,
+  upcomingDayPage,
+  upcomingLessons,
+} from "@/lib/lesson-selectors";
+import { relativeDay } from "@/lib/format";
+import { isLessonJoinable, isReportDue } from "@/lib/status";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
-type Filter = "upcoming" | "past" | "all";
+type Filter = "upcoming" | "past" | "cancelled";
 
 export default function ScheduleTab() {
   const { role } = useAuth();
@@ -23,6 +32,8 @@ export default function ScheduleTab() {
   const isTeacher = role === "teacher";
   const isAdmin = isAdminRole(role);
   const [filter, setFilter] = useState<Filter>("upcoming");
+  const [completedLimit, setCompletedLimit] = useState(COMPLETED_PAGE_SIZE);
+  const [upcomingDays, setUpcomingDays] = useState(1);
 
   const lessonsQuery = useQuery({
     queryKey: ["lessons"],
@@ -30,12 +41,26 @@ export default function ScheduleTab() {
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
-  const list = useMemo(() => {
-    const lessons = lessonsQuery.data ?? [];
-    if (filter === "upcoming") return upcomingLessons(lessons);
-    if (filter === "past") return pastLessons(lessons);
-    return [...lessons].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  }, [filter, lessonsQuery.data]);
+  const lessons = lessonsQuery.data ?? [];
+  // Computed on render so the "today" page advances at local midnight.
+  const upcomingPage = upcomingDayPage(lessons, upcomingDays);
+  const list =
+    filter === "upcoming"
+      ? upcomingPage.lessons
+      : filter === "cancelled"
+        ? cancelledLessons(lessons)
+        : pastLessons(lessons, { windowDays: 7, completedLimit });
+
+  const totalCompleted = useMemo(
+    () => countCompletedLessons(lessonsQuery.data ?? []),
+    [lessonsQuery.data]
+  );
+  const hasMoreCompleted =
+    filter === "past" && totalCompleted > completedLimit;
+  const hasMoreUpcoming = filter === "upcoming" && upcomingPage.hasMore;
+  const nextDayLabel = upcomingPage.nextDay
+    ? relativeDay(new Date(upcomingPage.nextDay).toISOString())
+    : null;
 
   // Offer "change time" once per weekly series, on its next lesson.
   const firstOfSeries = useMemo(() => {
@@ -80,9 +105,16 @@ export default function ScheduleTab() {
         options={[
           { value: "upcoming", label: "Upcoming" },
           { value: "past", label: "Past" },
-          { value: "all", label: "All" },
+          { value: "cancelled", label: "Cancelled" },
         ]}
       />
+      <AppText variant="caption" color="muted" style={styles.windowNote}>
+        {filter === "upcoming"
+          ? "Showing one lesson day at a time."
+          : filter === "past"
+            ? "Showing the last 7 days · completed lessons load four at a time."
+            : "Showing cancelled lessons within one week of today."}
+      </AppText>
 
       <View style={styles.list}>
         {lessonsQuery.isLoading ? (
@@ -93,40 +125,57 @@ export default function ScheduleTab() {
             onRetry={() => void lessonsQuery.refetch()}
           />
         ) : list.length ? (
-          list.map((lesson) => (
-            <LessonCard
-              key={lesson.id}
-              lesson={lesson}
-              perspective={perspective}
-              action={
-                isTeacher && isReportDue(lesson) ? (
-                  <Button
-                    title="Write lesson report"
-                    size="sm"
-                    onPress={() => router.push(`/lesson/${lesson.id}`)}
-                  />
-                ) : isTeacher && lesson.status === "scheduled" ? (
-                  <Button
-                    title="Open lesson room"
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => router.push(`/lesson/${lesson.id}`)}
-                  />
-                ) : isStudent &&
-                  lesson.seriesId &&
-                  firstOfSeries.get(lesson.seriesId) === lesson.id ? (
-                  <Button
-                    title="Change weekly time"
-                    size="sm"
-                    variant="secondary"
-                    onPress={() =>
-                      router.push(`/change-time/${lesson.seriesId}`)
-                    }
-                  />
-                ) : undefined
-              }
-            />
-          ))
+          <>
+            {list.map((lesson) => (
+              <LessonCard
+                key={lesson.id}
+                lesson={lesson}
+                perspective={perspective}
+                action={
+                  (isTeacher || isStudent) && isLessonJoinable(lesson) ? (
+                    <Button
+                      title={isTeacher ? "Open lesson room" : "Attend lesson"}
+                      size="sm"
+                      onPress={() => router.push(`/lesson/${lesson.id}`)}
+                    />
+                  ) : isTeacher && isReportDue(lesson) ? (
+                    <Button
+                      title="Write lesson report"
+                      size="sm"
+                      onPress={() => router.push(`/lesson/${lesson.id}`)}
+                    />
+                  ) : isStudent &&
+                    lesson.seriesId &&
+                    firstOfSeries.get(lesson.seriesId) === lesson.id ? (
+                    <Button
+                      title="Change weekly time"
+                      size="sm"
+                      variant="secondary"
+                      onPress={() =>
+                        router.push(`/change-time/${lesson.seriesId}`)
+                      }
+                    />
+                  ) : undefined
+                }
+              />
+            ))}
+            {hasMoreUpcoming ? (
+              <Button
+                title={`Load more${nextDayLabel ? ` · ${nextDayLabel}` : ""}`}
+                variant="secondary"
+                onPress={() => setUpcomingDays((value) => value + 1)}
+              />
+            ) : null}
+            {hasMoreCompleted ? (
+              <Button
+                title="Load more completed lessons"
+                variant="secondary"
+                onPress={() =>
+                  setCompletedLimit((value) => value + COMPLETED_PAGE_SIZE)
+                }
+              />
+            ) : null}
+          </>
         ) : (
           <EmptyState
             icon="calendar-outline"
@@ -134,18 +183,20 @@ export default function ScheduleTab() {
               filter === "upcoming"
                 ? "No upcoming lessons"
                 : filter === "past"
-                  ? "No past lessons yet"
-                  : "No lessons yet"
+                  ? "No lessons in the last 7 days"
+                  : "No cancelled lessons"
             }
             body={
-              isStudent
-                ? "Book weekly lessons with a teacher to get started."
-                : isTeacher
-                  ? "Publish your weekly availability so students can book."
-                  : "Booked lessons will appear here."
+              filter === "cancelled"
+                ? "Cancelled lessons from the past or next week will appear here."
+                : isStudent
+                  ? "Book weekly lessons with a teacher to get started."
+                  : isTeacher
+                    ? "Publish your weekly availability so students can book."
+                    : "Booked lessons will appear here."
             }
             action={
-              isStudent ? (
+              filter === "cancelled" ? undefined : isStudent ? (
                 <Button
                   title="Book weekly lessons"
                   size="sm"
@@ -167,5 +218,6 @@ export default function ScheduleTab() {
 }
 
 const styles = StyleSheet.create({
+  windowNote: { marginTop: 10 },
   list: { marginTop: 18, gap: 10 },
 });

@@ -57,8 +57,18 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
     }
     // Wait for a real fetch: an offline launch must keep last launch's reminders.
     if (!lessonsQuery.data) return;
-    const reminders = buildLessonReminders(lessonsQuery.data, role, Date.now());
-    void syncLessonReminders(reminders);
+    const now = Date.now();
+    const reminders = buildLessonReminders(lessonsQuery.data, role, now);
+    const activeLessonIds = new Set(
+      lessonsQuery.data
+        .filter(
+          (lesson) =>
+            lesson.status === "scheduled" &&
+            new Date(lesson.endsAt).getTime() > now
+        )
+        .map((lesson) => lesson.id)
+    );
+    void syncLessonReminders(reminders, activeLessonIds);
   }, [remindersEnabled, lessonsQuery.data, role]);
 
   useEffect(() => {

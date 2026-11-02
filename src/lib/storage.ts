@@ -4,6 +4,7 @@ import type { UserProfile } from "@/api/types";
 const SESSION_KEY = "anaquran.session.v1";
 const THEME_KEY = "anaquran.theme.v1";
 const WELCOME_KEY = "anaquran.welcome.v1";
+const EXACT_ALARM_KEY = "anaquran.exact-alarm.v1";
 
 export type CachedSession = {
   user: UserProfile;
@@ -80,5 +81,22 @@ export async function writeWelcomeSeen(): Promise<void> {
     await SecureStore.setItemAsync(WELCOME_KEY, "1");
   } catch {
     // Best-effort; worst case the welcome screen appears once more.
+  }
+}
+
+export async function readExactAlarmPromptSeen(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(EXACT_ALARM_KEY)) === "1";
+  } catch {
+    // If the flag cannot be read, do not ask again.
+    return true;
+  }
+}
+
+export async function writeExactAlarmPromptSeen(): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(EXACT_ALARM_KEY, "1");
+  } catch {
+    // Best-effort; worst case the prompt appears once more.
   }
 }

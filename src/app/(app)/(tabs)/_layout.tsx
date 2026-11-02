@@ -16,6 +16,7 @@ const TabLayout = () => {
   // The visible bar lives in (app)/_layout so it also covers stack screens.
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         tabBarStyle: { display: "none" },

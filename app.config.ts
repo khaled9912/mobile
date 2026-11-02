@@ -35,7 +35,9 @@ const config: ExpoConfig = {
   },
   android: {
     package: "com.anaquran.academy",
-    predictiveBackGestureEnabled: true,
+    // Expo Router's default stack does not consume Android's predictive back
+    // gesture, so the system finishes the activity instead of popping history.
+    predictiveBackGestureEnabled: false,
     adaptiveIcon: {
       backgroundColor: "#fbfaf6",
       foregroundImage: "./assets/android-icon-foreground.png",

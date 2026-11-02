@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Clipboard from "@react-native-clipboard/clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
 import { AppText } from "@/components/ui/app-text";
@@ -41,6 +42,67 @@ const detailLabel = (entry: ApiDebugEntry) => {
   return `${entry.status} · ${entry.durationMs ?? 0} ms`;
 };
 
+const CopyButton = ({ value, label }: { value: string; label: string }) => {
+  const { colors, radius } = useTheme();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  const copy = () => {
+    Clipboard.setString(value);
+    setCopied(true);
+  };
+
+  const tint = copied ? colors.success : colors.text;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        copied ? `${label} copied` : `Copy ${label.toLowerCase()}`
+      }
+      hitSlop={8}
+      onPress={copy}
+      style={({ pressed }) => [
+        styles.copy,
+        {
+          borderColor: copied ? colors.success : colors.border,
+          borderRadius: radius.sm,
+          opacity: pressed ? 0.6 : 1,
+        },
+      ]}
+    >
+      <Ionicons
+        name={copied ? "checkmark" : "copy-outline"}
+        size={12}
+        color={tint}
+      />
+      <Text style={[styles.copyLabel, { color: tint }]}>
+        {copied ? "Copied" : "Copy"}
+      </Text>
+    </Pressable>
+  );
+};
+
+const SectionLabel = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) => (
+  <View style={styles.blockHeader}>
+    <AppText variant="caption" color="muted" weight="700">
+      {label}
+    </AppText>
+    <CopyButton value={value} label={label} />
+  </View>
+);
+
 const EntryRow = ({
   entry,
   expanded,
@@ -60,6 +122,8 @@ const EntryRow = ({
         : entry.status >= 400
           ? colors.warning
           : colors.success;
+
+  const responseBody = entry.error ?? stringify(entry.response);
 
   return (
     <View
@@ -103,9 +167,7 @@ const EntryRow = ({
         <View style={[styles.details, { borderTopColor: colors.border }]}>
           {entry.request !== null ? (
             <>
-              <AppText variant="caption" color="muted" weight="700">
-                REQUEST
-              </AppText>
+              <SectionLabel label="REQUEST" value={stringify(entry.request)} />
               <ScrollView
                 nestedScrollEnabled
                 showsVerticalScrollIndicator
@@ -114,17 +176,15 @@ const EntryRow = ({
                   { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm },
                 ]}
               >
-                <Text style={[styles.code, { color: colors.text }]}>
+                <Text selectable style={[styles.code, { color: colors.text }]}>
                   {stringify(entry.request)}
                 </Text>
               </ScrollView>
             </>
           ) : null}
-          <AppText variant="caption" color="muted" weight="700">
-            RESPONSE
-          </AppText>
+          <SectionLabel label="RESPONSE" value={responseBody} />
           {entry.error ? (
-            <AppText variant="small" color="danger">
+            <AppText variant="small" color="danger" selectable>
               {entry.error}
             </AppText>
           ) : (
@@ -136,7 +196,7 @@ const EntryRow = ({
                 { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm },
               ]}
             >
-              <Text style={[styles.code, { color: colors.text }]}>
+              <Text selectable style={[styles.code, { color: colors.text }]}>
                 {stringify(entry.response)}
               </Text>
             </ScrollView>
@@ -230,7 +290,7 @@ export const ApiDebugOverlay = () => {
                 <AppText variant="h3">API debugger</AppText>
                 <AppText variant="caption" color="muted">
                   {entries.length} request{entries.length === 1 ? "" : "s"} · tap
-                  one for the bodies
+                  one to view or copy the bodies
                 </AppText>
               </View>
               <Pressable
@@ -388,6 +448,21 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 6,
   },
+  blockHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  copy: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  copyLabel: { fontSize: 11, fontWeight: "700" },
   codeBlock: { padding: 10, maxHeight: 220 },
   code: {
     fontFamily: "monospace",

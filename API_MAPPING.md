@@ -202,6 +202,17 @@ student took it), or `yours` (already booked by the caller).
 - Every booking is permanent: a `LessonSeries` that the API materializes 8 weeks
   ahead and rolls forward.
 
+Students can be in a different zone from their teacher (US/UK students with a
+teacher elsewhere), so every student-facing weekly time — directory day chips,
+teacher profile groups, assigned series, and change-request times — is converted
+from the rule's IANA `timeZoneId` to the device zone by
+`lib/weekly-time.ts`. The conversion anchors on the next occurrence, so day
+shifts (e.g. Monday 00:30 London → Sunday evening in New York) and US/UK
+daylight-saving differences are handled the same way the API materializes
+lessons. A `TimeZoneNote` names the viewer zone and the teacher's zone when they
+differ. Teacher and admin screens keep the teacher's wall clock, and booking
+still sends rule ids only — no API change.
+
 ---
 
 ## 6. Weekly time changes (student → admin only)
@@ -241,7 +252,12 @@ admin's note) on their dashboard.
 `LessonDto` embeds `report` and `review` DTOs when they exist, so the detail
 screen does not make separate report/review GETs.
 
-The Schedule tab filters the returned list into Upcoming / Past / All. The
+The Schedule tab works from the full lesson list and windows it client-side:
+Upcoming starts with the nearest lesson day (today when there is one) and each
+Load more reveals the next lesson day; Past keeps the previous 7 days; and
+Cancelled shows lessons within a week either side of today. Completed lessons
+are shown four at a time with a Load more action that raises the client-side
+cap, so older history stays reachable without loading everything at once. The
 teacher view surfaces lessons whose report is due and links them to the lesson
 screen; other roles only open the lesson room.
 
@@ -291,27 +307,36 @@ objects ship inside `LessonDto`.
 
 ---
 
-## 10. Availability (teacher)
+## 10. Availability (teacher and admin)
 
 | Feature | Mobile caller | Request | Response |
 | --- | --- | --- | --- |
 | List rules | `scheduling.getMyAvailabilityRules` | `GET /api/teacher/availability-rules` | `WeeklyRuleDto[]` |
 | Announce rules | `scheduling.publishWeeklyAvailability` | `POST /api/teacher/availability-rules` `{ daysOfWeek, startsAtTime, endsAtTime, timeZoneId }` | `201 WeeklyRuleDto[]` |
 | Remove rule | `scheduling.deleteWeeklyAvailability` | `DELETE /api/teacher/availability-rules/{ruleId}` | `204` |
+| Admin lists a teacher's rules | `scheduling.getTeacherAvailabilityAsAdmin` | `GET /api/admin/teachers/{teacherId}/availability-rules` | `WeeklyRuleDto[]` |
+| Admin announces rules | `scheduling.publishTeacherAvailabilityAsAdmin` | `POST /api/admin/teachers/{teacherId}/availability-rules` `{ daysOfWeek, startsAtTime, endsAtTime, timeZoneId }` | `201 WeeklyRuleDto[]` |
+| Admin removes a rule | `scheduling.deleteTeacherAvailabilityAsAdmin` | `DELETE /api/admin/teachers/{teacherId}/availability-rules/{ruleId}` | `204` |
 
 One call announces the same hours on several weekdays (for example Saturday
 through Thursday). The API requires at least one weekday, end after start, a
 range of at most 4 hours, a valid IANA time zone, and no overlap with the
 teacher's existing rules (`400`). A rule that a student has booked — or that is
 part of a pending change request — cannot be deleted (`409`). The screen
-defaults to Saturday–Thursday, uses the device time zone, and refreshes the
-dashboard and directory after publishing.
+defaults to Saturday–Thursday and refreshes the dashboard and directory after
+publishing.
+
+Teachers use `(app)/availability` and the device time zone. Admins open the same
+editor from People → a teacher's **Weekly availability** button
+(`(app)/people/availability/[teacherId]`); it loads that teacher's rules and
+defaults the time zone to their existing zone, which the admin can correct
+before announcing.
 
 The teacher has no request or approval screen: bookings are automatic and time
 changes are handled by the admin. The legacy one-off endpoints
 (`/api/teacher/availability`, `/api/teacher/student-availability`,
-`/api/student/availability`) and admin-on-behalf slot management still exist in
-the API but are no longer called by mobile. Admin weekly-rule management is a
+`/api/student/availability`, `/api/admin/teachers/{id}/availability`) still
+exist in the API but are not called by mobile; one-off slot management remains a
 web-only flow.
 
 ---
@@ -387,6 +412,7 @@ reconnect, no mutation retries.
 | `["assigned-teacher"]` | Student's active teacher and their weekly rules |
 | `["series"]` | Student's booked weekly times |
 | `["availability-rules", "teacher"]` | Teacher's announced weekly rules |
+| `["availability-rules", "admin", teacherId]` | One teacher's rules in the admin editor |
 | `["admin", "students", includeInactive]` | Admin student list |
 | `["admin", "teachers", includeInactive]` | Admin teacher list |
 | `["admin", "assignments"]` | Active assignments |
@@ -407,7 +433,7 @@ clear the entire cache.
 | `GET /api/teachers/public`, `GET /api/teachers/public/{id}` | Anonymous marketing directory; the app requires sign-in |
 | `GET /api/students/{id}` | Lists already include the fields the admin UI shows |
 | `GET/POST /api/student/availability`, `DELETE /api/student/availability/{id}` | Superseded by weekly rules; no student self-service availability screen in mobile |
-| `GET/POST /api/admin/teachers/{id}/availability-rules` (and legacy `/availability`) | Admin-on-behalf weekly rules remain a web-only flow |
+| `GET/POST /api/admin/teachers/{id}/availability` (legacy one-off) | Admin weekly rules use `/availability-rules`; one-off slot management remains web-only |
 | `GET/POST/DELETE /api/teacher/availability`, `/api/teacher/student-availability` | Superseded by `/api/teacher/availability-rules` |
 | `/api/lesson-requests` (student, teacher, admin variants) | Superseded by instant `POST /api/student/bookings`; the teacher and admin approval screens were removed |
 | `PATCH /api/lessons/{id}`, `DELETE /api/lessons/{id}` | Rescheduling and cancelling lessons remain a web-only flow |
@@ -442,14 +468,14 @@ notifications with `expo-notifications`:
 | Behaviour | Detail |
 | --- | --- |
 | Source data | `GET /api/lessons` — student/teacher see their own lessons; admin sees all |
-| Included lessons | `status === "scheduled"`, ends in the future, starts more than 5 minutes from now |
-| Trigger | `startsAt − 5 minutes`, one notification per lesson |
-| Identifier | `lesson-reminder:{lessonId}` (deterministic, replaced on every sync) |
+| Included lessons | `status === "scheduled"`, ends in the future, starts in the future |
+| Trigger | `startsAt − 5 minutes` (only if still ahead) and `startsAt`, two notifications per lesson |
+| Identifier | `lesson-reminder:{lessonId}:{lead\|start}` (deterministic; the scheduled content also stores `triggerAt`) |
 | Limit | 60 pending reminders (iOS allows 64 pending per app) |
-| Refresh | Rebuilt whenever the `/api/lessons` query data changes; cancellations and reschedules follow automatically |
+| Refresh | Reconciled whenever the `/api/lessons` query data changes: matching alarms are kept, stale ones are cancelled, new or moved ones are scheduled |
 | Sign-out | Pending lesson reminders are cancelled |
 | Tap action | Opens `(app)/lesson/[id]` |
-| Permission | Requested once after sign-in; Android channel `lesson-reminders` |
+| Permission | Notification permission requested once after sign-in; Android asks once for the **Alarms & reminders** special permission (Android 14+ denies it by default) so delivery stays exact; channel `lesson-reminders` |
 
 Delivery is per device: an account receives reminders on each phone where it
 has opened the app and synced the lesson list. Guaranteed delivery to a device

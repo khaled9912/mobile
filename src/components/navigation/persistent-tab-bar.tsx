@@ -3,7 +3,11 @@ import { router, useSegments } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
-import { isAdminRole, useAuth } from "@/providers/auth-provider";
+import {
+  canReviewLessons,
+  isAdminRole,
+  useAuth,
+} from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 
 /**
@@ -12,11 +16,25 @@ import { useTheme } from "@/providers/theme-provider";
  */
 export const TAB_BAR_CONTENT_HEIGHT = 56;
 
-type TabKey = "home" | "book" | "requests" | "schedule" | "people" | "profile";
+type TabKey =
+  | "home"
+  | "book"
+  | "requests"
+  | "schedule"
+  | "reviews"
+  | "people"
+  | "profile";
 
 type TabDef = {
   key: TabKey;
-  route: "/" | "/book" | "/requests" | "/schedule" | "/people" | "/profile";
+  route:
+    | "/"
+    | "/book"
+    | "/requests"
+    | "/schedule"
+    | "/reviews"
+    | "/people"
+    | "/profile";
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   activeIcon: keyof typeof Ionicons.glyphMap;
@@ -52,6 +70,13 @@ const ALL_TABS: TabDef[] = [
     activeIcon: "calendar",
   },
   {
+    key: "reviews",
+    route: "/reviews",
+    label: "Reviews",
+    icon: "reader-outline",
+    activeIcon: "reader",
+  },
+  {
     key: "people",
     route: "/people",
     label: "People",
@@ -85,6 +110,8 @@ const sectionTab = (
     case "profile":
     case "contact":
       return "profile";
+    case "reviews":
+      return "reviews";
     case "people":
     case "contact-submissions":
       return "people";
@@ -101,10 +128,14 @@ export const PersistentTabBar = () => {
 
   const isStudent = role === "student";
   const isAdmin = isAdminRole(role);
+  const isSupport = role === "support";
 
   const tabs = ALL_TABS.filter((tab) => {
+    if (tab.key === "home") return !isSupport;
     if (tab.key === "book") return isStudent;
     if (tab.key === "requests") return isStudent || isAdmin;
+    if (tab.key === "schedule") return !isSupport;
+    if (tab.key === "reviews") return canReviewLessons(role);
     if (tab.key === "people") return isAdmin;
     return true;
   });
@@ -118,7 +149,7 @@ export const PersistentTabBar = () => {
         : (tabSegment as TabKey);
   const active = tabs.some((tab) => tab.key === activeTab)
     ? activeTab
-    : "home";
+    : (tabs[0]?.key ?? "home");
 
   return (
     <View

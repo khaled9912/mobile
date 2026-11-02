@@ -50,6 +50,10 @@ const AppLayout = () => {
             name="profile/reports"
             options={{ title: "Lesson reports" }}
           />
+          <Stack.Screen
+            name="reviews/[id]"
+            options={{ title: "Lesson review" }}
+          />
           <Stack.Screen name="contact" options={{ title: "Contact the academy" }} />
           <Stack.Screen name="people/new" options={{ title: "New account" }} />
           <Stack.Screen

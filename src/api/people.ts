@@ -41,7 +41,7 @@ export interface CreateUserInput {
   fullName: string;
   email: string;
   password: string;
-  role: "teacher" | "admin";
+  role: "teacher" | "admin" | "support";
 }
 
 export interface CreateStudentInput {

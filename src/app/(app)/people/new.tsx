@@ -20,7 +20,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { RoleGate } from "@/components/ui/role-gate";
 
-type AccountRole = "student" | "teacher" | "admin";
+type AccountRole = "student" | "teacher" | "admin" | "support";
 
 type FieldErrors = {
   fullName?: string;
@@ -34,10 +34,14 @@ const roleOptions: { value: AccountRole; label: string }[] = [
   { value: "student", label: "Student" },
   { value: "teacher", label: "Teacher" },
   { value: "admin", label: "Admin" },
+  { value: "support", label: "Support" },
 ];
 
 const isAccountRole = (value: unknown): value is AccountRole =>
-  value === "student" || value === "teacher" || value === "admin";
+  value === "student" ||
+  value === "teacher" ||
+  value === "admin" ||
+  value === "support";
 
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ role?: string | string[] }>();

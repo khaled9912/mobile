@@ -1,3 +1,4 @@
+import { Redirect } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { LoadingView } from "@/components/ui/states";
 import { useAuth, isAdminRole } from "@/providers/auth-provider";
@@ -16,6 +17,8 @@ export default function HomeTab() {
     );
   }
 
+  // Support reviewers have no dashboard: their work starts in the queue.
+  if (role === "support") return <Redirect href="/reviews" />;
   if (role === "teacher") return <TeacherHome />;
   if (isAdminRole(role)) return <AdminHome />;
   return <StudentHome />;

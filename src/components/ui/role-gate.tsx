@@ -12,6 +12,7 @@ const roleName: Record<UserRole, string> = {
   teacher: "teachers",
   admin: "academy administrators",
   super_admin: "academy administrators",
+  support: "support reviewers",
 };
 
 export const RoleGate = ({

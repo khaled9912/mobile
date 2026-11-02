@@ -1,10 +1,16 @@
-export type UserRole = "student" | "teacher" | "admin" | "super_admin";
+export type UserRole =
+  | "student"
+  | "teacher"
+  | "admin"
+  | "super_admin"
+  | "support";
 
 export const USER_ROLES: readonly UserRole[] = [
   "student",
   "teacher",
   "admin",
   "super_admin",
+  "support",
 ];
 
 export const isUserRole = (value: unknown): value is UserRole =>

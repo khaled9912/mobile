@@ -38,17 +38,20 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
   const { user, status } = useAuth();
   const authenticated = status === "authenticated" && Boolean(user);
   const role = user?.role ?? "student";
+  // Support reviewers have no lessons of their own; the lessons endpoint would
+  // return every lesson in the academy for them.
+  const remindersEnabled = authenticated && role !== "support";
   const handled = useRef(new Set<string>());
 
   const lessonsQuery = useQuery({
     queryKey: ["lessons"],
     queryFn: getLessons,
-    enabled: authenticated,
+    enabled: remindersEnabled,
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   useEffect(() => {
-    if (!authenticated) {
+    if (!remindersEnabled) {
       void cancelLessonReminders();
       return;
     }
@@ -56,7 +59,7 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
     if (!lessonsQuery.data) return;
     const reminders = buildLessonReminders(lessonsQuery.data, role, Date.now());
     void syncLessonReminders(reminders);
-  }, [authenticated, lessonsQuery.data, role]);
+  }, [remindersEnabled, lessonsQuery.data, role]);
 
   useEffect(() => {
     if (!authenticated) return;

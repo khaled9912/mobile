@@ -1,5 +1,9 @@
 import { Tabs } from "expo-router";
-import { useAuth, isAdminRole } from "@/providers/auth-provider";
+import {
+  canReviewLessons,
+  isAdminRole,
+  useAuth,
+} from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 
 const TabLayout = () => {
@@ -7,6 +11,7 @@ const TabLayout = () => {
   const { role } = useAuth();
   const isStudent = role === "student";
   const isAdmin = isAdminRole(role);
+  const isReviewer = canReviewLessons(role);
 
   // The visible bar lives in (app)/_layout so it also covers stack screens.
   return (
@@ -27,6 +32,10 @@ const TabLayout = () => {
         options={{ href: isStudent || isAdmin ? undefined : null }}
       />
       <Tabs.Screen name="schedule" />
+      <Tabs.Screen
+        name="reviews"
+        options={{ href: isReviewer ? undefined : null }}
+      />
       <Tabs.Screen name="people" options={{ href: isAdmin ? undefined : null }} />
       <Tabs.Screen name="profile" />
     </Tabs>

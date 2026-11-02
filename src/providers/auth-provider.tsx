@@ -225,3 +225,6 @@ export const useAuth = () => {
 
 export const isAdminRole = (role: UserRole | null) =>
   role === "admin" || role === "super_admin";
+
+export const canReviewLessons = (role: UserRole | null) =>
+  role === "support" || isAdminRole(role);

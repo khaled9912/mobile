@@ -26,6 +26,7 @@ const roleLabel: Record<UserRole, string> = {
   teacher: "Teacher",
   admin: "Administrator",
   super_admin: "Administrator",
+  support: "Support reviewer",
 };
 
 const themeOptions: { value: ThemePreference; label: string }[] = [

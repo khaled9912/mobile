@@ -95,6 +95,48 @@ export interface ReviewInput {
   status: ReviewStatus;
 }
 
+export interface DigestAction {
+  lessonId: string;
+  startsAt: string;
+  studentName: string;
+  gaps: string | null;
+  teacherAction: string | null;
+  studentAction: string | null;
+  reviewerName: string | null;
+}
+
+export interface DigestUnreviewedLesson {
+  lessonId: string;
+  startsAt: string;
+  studentName: string;
+  flaggedSegments: number;
+  reviewStatus: ReviewStatus | null;
+}
+
+export interface TeacherDigest {
+  teacherId: string;
+  teacherName: string;
+  lessons: number;
+  reviewed: number;
+  unreviewed: number;
+  flaggedLessons: number;
+  avgTeachingClarity: number | null;
+  avgStudentPractice: number | null;
+  avgCorrectionQuality: number | null;
+  avgEngagement: number | null;
+  actions: DigestAction[];
+  unreviewedLessons: DigestUnreviewedLesson[];
+}
+
+export interface WeeklyDigest {
+  weekStart: string;
+  weekEnd: string;
+  lessons: number;
+  reviewed: number;
+  flaggedLessons: number;
+  teachers: TeacherDigest[];
+}
+
 export const getReviewQueue = (status: ReviewFilter = "unreviewed") =>
   apiFetch<ReviewQueueItem[]>(
     `/api/admin/review-queue?status=${encodeURIComponent(status)}`
@@ -103,6 +145,11 @@ export const getReviewQueue = (status: ReviewFilter = "unreviewed") =>
 export const getReviewWorkspace = (lessonId: string) =>
   apiFetch<ReviewWorkspace>(
     `/api/admin/lessons/${encodeURIComponent(lessonId)}/review`
+  );
+
+export const getWeeklyDigest = (weekStart: string) =>
+  apiFetch<WeeklyDigest>(
+    `/api/admin/review-digest?weekStart=${encodeURIComponent(weekStart)}`
   );
 
 export const saveQualityReview = (lessonId: string, input: ReviewInput) =>

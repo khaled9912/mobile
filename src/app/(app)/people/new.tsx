@@ -79,6 +79,9 @@ export default function NewAccountScreen() {
     onSuccess: async (user) => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "students"] });
       await queryClient.invalidateQueries({ queryKey: ["admin", "teachers"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "support-users"],
+      });
       await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
       setNotice(`${user.fullName} now has an account.`);
       Alert.alert(

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Alert, StyleSheet, Switch, View } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
 import {
@@ -38,7 +39,7 @@ const tabOptions: { value: Tab; label: string }[] = [
 export default function PeopleTab() {
   const { role } = useAuth();
   const isAdmin = isAdminRole(role);
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("students");
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -205,7 +206,7 @@ export default function PeopleTab() {
         <PageHeader
           eyebrow="Academy administration"
           title="People"
-          subtitle="Manage student and teacher accounts, and who teaches whom."
+          subtitle="Manage student, teacher and support accounts, and who teaches whom."
           right={
             <Button title={addLabel} size="sm" icon="add" onPress={openAdd} />
           }
@@ -217,6 +218,36 @@ export default function PeopleTab() {
           onChange={setTab}
           options={tabOptions}
         />
+
+        <Card
+          onPress={() => router.push("/people/support")}
+          accessibilityLabel="Support team"
+          style={styles.teamLink}
+        >
+          <View style={styles.teamRow}>
+            <View
+              style={[
+                styles.teamIcon,
+                { backgroundColor: colors.brandSoft, borderRadius: radius.md },
+              ]}
+            >
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={18}
+                color={colors.brand}
+              />
+            </View>
+            <View style={styles.flex}>
+              <AppText variant="label" weight="700">
+                Support team
+              </AppText>
+              <AppText variant="caption" color="muted">
+                Reviewers who audit lesson transcripts and weekly digests
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </View>
+        </Card>
 
         {notice ? (
           <View style={styles.block}>
@@ -415,6 +446,7 @@ export default function PeopleTab() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   block: { marginTop: 14 },
   filters: { marginTop: 16, gap: 12 },
   switchRow: {
@@ -424,6 +456,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   switchCopy: { flex: 1, gap: 2 },
+  teamLink: { marginTop: 16 },
+  teamRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  teamIcon: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   list: { marginTop: 16, gap: 10 },
   personRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   personCopy: { flex: 1, gap: 2 },

@@ -14,6 +14,7 @@ import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
@@ -109,6 +110,15 @@ export default function ReviewsTab() {
           title="Lesson reviews"
           eyebrow="Support"
           subtitle="Read the transcript, score the lesson and record the gaps to follow up."
+          right={
+            <Button
+              title="Weekly digest"
+              variant="secondary"
+              size="sm"
+              icon="stats-chart-outline"
+              onPress={() => router.push("/reviews/weekly")}
+            />
+          }
         />
         <Segmented
           label="Review queue filter"

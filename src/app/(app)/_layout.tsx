@@ -54,11 +54,19 @@ const AppLayout = () => {
             name="reviews/[id]"
             options={{ title: "Lesson review" }}
           />
+          <Stack.Screen
+            name="reviews/weekly"
+            options={{ title: "Weekly digest" }}
+          />
           <Stack.Screen name="contact" options={{ title: "Contact the academy" }} />
           <Stack.Screen name="people/new" options={{ title: "New account" }} />
           <Stack.Screen
             name="people/assign"
             options={{ title: "Assign teacher" }}
+          />
+          <Stack.Screen
+            name="people/support"
+            options={{ title: "Support team" }}
           />
           <Stack.Screen
             name="contact-submissions"

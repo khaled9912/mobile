@@ -25,6 +25,11 @@ export const getTeachers = async (includeInactive = false) => {
 export const getAssignments = () =>
   apiFetch<Assignment[]>("/api/admin/assignments");
 
+export const getSupportUsers = async () => {
+  const list = await apiFetch<UserDto[]>("/api/admin/support-users");
+  return list.map(normalizeUser);
+};
+
 export const createAssignment = (teacherId: string, studentId: string) =>
   apiFetch<Assignment>("/api/teacher-student-assignments", {
     method: "POST",

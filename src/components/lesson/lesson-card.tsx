@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import type { Lesson } from "@/api/types";
-import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
+import { formatDateTime, formatTimeRange, relativeDay, startsInLabel } from "@/lib/format";
 import {
   isLessonLive,
   isReportDue,
@@ -26,6 +26,10 @@ export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => 
   const { colors, radius } = useTheme();
   const now = useNow();
   const live = isLessonLive(lesson, now);
+  const countdown =
+    lesson.status === "scheduled" && !live
+      ? startsInLabel(lesson.startsAt, now)
+      : null;
   const person =
     perspective === "teacher"
       ? lesson.studentName
@@ -70,6 +74,11 @@ export const LessonCard = ({ lesson, perspective, action, subtitle }: Props) => 
           <AppText variant="small" color="muted" style={styles.subtitle}>
             {perspective === "teacher" ? "Student" : "Teacher"}: {person}
           </AppText>
+          {countdown ? (
+            <AppText variant="caption" weight="700" color="brand">
+              {countdown}
+            </AppText>
+          ) : null}
           {subtitle ? (
             <AppText variant="caption" color="muted">
               {subtitle}

@@ -188,3 +188,26 @@ export interface WeeklyAvailability {
   reviews: TeacherReview[] | null;
   hasLessons: boolean;
 }
+
+export type NotificationKind =
+  | "booking"
+  | "lesson"
+  | "request"
+  | "report"
+  | "payment"
+  | "system";
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  kind: NotificationKind;
+  link: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationsFeed {
+  items: AppNotification[];
+  unread: number;
+}

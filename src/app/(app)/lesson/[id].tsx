@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  Share,
   StyleSheet,
   View,
 } from "react-native";
@@ -17,6 +16,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { useLessonCall } from "@/providers/lesson-call-provider";
 import { LessonFeedback } from "@/components/lesson/lesson-feedback";
+import { ShareLessonDrawer } from "@/components/lesson/share-lesson-drawer";
 import { KeyboardAwareScrollView } from "@/components/ui/keyboard-aware-scroll-view";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
-import { JITSI_DOMAIN } from "@/config/env";
+import { lessonRoomName, lessonRoomUrl } from "@/lib/lesson-room";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 import {
@@ -85,19 +85,7 @@ export default function LessonRoomScreen() {
     else router.replace("/schedule");
   }, []);
 
-  const shareRoom = useCallback(async () => {
-    if (!lesson) return;
-    const url = `https://${JITSI_DOMAIN}/rayan-academy-${lesson.id}`;
-    try {
-      await Share.share({
-        title: "Ana Quran lesson room",
-        message: `Join my Ana Quran lesson room: ${url}`,
-        url,
-      });
-    } catch {
-      // The share sheet was dismissed.
-    }
-  }, [lesson]);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const callJoined = call?.lessonId === lesson?.id && joined;
 
@@ -110,16 +98,19 @@ export default function LessonRoomScreen() {
     !beforeStart &&
     (!afterEnd || callJoined);
 
+  // Sharing only makes sense while the room is open; the recap is a record.
+  const canShare = Boolean(lesson) && showingRoom;
+
   useEffect(() => {
     if (!lesson || !showingRoom) return;
-    const room = `rayan-academy-${lesson.id}`;
+    const room = lessonRoomName(lesson.id);
     startCall({
       lessonId: lesson.id,
       room,
       displayName: roomDisplayName,
       title: "Lesson room",
       subtitle: `${formatDateTime(lesson.startsAt)} · ${lesson.teacherName} with ${lesson.studentName}`,
-      shareUrl: `https://${JITSI_DOMAIN}/${room}`,
+      shareUrl: lessonRoomUrl(lesson.id),
     });
   }, [lesson, roomDisplayName, showingRoom, startCall]);
 
@@ -200,20 +191,17 @@ export default function LessonRoomScreen() {
           />
         )}
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Share lesson room link"
-        hitSlop={12}
-        disabled={!lesson}
-        onPress={() => void shareRoom()}
-        style={[styles.headerButton, { opacity: lesson ? 1 : 0.4 }]}
-      >
-        <Ionicons
-          name="share-outline"
-          size={21}
-          color={showingRoom ? "#ffffff" : colors.muted}
-        />
-      </Pressable>
+      {canShare ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Share lesson room link"
+          hitSlop={12}
+          onPress={() => setShareOpen(true)}
+          style={styles.headerButton}
+        >
+          <Ionicons name="share-outline" size={21} color="#ffffff" />
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -346,6 +334,13 @@ export default function LessonRoomScreen() {
         {header}
         {renderContent()}
       </SafeAreaView>
+      {lesson ? (
+        <ShareLessonDrawer
+          visible={shareOpen}
+          shareUrl={lessonRoomUrl(lesson.id)}
+          onClose={() => setShareOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

@@ -155,3 +155,42 @@ export const initialsOf = (name: string) =>
 
 export const minutesUntil = (value: string) =>
   Math.round((parseDate(value).getTime() - Date.now()) / 60000);
+
+/**
+ * Countdown for a lesson later today: "Starts in 2h 15m". Returns null for
+ * past lessons and for anything not happening on the same local day, where
+ * the relative day label already says what is needed.
+ */
+export const startsInLabel = (value: string, now = Date.now()) => {
+  const date = parseDate(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffMs = date.getTime() - now;
+  if (diffMs <= 0) return null;
+  const today = new Date(now);
+  const sameDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+  if (!sameDay) return null;
+
+  const totalMinutes = Math.ceil(diffMs / 60_000);
+  if (totalMinutes < 60) return `Starts in ${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `Starts in ${hours}h ${minutes}m` : `Starts in ${hours}h`;
+};
+
+/** Compact age for notification rows: "Just now", "12m ago", "3h ago". */
+export const timeAgo = (value: string) => {
+  const date = parseDate(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  if (diff < 60_000) return "Just now";
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatDayLabel(value);
+};

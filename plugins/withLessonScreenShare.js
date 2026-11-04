@@ -226,6 +226,28 @@ const withScreenShareAndroidManifest = (config) =>
     return mod;
   });
 
+// JitsiWebRTC references an optional AV1 decoder class that R8 cannot find.
+const withScreenShareProguard = (config) =>
+  withDangerousMod(config, [
+    "android",
+    async (mod) => {
+      const file = path.join(
+        path.resolve(mod.modRequest.platformProjectRoot),
+        "app",
+        "proguard-rules.pro"
+      );
+      const rule = "-dontwarn org.webrtc.Dav1dDecoder$Natives";
+      const contents = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+      if (!contents.includes(rule)) {
+        fs.appendFileSync(
+          file,
+          `${contents.endsWith("\n") || contents === "" ? "" : "\n"}\n# JitsiWebRTC references an optional AV1 decoder class that is not packaged.\n${rule}\n`
+        );
+      }
+      return mod;
+    },
+  ]);
+
 const withScreenShareMainApplication = (config) =>
   withMainApplication(config, (mod) => {
     let contents = mod.modResults.contents;
@@ -253,6 +275,7 @@ const withLessonScreenShare = (config) => {
   config = withScreenShareGradleProperties(config);
   config = withScreenShareProjectGradle(config);
   config = withScreenShareAndroidManifest(config);
+  config = withScreenShareProguard(config);
   config = withScreenShareMainApplication(config);
   return config;
 };

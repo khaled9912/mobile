@@ -33,6 +33,7 @@ import {
 } from "@/lib/weekly-time";
 import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { NOTIFICATIONS_QUERY_KEY } from "@/hooks/use-notifications";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
@@ -74,6 +75,7 @@ export default function TeacherProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
       await queryClient.invalidateQueries({ queryKey: ["series"] });
       await queryClient.invalidateQueries({ queryKey: ["change-requests"] });
+      await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
     },
     onError: (mutationError) => {
       setNotice("");

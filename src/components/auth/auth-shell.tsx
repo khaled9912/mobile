@@ -1,8 +1,14 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "@/components/ui/screen";
+import { PillPressable } from "@/components/ui/pill-pressable";
+import {
+  NotificationsBell,
+  NotificationsSheet,
+} from "@/components/notifications/notifications-sheet";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { BrandLockup } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
 import { useTheme } from "@/providers/theme-provider";
@@ -21,28 +27,44 @@ export const AuthShell = ({
   showBack = false,
 }: Props) => {
   const { colors, radius } = useTheme();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // The masthead sits outside the scroll view, so it stays visible while a
   // long form (or the keyboard) scrolls the fields beneath it.
   const header = (
     <View style={[styles.header, { borderBottomColor: colors.border }]}>
-      {showBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
+      <View style={styles.side}>
+        {showBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={styles.back}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </Pressable>
+        ) : null}
+      </View>
+      <BrandLockup size={36} />
+      <View style={[styles.side, styles.actions]}>
+        <PillPressable
+          accessibilityLabel="Chat on WhatsApp"
+          onPress={openWhatsApp}
+          style={styles.iconButton}
         >
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Pressable>
-      ) : null}
-      <BrandLockup size={40} />
+          <Ionicons name="logo-whatsapp" size={19} color={colors.text} />
+        </PillPressable>
+        <NotificationsBell
+          onPress={() => setNotificationsOpen((prev) => !prev)}
+        />
+      </View>
     </View>
   );
 
   return (
-    <Screen keyboard contentStyle={styles.content} header={header}>
+    <>
+      <Screen keyboard contentStyle={styles.content} header={header}>
       <View
         style={[
           styles.card,
@@ -68,7 +90,12 @@ export const AuthShell = ({
         ) : null}
         <View style={styles.body}>{children}</View>
       </View>
-    </Screen>
+      </Screen>
+      <NotificationsSheet
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+      />
+    </>
   );
 };
 
@@ -81,19 +108,25 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 8,
-    paddingBottom: 10,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  side: { flex: 1, flexDirection: "row", alignItems: "center" },
+  actions: { justifyContent: "flex-end", gap: 4 },
   back: {
-    position: "absolute",
-    left: 8,
-    top: 0,
-    bottom: 0,
     justifyContent: "center",
     paddingHorizontal: 8,
+    height: 38,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
   },
   card: {
     borderWidth: StyleSheet.hairlineWidth * 2,

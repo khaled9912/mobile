@@ -120,20 +120,30 @@ export const LaunchIntro = ({ onDone }: Props) => {
               <BrandMark size={104} />
             </Animated.View>
 
-            <View style={styles.wordRow}>
-              {PRODUCT.split("").map((char, index) => (
+            <Animated.View style={{ opacity: logoOpacity }}>
+              <View style={styles.wordBlock}>
                 <AppText
-                  key={`${char}-${index}`}
-                  weight="800"
-                  style={[
-                    styles.wordmark,
-                    { opacity: index < productChars ? 1 : 0 },
-                  ]}
+                  weight="700"
+                  style={[styles.arabic, { color: colors.brand }]}
                 >
-                  {char === " " ? "\u00A0" : char}
+                  أنا قرآن
                 </AppText>
-              ))}
-            </View>
+                <View style={styles.wordRow}>
+                  {PRODUCT.split("").map((char, index) => (
+                    <AppText
+                      key={`${char}-${index}`}
+                      weight="800"
+                      style={[
+                        styles.wordmark,
+                        { opacity: index < productChars ? 1 : 0 },
+                      ]}
+                    >
+                      {char === " " ? "\u00A0" : char}
+                    </AppText>
+                  ))}
+                </View>
+              </View>
+            </Animated.View>
 
             <View style={styles.subtitleRow}>
               <AppText variant="label" color="muted" style={styles.subtitle}>
@@ -165,10 +175,6 @@ export const LaunchIntro = ({ onDone }: Props) => {
               />
             </View>
           </View>
-
-          <AppText variant="caption" color="muted" align="center">
-            Tap to skip
-          </AppText>
         </SafeAreaView>
       </Pressable>
     </Animated.View>
@@ -185,6 +191,8 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18 },
+  wordBlock: { alignItems: "center", gap: 2 },
+  arabic: { fontSize: 38, lineHeight: 54 },
   wordRow: { flexDirection: "row", alignItems: "flex-end" },
   wordmark: { fontSize: 42, lineHeight: 50, letterSpacing: -1 },
   subtitleRow: {

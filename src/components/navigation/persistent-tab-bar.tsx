@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router, useSegments } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
+import { PillPressable } from "@/components/ui/pill-pressable";
 import {
   canReviewLessons,
   isAdminRole,
@@ -11,10 +12,11 @@ import {
 import { useTheme } from "@/providers/theme-provider";
 
 /**
- * Height of the bar above the bottom safe-area inset. Screens that position
- * something above the bar (the offline banner) use this value.
+ * Height of the floating bar above the bottom safe-area inset. Screens that
+ * position something above the bar (the offline banner) use TAB_BAR_OFFSET.
  */
-export const TAB_BAR_CONTENT_HEIGHT = 56;
+export const TAB_BAR_CONTENT_HEIGHT = 58;
+export const TAB_BAR_OFFSET = TAB_BAR_CONTENT_HEIGHT + 16;
 
 type TabKey =
   | "home"
@@ -121,10 +123,13 @@ const sectionTab = (
 };
 
 export const PersistentTabBar = () => {
-  const { colors } = useTheme();
+  const { colors, radius, scheme } = useTheme();
   const { role } = useAuth();
   const insets = useSafeAreaInsets();
   const segments: string[] = useSegments();
+  const navBackground = scheme === "dark" ? colors.tabBar : "#10283a";
+  const navBorder = scheme === "dark" ? colors.border : "#173d3f";
+  const navMuted = "rgba(255,255,255,0.66)";
 
   const isStudent = role === "student";
   const isAdmin = isAdminRole(role);
@@ -154,43 +159,78 @@ export const PersistentTabBar = () => {
   return (
     <View
       style={[
-        styles.bar,
-        {
-          backgroundColor: colors.tabBar,
-          borderTopColor: colors.border,
-          paddingBottom: insets.bottom,
-        },
+        styles.wrap,
+        { paddingBottom: Math.max(insets.bottom, 8) },
       ]}
     >
-      <View style={styles.row}>
+      <View
+        style={[
+          styles.bar,
+          {
+            backgroundColor: navBackground,
+            borderColor: navBorder,
+            borderRadius: radius.pill,
+            shadowColor: colors.shadow,
+          },
+        ]}
+      >
         {tabs.map((tab) => {
           const selected = tab.key === active;
-          const color = selected ? colors.link : colors.muted;
-          return (
-            <Pressable
-              key={tab.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={tab.label}
-              android_ripple={{ color: colors.brandSoft }}
-              onPress={() => router.navigate(tab.route)}
-              style={styles.item}
-            >
+          const color = selected ? colors.onBrand : navMuted;
+          const content = (
+            <>
               <Ionicons
                 name={selected ? tab.activeIcon : tab.icon}
-                size={22}
+                size={20}
                 color={color}
               />
               <AppText
                 variant="caption"
-                weight="600"
+                weight="700"
                 color={color}
                 numberOfLines={1}
                 style={styles.label}
               >
                 {tab.label}
               </AppText>
-            </Pressable>
+            </>
+          );
+
+          if (selected) {
+            return (
+              <View
+                key={tab.key}
+                accessible
+                accessibilityRole="tab"
+                accessibilityState={{ selected: true }}
+                accessibilityLabel={tab.label}
+                style={[
+                  styles.item,
+                  styles.itemActive,
+                  {
+                    backgroundColor: colors.brand,
+                    borderColor: colors.brandPressed,
+                  },
+                ]}
+              >
+                {content}
+              </View>
+            );
+          }
+
+          return (
+            <PillPressable
+              key={tab.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: false }}
+              accessibilityLabel={tab.label}
+              onPress={() => router.navigate(tab.route)}
+              pressedBackgroundColor="rgba(255,255,255,0.14)"
+              pressedBorderColor="rgba(255,255,255,0.32)"
+              style={styles.item}
+            >
+              {content}
+            </PillPressable>
           );
         })}
       </View>
@@ -199,14 +239,27 @@ export const PersistentTabBar = () => {
 };
 
 const styles = StyleSheet.create({
-  bar: { borderTopWidth: StyleSheet.hairlineWidth, elevation: 8 },
-  row: { flexDirection: "row", height: TAB_BAR_CONTENT_HEIGHT },
+  wrap: { paddingHorizontal: 16, paddingTop: 8 },
+  bar: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: TAB_BAR_CONTENT_HEIGHT,
+    gap: 3,
+    padding: 5,
+    borderWidth: 1,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
   item: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 2,
+    paddingVertical: 6,
     paddingHorizontal: 2,
   },
-  label: { fontSize: 11 },
+  itemActive: { borderWidth: 1, borderRadius: 999 },
+  label: { fontSize: 10 },
 });

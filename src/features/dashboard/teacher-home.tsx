@@ -12,8 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { AppText } from "@/components/ui/app-text";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard } from "@/components/ui/stat-card";
+import {
+  LessonCardSkeleton,
+  Skeleton,
+  StatRowSkeleton,
+} from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import { firstName, todayLessons } from "@/lib/lesson-selectors";
 import { formatWeeklySlot } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { isReportDue } from "@/lib/status";
@@ -34,7 +39,7 @@ export const TeacherHome = () => {
 
   const lessons = lessonsQuery.data ?? [];
   const rules = rulesQuery.data ?? [];
-  const upcoming = upcomingLessons(lessons);
+  const today = todayLessons(lessons);
   const booked = rules.filter((rule) => rule.status === "booked").length;
   const reportsDue = lessons
     .filter(isReportDue)
@@ -51,16 +56,20 @@ export const TeacherHome = () => {
         subtitle="Your teaching week, weekly availability, and lesson reports."
       />
 
-      <View style={styles.stats}>
-        <StatCard label="Upcoming lessons" value={upcoming.length} />
-        <StatCard label="Weekly slots" value={rules.length} />
-        <StatCard label="Booked slots" value={booked} />
-        <StatCard label="Reports due" value={reportsDue.length} />
-      </View>
+      {lessonsQuery.isLoading ? (
+        <StatRowSkeleton />
+      ) : (
+        <View style={styles.stats}>
+          <StatCard label="Today's lessons" value={today.length} />
+          <StatCard label="Weekly slots" value={rules.length} />
+          <StatCard label="Booked slots" value={booked} />
+          <StatCard label="Reports due" value={reportsDue.length} />
+        </View>
+      )}
 
       <View style={styles.section}>
         <SectionHeader
-          title="Next lessons"
+          title="Today's lessons"
           action={
             <Button
               title="Full schedule"
@@ -71,17 +80,17 @@ export const TeacherHome = () => {
           }
         />
         {lessonsQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading your lessons…
-          </AppText>
+          <View style={styles.list}>
+            <LessonCardSkeleton />
+          </View>
         ) : lessonsQuery.isError ? (
           <ErrorView
             error={lessonsQuery.error}
             onRetry={() => void lessonsQuery.refetch()}
           />
-        ) : upcoming.length ? (
+        ) : today.length ? (
           <View style={styles.list}>
-            {upcoming.slice(0, 3).map((lesson) => (
+            {today.map((lesson) => (
               <LessonCard
                 key={lesson.id}
                 lesson={lesson}
@@ -99,14 +108,26 @@ export const TeacherHome = () => {
         ) : (
           <EmptyState
             icon="calendar-outline"
-            title="No upcoming lessons"
-            body="Announce your weekly times so students can book them."
+            title="No lessons today"
+            body={
+              rules.length
+                ? "You're all caught up for today. Open the full schedule to see the week ahead."
+                : "Announce your weekly times so students can book them."
+            }
             action={
-              <Button
-                title="Manage weekly availability"
-                size="sm"
-                onPress={() => router.push("/availability")}
-              />
+              rules.length ? (
+                <Button
+                  title="Open full schedule"
+                  size="sm"
+                  onPress={() => router.navigate("/schedule")}
+                />
+              ) : (
+                <Button
+                  title="Manage weekly availability"
+                  size="sm"
+                  onPress={() => router.push("/availability")}
+                />
+              )
             }
           />
         )}
@@ -164,9 +185,10 @@ export const TeacherHome = () => {
           }
         />
         {rulesQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading your weekly times…
-          </AppText>
+          <View style={styles.list}>
+            <Skeleton height={64} radius={18} />
+            <Skeleton height={64} radius={18} />
+          </View>
         ) : rules.length ? (
           <View style={styles.list}>
             {rules.slice(0, 4).map((rule) => (

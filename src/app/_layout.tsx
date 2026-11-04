@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -16,8 +16,8 @@ import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
 import { LessonCallProvider } from "@/providers/lesson-call-provider";
 import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
+import { LaunchIntro } from "@/components/onboarding/launch-intro";
 import { queryClient } from "@/lib/query-client";
-import { getWelcomeSeen, subscribeWelcome } from "@/lib/welcome";
 import { BrandLockup } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
 
@@ -45,10 +45,14 @@ const BootOverlay = () => {
 const RootNavigator = () => {
   const { colors, scheme } = useTheme();
   const { user, status, hydrated } = useAuth();
-  const welcomeSeen = useSyncExternalStore(subscribeWelcome, getWelcomeSeen);
   const segments = useSegments();
   const segmentKey = segments.join("/");
   const inAuthGroup = segments[0] === "(auth)";
+  const [introDone, setIntroDone] = useState(false);
+
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (hydrated) void SplashScreen.hideAsync().catch(() => {});
@@ -57,13 +61,13 @@ const RootNavigator = () => {
   useEffect(() => {
     if (!hydrated || status === "restoring") return;
     if (!user && !inAuthGroup) {
-      router.replace(welcomeSeen ? "/login" : "/welcome");
+      router.replace("/welcome");
       return;
     }
     if (user && (inAuthGroup || segmentKey === "")) {
       router.replace("/");
     }
-  }, [hydrated, status, user, welcomeSeen, inAuthGroup, segmentKey]);
+  }, [hydrated, status, user, inAuthGroup, segmentKey]);
 
   const navigationTheme = useMemo(() => {
     const base = scheme === "dark" ? DarkTheme : DefaultTheme;
@@ -95,7 +99,12 @@ const RootNavigator = () => {
         <Stack.Screen name="(app)" />
         <Stack.Screen name="+not-found" />
       </Stack>
-      {status === "restoring" ? <BootOverlay /> : null}
+      {status === "restoring" && introDone ? <BootOverlay /> : null}
+      {introDone ? null : (
+        <View style={styles.introLayer}>
+          <LaunchIntro onDone={() => setIntroDone(true)} />
+        </View>
+      )}
     </NavigationThemeProvider>
   );
 };
@@ -128,6 +137,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 18,
     zIndex: 2000,
+  },
+  introLayer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 3000,
+    elevation: 30,
   },
   spinner: { marginTop: 6 },
 });

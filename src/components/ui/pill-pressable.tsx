@@ -17,6 +17,9 @@ type Props = {
   accessibilityState?: AccessibilityState;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  /** Press wash override for surfaces where the brand wash would not fit. */
+  pressedBackgroundColor?: string;
+  pressedBorderColor?: string;
 };
 
 /**
@@ -31,8 +34,11 @@ export const PillPressable = ({
   accessibilityState,
   style,
   disabled,
+  pressedBackgroundColor,
+  pressedBorderColor,
 }: Props) => {
   const { colors, radius } = useTheme();
+  const wash = pressedBackgroundColor ?? colors.brandSoft;
 
   return (
     <Pressable
@@ -41,14 +47,14 @@ export const PillPressable = ({
       accessibilityState={accessibilityState}
       disabled={disabled}
       onPress={onPress}
-      android_ripple={{ color: colors.brandSoft }}
+      android_ripple={{ color: wash, borderless: false }}
       style={({ pressed }) => [
         styles.base,
         { borderRadius: radius.pill },
         style,
         pressed && {
-          backgroundColor: colors.brandSoft,
-          borderColor: colors.brand,
+          backgroundColor: wash,
+          borderColor: pressedBorderColor ?? colors.brand,
         },
       ]}
     >
@@ -62,5 +68,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
     backgroundColor: "transparent",
+    overflow: "hidden",
   },
 });

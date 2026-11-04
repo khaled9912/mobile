@@ -8,8 +8,10 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets, type Edge } from "react-native-safe-area-context";
 import { useTheme } from "@/providers/theme-provider";
+import { useAppHeaderPresent } from "@/components/navigation/app-header-context";
+import { TAB_BAR_OFFSET } from "@/components/navigation/persistent-tab-bar";
 import { KeyboardAwareScrollView } from "./keyboard-aware-scroll-view";
 
 type Props = {
@@ -37,13 +39,25 @@ export const Screen = ({
   header,
 }: Props) => {
   const { colors } = useTheme();
+  const appHeaderPresent = useAppHeaderPresent();
+  const insets = useSafeAreaInsets();
+  const resolvedEdges = appHeaderPresent
+    ? edges.filter((edge) => edge !== "top")
+    : edges;
+  // Screens inside the app shell sit behind the floating tab bar, so their
+  // scroll content needs to clear it instead of ending underneath.
+  const bottomPadding = footer
+    ? 16
+    : appHeaderPresent
+      ? TAB_BAR_OFFSET + insets.bottom + 12
+      : 40;
 
   const body = scroll ? (
     <KeyboardAwareScrollView
       style={styles.flex}
       contentContainerStyle={[
         styles.content,
-        { paddingBottom: footer ? 16 : 40 },
+        { paddingBottom: bottomPadding },
         contentStyle,
       ]}
       keyboardDismissMode="on-drag"
@@ -67,7 +81,7 @@ export const Screen = ({
 
   return (
     <SafeAreaView
-      edges={edges}
+      edges={resolvedEdges}
       style={[styles.flex, { backgroundColor: colors.background }]}
     >
       {header ? (

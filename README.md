@@ -125,13 +125,12 @@ src/
 Navigation rules:
 
 - Routes live only in `src/app/`. Non-route code stays outside it.
-- The root stack redirects unauthenticated users to `/welcome` on first launch
-  (stored once in the local flag `anaquran.welcome.v1`) and to `/login`
-  afterwards. Authenticated users are redirected away from `(auth)`.
+- The root stack sends every unauthenticated user to `/welcome`, both on cold
+  start and after logout. Authenticated users are redirected away from
+  `(auth)`.
 - `/welcome` is a single branded screen with the product summary and
   **Sign in** / **Create account** actions. It is not a replica of the web
-  marketing page and makes no API calls. Signed-out users can reopen it from
-  the **About Ana Quran** link on the login screen.
+  marketing page and makes no API calls.
 - Tab visibility is role-aware: Book is student-only, Requests is
   student/admin-only (weekly time changes), People is admin-only.
 - Pushed screens use the native stack header and back gesture. Screens under an
@@ -249,7 +248,7 @@ seven days, and completed lessons load four at a time.
 ## Live lessons (Jitsi)
 
 The app renders the native Jitsi SDK (`@jitsi/react-native-sdk`) and joins the
-room `rayan-academy-{lessonId}` on the self-hosted server.
+room `ana-quran-{lessonId}` on the self-hosted server.
 
 - The join button unlocks at `startsAt` for every participant; before then the
   screen shows a countdown and the room stays closed. There is no presence check,
@@ -276,7 +275,7 @@ room `rayan-academy-{lessonId}` on the self-hosted server.
   SDK version: the call and screen share continue while the app is backgrounded,
   but iOS does not float a room preview.
 - The lesson header's share action opens the native share sheet with the room
-  URL (`https://{JITSI_DOMAIN}/rayan-academy-{lessonId}`); the in-call header
+  URL (`https://{JITSI_DOMAIN}/ana-quran-{lessonId}`); the in-call header
   exposes the same share action. This is a link share separate from screen
   sharing.
 - The `JitsiMeeting` view is mounted once in the root `LessonCallProvider`, not
@@ -509,9 +508,8 @@ Current automated status:
 
 Manual device QA still matters because unit tests do not exercise native UI:
 
-1. Fresh install: confirm the welcome screen appears once, both actions work,
-   and it does not reappear after a relaunch. Reopen it from **About Ana
-   Quran** on the login screen.
+1. Fresh install or signed-out launch: confirm the welcome screen is the
+   landing page every time, both actions work, and signing out returns here.
 2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
 3. Student: browse teachers, book one or more weekly times, request a time

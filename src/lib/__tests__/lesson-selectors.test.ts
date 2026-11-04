@@ -6,6 +6,7 @@ import {
   countCompletedLessons,
   firstName,
   pastLessons,
+  todayLessons,
   upcomingDayPage,
   upcomingLessons,
 } from "../lesson-selectors";
@@ -212,6 +213,27 @@ describe("lesson selectors", () => {
     expect(
       cancelledLessons([past, future, old], now).map((l) => l.id)
     ).toEqual(["cancelled-future", "cancelled-past"]);
+  });
+
+  it("keeps only the viewer's local day for the dashboard", () => {
+    const base = new Date(2026, 0, 5, 9, 0, 0);
+    const fixedNow = base.getTime();
+    const atLocal = (dayOffset: number, localHour: number) => {
+      const date = new Date(base);
+      date.setDate(date.getDate() + dayOffset);
+      date.setHours(localHour, 0, 0, 0);
+      return date.toISOString();
+    };
+    const lessons = [
+      lesson({ id: "today", startsAt: atLocal(0, 18), endsAt: atLocal(0, 19) }),
+      lesson({
+        id: "tomorrow",
+        startsAt: atLocal(1, 10),
+        endsAt: atLocal(1, 11),
+      }),
+    ];
+
+    expect(todayLessons(lessons, fixedNow).map((l) => l.id)).toEqual(["today"]);
   });
 
   it("uses the first name for greetings", () => {

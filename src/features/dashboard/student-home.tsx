@@ -13,12 +13,21 @@ import { Notice } from "@/components/ui/notice";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard, InfoRow } from "@/components/ui/stat-card";
+import {
+  LessonCardSkeleton,
+  Skeleton,
+  StatRowSkeleton,
+} from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { Avatar } from "@/components/ui/avatar";
 import { AppText } from "@/components/ui/app-text";
 import { Card } from "@/components/ui/card";
-import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
+import {
+  firstName,
+  todayLessons,
+  upcomingLessons,
+} from "@/lib/lesson-selectors";
 import { formatWeeklySlot } from "@/lib/format";
 import { getViewerTimeZone, toViewerWeeklyTime } from "@/lib/weekly-time";
 import { TimeZoneNote } from "@/components/student/time-zone-note";
@@ -45,8 +54,9 @@ export const StudentHome = () => {
   });
 
   const lessons = lessonsQuery.data ?? [];
-  const upcoming = upcomingLessons(lessons);
-  const next = upcoming[0];
+  const today = todayLessons(lessons);
+  const next = today[0];
+  const hasLaterLessons = upcomingLessons(lessons).length > 0;
   const pendingChanges = (changesQuery.data ?? [])
     .filter((change) => change.status === "pending")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -78,16 +88,20 @@ export const StudentHome = () => {
         </View>
       ) : null}
 
-      <View style={styles.stats}>
-        <StatCard label="Upcoming" value={upcoming.length} />
-        <StatCard label="Weekly times" value={series.length} />
-        <StatCard label="Changes" value={pendingChanges.length} />
-        <StatCard label="Completed" value={completed.length} />
-      </View>
+      {lessonsQuery.isLoading ? (
+        <StatRowSkeleton />
+      ) : (
+        <View style={styles.stats}>
+          <StatCard label="Today" value={today.length} />
+          <StatCard label="Weekly times" value={series.length} />
+          <StatCard label="Changes" value={pendingChanges.length} />
+          <StatCard label="Completed" value={completed.length} />
+        </View>
+      )}
 
       <View style={styles.section}>
         <SectionHeader
-          title="Next lesson"
+          title="Today's lesson"
           action={
             <Button
               title="Schedule"
@@ -98,9 +112,7 @@ export const StudentHome = () => {
           }
         />
         {lessonsQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading your lessons…
-          </AppText>
+          <LessonCardSkeleton />
         ) : lessonsQuery.isError ? (
           <ErrorView
             error={lessonsQuery.error}
@@ -115,6 +127,19 @@ export const StudentHome = () => {
                 title="Open lesson room"
                 size="sm"
                 onPress={() => router.push(`/lesson/${next.id}`)}
+              />
+            }
+          />
+        ) : hasLaterLessons ? (
+          <EmptyState
+            icon="calendar-outline"
+            title="No lessons today"
+            body="Your next lesson shows here on the day. Open the schedule to see the week ahead."
+            action={
+              <Button
+                title="Open schedule"
+                size="sm"
+                onPress={() => router.navigate("/schedule")}
               />
             }
           />
@@ -162,9 +187,16 @@ export const StudentHome = () => {
       <View style={styles.section}>
         <SectionHeader title="Your teacher" />
         {teacherQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading your teacher…
-          </AppText>
+          <Card>
+            <View style={styles.personRow}>
+              <Skeleton width={52} height={52} radius={26} />
+              <View style={styles.personCopy}>
+                <Skeleton width="55%" height={18} />
+                <Skeleton width="40%" height={12} />
+                <Skeleton width="45%" height={12} />
+              </View>
+            </View>
+          </Card>
         ) : teacher ? (
           <Card>
             <View style={styles.personRow}>

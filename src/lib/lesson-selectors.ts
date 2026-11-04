@@ -21,6 +21,19 @@ export const upcomingLessons = (lessons: Lesson[], now = Date.now()) =>
     )
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 
+/** Upcoming lessons that start on the viewer's local calendar day. */
+export const todayLessons = (lessons: Lesson[], now = Date.now()) => {
+  const today = new Date(now);
+  return upcomingLessons(lessons, now).filter((lesson) => {
+    const start = new Date(startsAtMs(lesson));
+    return (
+      start.getFullYear() === today.getFullYear() &&
+      start.getMonth() === today.getMonth() &&
+      start.getDate() === today.getDate()
+    );
+  });
+};
+
 export type LessonDay = {
   /** Local midnight at the start of the day. */
   dayStart: number;

@@ -37,7 +37,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export const AppThemeProvider = ({ children }: { children: ReactNode }) => {
   const systemScheme = useColorScheme();
-  const [preference, setPreferenceState] = useState<ThemePreference>("system");
+  const [preference, setPreferenceState] = useState<ThemePreference>("light");
 
   useEffect(() => {
     let active = true;

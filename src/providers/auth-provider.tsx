@@ -16,7 +16,6 @@ import {
 import { ApiError, onUnauthorized } from "@/api/client";
 import type { UserProfile, UserRole } from "@/api/types";
 import { clearApiDebugEntries } from "@/lib/api-debug";
-import { hydrateWelcome } from "@/lib/welcome";
 import {
   clearCachedSession,
   readCachedSession,
@@ -126,10 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let active = true;
 
     const restore = async () => {
-      const [cached] = await Promise.all([
-        readCachedSession(),
-        hydrateWelcome(),
-      ]);
+      const cached = await readCachedSession();
       if (!active) return;
       if (cached) {
         setUser(cached.user);

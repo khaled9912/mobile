@@ -10,7 +10,6 @@ import {
 } from "react";
 import {
   Pressable,
-  Share,
   StyleSheet,
   View,
   type StyleProp,
@@ -22,6 +21,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/auth-provider";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
+import { ShareLessonDrawer } from "@/components/lesson/share-lesson-drawer";
 import { BrandMark } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
 import { TAB_BAR_CONTENT_HEIGHT } from "@/components/navigation/persistent-tab-bar";
@@ -158,7 +158,16 @@ const LessonCallHost = ({
   const showMini = !expanded && joined;
   const tabBarVisible = !pathname.startsWith("/lesson/");
 
+  // Jitsi also fires onReadyToClose when the room unmounts, so the second
+  // leave call would dispatch another GO_BACK after the stack already popped.
+  const leavingRef = useRef(false);
+  useEffect(() => {
+    leavingRef.current = false;
+  }, [call.lessonId]);
+
   const endAndReturn = useCallback(() => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
     onEnd();
     if (isLessonRoute) {
       if (router.canGoBack()) router.back();
@@ -178,13 +187,7 @@ const LessonCallHost = ({
     if (!isLessonRoute) router.push(`/lesson/${call.lessonId}`);
   }, [call.lessonId, isLessonRoute, onMinimized]);
 
-  const shareRoom = useCallback(() => {
-    void Share.share({
-      title: "Ana Quran lesson room",
-      message: `Join my Ana Quran lesson room: ${call.shareUrl}`,
-      url: call.shareUrl,
-    }).catch(() => {});
-  }, [call.shareUrl]);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const containerStyle: StyleProp<ViewStyle> = expanded
     ? styles.expandedHost
@@ -243,7 +246,7 @@ const LessonCallHost = ({
             accessibilityRole="button"
             accessibilityLabel="Share lesson room link"
             hitSlop={10}
-            onPress={shareRoom}
+            onPress={() => setShareOpen(true)}
             style={({ pressed }) => [
               styles.iconButton,
               pressed && styles.pressed,
@@ -302,7 +305,7 @@ const LessonCallHost = ({
             accessibilityRole="button"
             accessibilityLabel="Share lesson room link"
             hitSlop={8}
-            onPress={shareRoom}
+            onPress={() => setShareOpen(true)}
             style={({ pressed }) => [
               styles.miniIcon,
               pressed && styles.pressed,
@@ -350,8 +353,8 @@ const LessonCallHost = ({
         >
           <BrandMark
             size={showMini ? 24 : 46}
-            color="#ffffff"
-            fill="rgba(255,255,255,0.16)"
+            color="#8fd39a"
+            fill="#f2faf3"
           />
         </View>
         {showMini ? (
@@ -363,6 +366,12 @@ const LessonCallHost = ({
           />
         ) : null}
       </View>
+
+      <ShareLessonDrawer
+        visible={shareOpen}
+        shareUrl={call.shareUrl}
+        onClose={() => setShareOpen(false)}
+      />
     </View>
   );
 };

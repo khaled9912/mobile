@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  Linking,
+  Animated,
+  Easing,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,11 +15,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
 import { PillPressable } from "@/components/ui/pill-pressable";
+import { openWhatsApp } from "@/lib/whatsapp";
+import {
+  NotificationsBell,
+  NotificationsSheet,
+} from "@/components/notifications/notifications-sheet";
+import { PrayerArt } from "@/components/onboarding/prayer-art";
+import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import type { ThemeColors } from "@/theme/tokens";
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type TabKey = "home" | "options" | "teachers" | "more";
+type TabKey = "home" | "teachers";
 type Tone = "brand" | "gold" | "info" | "success";
 
 type Option = {
@@ -31,6 +39,10 @@ type Option = {
 };
 
 const CARD_HEIGHT = 356;
+const CARD_PEEK_X = 24;
+const CARD_PEEK_Y = 13;
+const CARD_PEEK_SCALE = 0.045;
+const STACK_WIDTH = 52;
 
 const OPTIONS: Option[] = [
   {
@@ -74,18 +86,11 @@ const TABS: {
   activeIcon: IconName;
 }[] = [
   { key: "home", label: "Home", icon: "home-outline", activeIcon: "home" },
-  { key: "options", label: "Options", icon: "grid-outline", activeIcon: "grid" },
   {
     key: "teachers",
     label: "Teachers",
     icon: "people-outline",
     activeIcon: "people",
-  },
-  {
-    key: "more",
-    label: "More",
-    icon: "ellipsis-horizontal-circle-outline",
-    activeIcon: "ellipsis-horizontal-circle",
   },
 ];
 
@@ -98,21 +103,44 @@ const PROMISES: { label: string; icon: IconName }[] = [
 
 const PERKS: { title: string; body: string; icon: IconName }[] = [
   {
-    title: "Certified and vetted",
-    body: "Every teacher is interviewed, tested, and reviewed by the academy.",
+    title: "Personal attention",
+    body: "Individual lessons shaped around each learner's level, goals, and progress.",
+    icon: "person-outline",
+  },
+  {
+    title: "Flexible scheduling",
+    body: "Pick your teacher's weekly times. Booking is instant and repeats every week.",
+    icon: "calendar-outline",
+  },
+  {
+    title: "A guided experience",
+    body: "A clear weekly plan keeps students, teachers, and lesson times coordinated.",
     icon: "shield-checkmark-outline",
   },
+];
+
+const STEPS: { number: string; title: string; body: string }[] = [
   {
-    title: "Ijazah in Hafs",
-    body: "Learn with teachers who carry an authentic chain of recitation.",
-    icon: "ribbon-outline",
+    number: "01",
+    title: "Meet your teacher",
+    body: "We connect each student with a dedicated teacher who understands their goals and learning pace.",
   },
   {
-    title: "English and Arabic",
-    body: "Switch between languages as your confidence grows.",
-    icon: "chatbubbles-outline",
+    number: "02",
+    title: "Choose your weekly times",
+    body: "See each teacher's weekly schedule and pick the times that fit your routine — as many as you need.",
+  },
+  {
+    number: "03",
+    title: "Learn one-to-one every week",
+    body: "Your times lock in instantly and repeat every week. Join each lesson online, starting with a trial.",
   },
 ];
+
+const useAnimatedValue = (initial: number) => {
+  const [value] = useState(() => new Animated.Value(initial));
+  return value;
+};
 
 const accentFor = (colors: ThemeColors, tone: Tone) => {
   switch (tone) {
@@ -125,6 +153,139 @@ const accentFor = (colors: ThemeColors, tone: Tone) => {
     default:
       return { solid: colors.brand, soft: colors.brandSoft };
   }
+};
+
+const CardArt = ({
+  icon,
+  accent,
+  index,
+}: {
+  icon: IconName;
+  accent: { solid: string; soft: string };
+  index: number;
+}) => {
+  const { colors } = useTheme();
+  const drift = useAnimatedValue(0);
+
+  useEffect(() => {
+    const duration = 3200 + index * 480;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, {
+          toValue: 1,
+          duration,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(drift, {
+          toValue: 0,
+          duration,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [drift, index]);
+
+  return (
+    <View style={[styles.cardArt, { backgroundColor: accent.soft }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.artRing,
+          styles.artRingLarge,
+          {
+            backgroundColor: accent.solid,
+            opacity: drift.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.16, 0.06],
+            }),
+            transform: [
+              {
+                translateX: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-16, 18],
+                }),
+              },
+              {
+                translateY: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [14, -14],
+                }),
+              },
+              {
+                scale: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.16],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.artRing,
+          styles.artRingSmall,
+          {
+            backgroundColor: accent.solid,
+            opacity: drift.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.08, 0.18],
+            }),
+            transform: [
+              {
+                translateX: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [12, -18],
+                }),
+              },
+              {
+                translateY: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-10, 12],
+                }),
+              },
+              {
+                scale: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.94, 1.12],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.iconBubble,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            transform: [
+              {
+                translateY: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [3, -3],
+                }),
+              },
+              {
+                scale: drift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.04],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name={icon} size={54} color={accent.solid} />
+      </Animated.View>
+    </View>
+  );
 };
 
 type PillButtonProps = {
@@ -179,18 +340,17 @@ const PillButton = ({
   );
 };
 
-type Props = {
-  onReplayIntro: () => void;
-};
-
-export const WelcomeExperience = ({ onReplayIntro }: Props) => {
+export const WelcomeExperience = () => {
   const { colors, radius, scheme } = useTheme();
+  const { user } = useAuth();
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<TabKey>("home");
   const [activeOption, setActiveOption] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const cardWidth = Math.min(width - 56, 360);
+  const cardWidth = Math.min(width - 84, 340);
+  const pan = useAnimatedValue(0);
+  const settle = useAnimatedValue(0);
   const navBackground = scheme === "dark" ? colors.tabBar : "#10283a";
   const navBorder = scheme === "dark" ? colors.border : "#173d3f";
   const navMuted = "rgba(255,255,255,0.66)";
@@ -201,30 +361,106 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
-  const handleBack = () => {
-    if (tab !== "home") {
-      switchTab("home");
-      return;
-    }
-    onReplayIntro();
-  };
+  const openCard = () => router.push(user ? "/book" : "/signup");
 
-  const openWhatsApp = () => {
-    const message = encodeURIComponent(
-      "Assalamu alaikum, I'd like to know more about Ana Quran lessons."
-    );
-    void Linking.openURL(`whatsapp://send?text=${message}`).catch(() => {
-      Alert.alert(
-        "WhatsApp not available",
-        "Install WhatsApp to chat with the academy."
-      );
+  // Dots swap the deck instead of jumping: the front card folds back, the
+  // chosen card comes forward, then the stack settles.
+  const swapTo = (index: number) => {
+    if (index === activeOption) return;
+    Animated.timing(settle, {
+      toValue: 1,
+      duration: 150,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      setActiveOption(index);
+      Animated.spring(settle, {
+        toValue: 0,
+        tension: 120,
+        friction: 12,
+        useNativeDriver: true,
+      }).start();
     });
   };
 
-  const openSignup = () => router.push("/signup");
+  const dismissCard = (direction: 1 | -1) => {
+    Animated.timing(pan, {
+      toValue: direction * (cardWidth + 80),
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      pan.setValue(0);
+      settle.setValue(1);
+      setActiveOption((prev) => (prev + 1) % OPTIONS.length);
+      Animated.spring(settle, {
+        toValue: 0,
+        tension: 120,
+        friction: 12,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const cardPan = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 8 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderMove: (_, gesture) => pan.setValue(gesture.dx),
+        onPanResponderRelease: (_, gesture) => {
+          if (
+            Math.abs(gesture.dx) > cardWidth * 0.22 ||
+            Math.abs(gesture.vx) > 0.4
+          ) {
+            dismissCard(gesture.dx >= 0 ? 1 : -1);
+            return;
+          }
+          Animated.spring(pan, {
+            toValue: 0,
+            tension: 140,
+            friction: 11,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(pan, {
+            toValue: 0,
+            tension: 140,
+            friction: 11,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    // dismissCard closes over cardWidth and the shared pan value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cardWidth, pan]
+  );
 
   const renderHome = () => (
     <View style={styles.section}>
+      <View
+        style={[
+          styles.hero,
+          { backgroundColor: colors.brandSoft, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.heroCopy}>
+          <AppText variant="caption" weight="700" color="gold">
+            PERSONAL GUIDANCE
+          </AppText>
+          <AppText variant="h2">
+            Grow your connection with the Qur&apos;an and Arabic.
+          </AppText>
+          <AppText variant="small" color="muted" style={styles.cardBody}>
+            Learn with dedicated teachers through personal online lessons,
+            flexible scheduling, and a learning experience built around you.
+          </AppText>
+        </View>
+        <PrayerArt width={124} height={140} />
+      </View>
+
       <View
         style={[
           styles.trust,
@@ -240,105 +476,134 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
       <View
         style={[
           styles.stack,
-          { width: cardWidth + 26, height: CARD_HEIGHT + 18 },
+          { width: cardWidth + STACK_WIDTH, height: CARD_HEIGHT + 30 },
         ]}
       >
-        {OPTIONS.map((option, index) => {
-          const order = (index - activeOption + OPTIONS.length) % OPTIONS.length;
-          if (order > 2) return null;
-          const accent = accentFor(colors, option.tone);
-          const front = order === 0;
-
-          return (
-            <Pressable
-              key={option.key}
-              disabled={!front}
-              accessibilityRole="button"
-              accessibilityLabel={`${option.title}. Show the next option`}
-              accessibilityElementsHidden={!front}
-              importantForAccessibility={front ? "auto" : "no-hide-descendants"}
-              onPress={() =>
-                setActiveOption((prev) => (prev + 1) % OPTIONS.length)
-              }
-              style={({ pressed }) => [
-                styles.card,
-                {
-                  width: cardWidth,
-                  height: CARD_HEIGHT,
-                  zIndex: 10 - order,
-                  opacity: 1 - order * 0.12,
-                  transform: [
-                    { translateX: order * 13 },
-                    { translateY: order * 9 },
-                    { scale: 1 - order * 0.04 },
-                  ],
-                  backgroundColor: pressed ? colors.brandSoft : colors.card,
-                  borderColor: pressed ? colors.brand : colors.border,
-                  shadowColor: colors.shadow,
-                  elevation: 6 - order * 2,
-                },
-              ]}
-            >
-              <View style={[styles.cardArt, { backgroundColor: accent.soft }]}>
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.artRing,
-                    styles.artRingLarge,
-                    { backgroundColor: accent.solid },
-                  ]}
-                />
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.artRing,
-                    styles.artRingSmall,
-                    { backgroundColor: accent.solid },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.iconBubble,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={option.icon}
-                    size={54}
-                    color={accent.solid}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.tag,
-                    {
-                      backgroundColor: colors.card,
-                      borderColor: accent.solid,
-                    },
-                  ]}
-                >
-                  <AppText variant="caption" weight="700" color={accent.solid}>
-                    {option.tag}
-                  </AppText>
-                </View>
-              </View>
-
-              <View style={styles.cardCopy}>
-                <AppText variant="h2">{option.title}</AppText>
-                <AppText
-                  variant="small"
-                  color="muted"
-                  style={styles.cardBody}
-                >
-                  {option.body}
-                </AppText>
-              </View>
-            </Pressable>
+        {(() => {
+          const settleX = settle.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, CARD_PEEK_X],
+          });
+          const settleY = settle.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, CARD_PEEK_Y],
+          });
+          const settleScale = settle.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, CARD_PEEK_SCALE],
+          });
+          const revealScale = Animated.add(
+            1,
+            Animated.multiply(settleScale, -1)
           );
-        })}
+
+          return OPTIONS.map((option, index) => {
+            const order =
+              (index - activeOption + OPTIONS.length) % OPTIONS.length;
+            if (order > 2) return null;
+            const accent = accentFor(colors, option.tone);
+            const front = order === 0;
+            const transform = front
+              ? [
+                  { translateX: pan },
+                  {
+                    rotate: pan.interpolate({
+                      inputRange: [-cardWidth, 0, cardWidth],
+                      outputRange: ["-8deg", "0deg", "8deg"],
+                    }),
+                  },
+                  { translateX: settleX },
+                  { translateY: settleY },
+                  { scale: revealScale },
+                ]
+              : [
+                  {
+                    translateX: Animated.add(
+                      settleX,
+                      order * CARD_PEEK_X
+                    ),
+                  },
+                  {
+                    translateY: Animated.add(
+                      settleY,
+                      order * CARD_PEEK_Y
+                    ),
+                  },
+                  {
+                    scale: Animated.add(
+                      revealScale,
+                      -order * CARD_PEEK_SCALE
+                    ),
+                  },
+                ];
+
+            return (
+              <Animated.View
+                key={option.key}
+                style={[
+                  styles.card,
+                  {
+                    width: cardWidth,
+                    height: CARD_HEIGHT,
+                    zIndex: 10 - order,
+                    opacity: Animated.add(
+                      1 - order * 0.08,
+                      Animated.multiply(settle, -0.08)
+                    ),
+                    transform,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    shadowColor: colors.shadow,
+                    elevation: 6 - order * 2,
+                  },
+                ]}
+                {...(front ? cardPan.panHandlers : {})}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${option.title}. ${
+                    user ? "Browse available teachers" : "Create an account"
+                  }`}
+                  accessibilityHint={
+                    user ? "Opens the teacher directory" : "Opens sign up"
+                  }
+                  onPress={openCard}
+                  style={styles.cardPress}
+                >
+                  <CardArt icon={option.icon} accent={accent} index={index} />
+                  <View
+                    style={[
+                      styles.tag,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: accent.solid,
+                      },
+                    ]}
+                  >
+                    <AppText
+                      variant="caption"
+                      weight="700"
+                      color={accent.solid}
+                    >
+                      {option.tag}
+                    </AppText>
+                  </View>
+
+                  <View style={styles.cardCopy}>
+                    <AppText variant="h2">{option.title}</AppText>
+                    <AppText
+                      variant="small"
+                      color="muted"
+                      style={styles.cardBody}
+                    >
+                      {option.body}
+                    </AppText>
+                  </View>
+                </Pressable>
+              </Animated.View>
+            );
+          });
+        })()}
       </View>
 
       <View style={styles.dots}>
@@ -347,7 +612,7 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
           return (
             <Pressable
               key={option.key}
-              onPress={() => setActiveOption(index)}
+              onPress={() => swapTo(index)}
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel={`Show ${option.title}`}
@@ -371,19 +636,14 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
       </View>
 
       <AppText variant="caption" color="muted" align="center">
-        Tap the card to browse the next option
+        Swipe the card to see the next option
       </AppText>
 
       <View style={styles.actions}>
         <PillButton
           title="Get started"
           icon="arrow-forward"
-          onPress={openSignup}
-        />
-        <PillButton
-          title="View all options"
-          variant="outline"
-          onPress={() => switchTab("options")}
+          onPress={openCard}
         />
         <Pressable
           onPress={() => router.push("/login")}
@@ -421,72 +681,43 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
           ))}
         </View>
       </View>
-    </View>
-  );
 
-  const renderOptions = () => (
-    <View style={styles.section}>
-      <View style={styles.pageIntro}>
-        <AppText variant="h1">All options</AppText>
-        <AppText variant="body" color="muted">
-          Everything that comes with an Ana Quran membership. Tap one to preview
-          it on the home card.
+      <View style={styles.steps}>
+        <AppText variant="h3">Simple steps. Personal progress.</AppText>
+        <AppText variant="small" color="muted">
+          From your first sign-up to your next lesson, we make it easy to stay
+          connected and keep learning.
         </AppText>
+        {STEPS.map((step) => (
+          <View
+            key={step.number}
+            style={[
+              styles.stepCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <AppText variant="h3" color="gold" weight="800">
+              {step.number}
+            </AppText>
+            <View style={styles.optionCopy}>
+              <AppText variant="h3">{step.title}</AppText>
+              <AppText variant="caption" color="muted">
+                {step.body}
+              </AppText>
+            </View>
+          </View>
+        ))}
       </View>
-
-      <View style={styles.list}>
-        {OPTIONS.map((option, index) => {
-          const accent = accentFor(colors, option.tone);
-          return (
-            <Pressable
-              key={option.key}
-              onPress={() => {
-                setActiveOption(index);
-                switchTab("home");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Preview ${option.title}`}
-              style={({ pressed }) => [
-                styles.optionRow,
-                {
-                  backgroundColor: pressed ? colors.brandSoft : colors.card,
-                  borderColor: pressed ? colors.brand : colors.border,
-                },
-              ]}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: accent.soft }]}>
-                <Ionicons name={option.icon} size={22} color={accent.solid} />
-              </View>
-              <View style={styles.optionCopy}>
-                <AppText variant="label">{option.title}</AppText>
-                <AppText variant="caption" color="muted">
-                  {option.body}
-                </AppText>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.muted}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <PillButton
-        title="Get started"
-        icon="arrow-forward"
-        onPress={openSignup}
-      />
     </View>
   );
 
   const renderTeachers = () => (
     <View style={styles.section}>
       <View style={styles.pageIntro}>
-        <AppText variant="h1">Meet your teachers</AppText>
-        <AppText variant="body" color="muted">
-          One-to-one lessons with teachers the academy knows personally.
+        <AppText variant="h2">Meet your teacher</AppText>
+        <AppText variant="small" color="muted">
+          Every teacher is interviewed, tested, and reviewed by the academy
+          before they join a single lesson.
         </AppText>
       </View>
 
@@ -500,12 +731,15 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
             ]}
           >
             <View
-              style={[styles.perkIcon, { backgroundColor: colors.brandSoft }]}
+              style={[
+                styles.perkIcon,
+                { backgroundColor: colors.brandSoft },
+              ]}
             >
               <Ionicons name={perk.icon} size={22} color={colors.brand} />
             </View>
             <View style={styles.optionCopy}>
-              <AppText variant="label">{perk.title}</AppText>
+              <AppText variant="h3">{perk.title}</AppText>
               <AppText variant="caption" color="muted">
                 {perk.body}
               </AppText>
@@ -514,91 +748,39 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
         ))}
       </View>
 
-      <PillButton
-        title="Create an account to meet them"
-        icon="arrow-forward"
-        onPress={openSignup}
-      />
-    </View>
-  );
-
-  const renderMore = () => (
-    <View style={styles.section}>
-      <View style={styles.pageIntro}>
-        <AppText variant="h1">More</AppText>
-        <AppText variant="body" color="muted">
-          Sign in, create an account, or reach the academy team.
-        </AppText>
-      </View>
-
       <View style={styles.actions}>
         <PillButton
-          title="Sign in"
-          variant="outline"
-          onPress={() => router.push("/login")}
-        />
-        <PillButton title="Create account" onPress={openSignup} />
-      </View>
-
-      <View
-        style={[
-          styles.moreCard,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        <AppText variant="label">Chat with the academy</AppText>
-        <AppText variant="caption" color="muted">
-          Questions about lessons, teachers, or payments? Message us on
-          WhatsApp.
-        </AppText>
-        <PillButton
-          title="Open WhatsApp"
-          variant="outline"
-          icon="logo-whatsapp"
-          onPress={openWhatsApp}
+          title={user ? "Browse teachers" : "Create an account"}
+          icon="arrow-forward"
+          onPress={openCard}
         />
       </View>
-
-      <PillButton
-        title="Replay introduction"
-        variant="outline"
-        icon="refresh"
-        onPress={onReplayIntro}
-      />
-
-      <AppText
-        variant="caption"
-        color="muted"
-        align="center"
-        style={styles.footer}
-      >
-        Ana Quran · Qur&apos;an &amp; Arabic Academy
-      </AppText>
     </View>
   );
 
   return (
+    <>
     <SafeAreaView
       edges={["top", "bottom", "left", "right"]}
       style={[styles.root, { backgroundColor: colors.background }]}
     >
       <View style={styles.header}>
         <View style={styles.headerSide}>
-          <PillPressable
-            accessibilityLabel={
-              tab === "home" ? "Replay introduction" : "Back to home"
-            }
-            onPress={handleBack}
-            style={[
-              styles.iconButton,
-              {
-                backgroundColor: colors.surfaceMuted,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
-          </PillPressable>
+          {tab === "home" ? null : (
+            <PillPressable
+              accessibilityLabel="Back to home"
+              onPress={() => switchTab("home")}
+              style={[
+                styles.iconButton,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.text} />
+            </PillPressable>
+          )}
         </View>
 
         <AppText style={[styles.brandTitle, { color: colors.text }]}>
@@ -613,95 +795,41 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
           >
             <Ionicons name="logo-whatsapp" size={19} color={colors.text} />
           </PillPressable>
-          <PillPressable
-            accessibilityLabel="Notifications"
-            accessibilityState={{ expanded: notificationsOpen }}
+          <NotificationsBell
             onPress={() => setNotificationsOpen((prev) => !prev)}
-            style={styles.iconButton}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={19}
-              color={colors.text}
-            />
-            <View
-              style={[
-                styles.bellDot,
-                {
-                  backgroundColor: colors.danger,
-                  borderColor: colors.background,
-                },
-              ]}
-            />
-          </PillPressable>
+          />
         </View>
       </View>
 
-      <View style={styles.welcomeRow}>
-        <View
-          style={[
-            styles.avatar,
-            {
-              backgroundColor: colors.brand,
-              borderColor: colors.brandPressed,
-            },
-          ]}
-        >
-          <AppText weight="800" color={colors.onBrand} style={styles.avatarText}>
-            AQ
-          </AppText>
-        </View>
-        <View style={styles.welcomeCopy}>
-          <AppText variant="caption" color="muted">
-            Welcome back,
-          </AppText>
-          <AppText variant="h3" weight="800">
-            anaquran
-          </AppText>
-        </View>
-        <View
-          style={[
-            styles.livePill,
-            { backgroundColor: colors.brandSoft, borderColor: colors.border },
-          ]}
-        >
-          <View style={[styles.liveDot, { backgroundColor: colors.brand }]} />
-          <AppText variant="caption" weight="700" color="brand">
-            Live 1:1
-          </AppText>
-        </View>
-      </View>
-
-      {notificationsOpen ? (
-        <View
-          style={[
-            styles.notification,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          <View
-            style={[
-              styles.notificationIcon,
-              { backgroundColor: colors.brandSoft },
-            ]}
-          >
-            <Ionicons name="sparkles" size={16} color={colors.brand} />
-          </View>
-          <View style={styles.notificationCopy}>
-            <AppText variant="label">Welcome to Ana Quran</AppText>
-            <AppText variant="caption" color="muted">
-              Your first lesson is one step away. Create an account to book it.
-            </AppText>
-          </View>
+      <View style={styles.greeting}>
+        <AppText variant="caption" color="muted">
+          Welcome to Ana Quran,
+        </AppText>
+        <View style={styles.greetingActions}>
           <PillPressable
-            accessibilityLabel="Dismiss notification"
-            onPress={() => setNotificationsOpen(false)}
-            style={styles.notificationClose}
+            accessibilityLabel="Log in"
+            onPress={() => router.push("/login")}
+            style={styles.greetingLink}
           >
-            <Ionicons name="close" size={15} color={colors.muted} />
+            <AppText variant="h3" weight="800">
+              Log in
+            </AppText>
+          </PillPressable>
+          <AppText variant="h3" weight="800" color="muted">
+            or
+          </AppText>
+          <PillPressable
+            accessibilityLabel="Sign up"
+            onPress={openCard}
+            style={styles.greetingLink}
+          >
+            <AppText variant="h3" weight="800">
+              Sign up
+            </AppText>
           </PillPressable>
         </View>
-      ) : null}
+      </View>
+
 
       <ScrollView
         ref={scrollRef}
@@ -709,13 +837,7 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {tab === "home"
-          ? renderHome()
-          : tab === "options"
-            ? renderOptions()
-            : tab === "teachers"
-              ? renderTeachers()
-              : renderMore()}
+        {tab === "home" ? renderHome() : renderTeachers()}
       </ScrollView>
 
       <View style={styles.navWrap}>
@@ -779,6 +901,8 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
                 accessibilityState={{ selected: false }}
                 accessibilityLabel={item.label}
                 onPress={() => switchTab(item.key)}
+                pressedBackgroundColor="rgba(255,255,255,0.14)"
+                pressedBorderColor="rgba(255,255,255,0.32)"
                 style={styles.navItem}
               >
                 {label}
@@ -788,6 +912,11 @@ export const WelcomeExperience = ({ onReplayIntro }: Props) => {
         </View>
       </View>
     </SafeAreaView>
+    <NotificationsSheet
+      visible={notificationsOpen}
+      onClose={() => setNotificationsOpen(false)}
+    />
+    </>
   );
 };
 
@@ -815,42 +944,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  bellDot: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    borderWidth: 1.5,
-  },
-  welcomeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  greeting: {
     paddingHorizontal: 20,
     paddingBottom: 12,
+    gap: 2,
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  avatarText: { fontSize: 13 },
-  welcomeCopy: { flex: 1 },
-  livePill: {
+  greetingActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    flexWrap: "wrap",
+    gap: 4,
+    marginLeft: -6,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 999 },
+  greetingLink: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   notification: {
     flexDirection: "row",
     alignItems: "center",
@@ -881,6 +990,26 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   section: { gap: 16 },
+  hero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 4,
+    paddingVertical: 10,
+  },
+  heroCopy: { flex: 1, gap: 6 },
+  steps: { gap: 10, paddingTop: 8 },
+  stepCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+  },
   trust: {
     alignSelf: "center",
     flexDirection: "row",
@@ -903,6 +1032,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 6,
   },
+  cardPress: { flex: 1 },
   cardArt: {
     flex: 1,
     margin: 12,
@@ -937,8 +1067,9 @@ const styles = StyleSheet.create({
   },
   tag: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 24,
+    right: 24,
+    zIndex: 1,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 10,

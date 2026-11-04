@@ -272,7 +272,7 @@ screen; other roles only open the lesson room.
   that crosses `endsAt` after joining does not tear down the call; cancelled
   lessons always show a closed-room state.
 - Jitsi itself is not an API endpoint. The client renders
-  `@jitsi/react-native-sdk` and joins `rayan-academy-{lessonId}`. Screen sharing
+  `@jitsi/react-native-sdk` and joins `ana-quran-{lessonId}`. Screen sharing
   is native (ReplayKit on iOS, MediaProjection on Android), not a link share.
   See the README for setup and platform limitations.
 - The native `JitsiMeeting` view lives in a root `LessonCallProvider`, not in the
@@ -280,7 +280,7 @@ screen; other roles only open the lesson room.
   call. Off the lesson screen the call docks as a mini player with Open, share,
   and leave actions; the Ana Quran mark overlays both the full and mini stages.
 - The lesson header has a share action that opens the native share sheet with
-  `https://{JITSI_DOMAIN}/rayan-academy-{lessonId}`. No API call is involved.
+  `https://{JITSI_DOMAIN}/ana-quran-{lessonId}`. No API call is involved.
 
 ---
 

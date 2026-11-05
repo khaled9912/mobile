@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { sendContactMessage } from "@/api/contact";
 import { isValidEmail } from "@/lib/validation";
 import { useAuth } from "@/providers/auth-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -23,12 +24,12 @@ const MAX_MESSAGE = 3000;
 
 export default function ContactScreen() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [name, setName] = useState(user?.fullName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const send = useMutation({
     mutationFn: sendContactMessage,
@@ -37,10 +38,9 @@ export default function ContactScreen() {
       setMessage("");
       setErrors({});
       setFormError(null);
-      setNotice("Thank you! Your message has been sent successfully.");
+      showToast("Thank you! Your message has been sent successfully.");
     },
     onError: (error) => {
-      setNotice(null);
       if (error instanceof ApiError && error.validationErrors) {
         const mapped: FieldErrors = {};
         for (const [field, messages] of Object.entries(
@@ -92,7 +92,6 @@ export default function ContactScreen() {
 
     setErrors(nextErrors);
     setFormError(null);
-    setNotice(null);
     if (Object.keys(nextErrors).length > 0) return;
 
     send.mutate({
@@ -109,12 +108,6 @@ export default function ContactScreen() {
         title="Contact the academy"
         subtitle="Send a message and the academy team will reply by email."
       />
-
-      {notice ? (
-        <View style={styles.notice}>
-          <Notice tone="success" message={notice} />
-        </View>
-      ) : null}
 
       <Card>
         <View style={styles.form}>
@@ -171,6 +164,5 @@ export default function ContactScreen() {
 
 const styles = StyleSheet.create({
   form: { gap: 16 },
-  notice: { marginBottom: 12 },
   footnote: { lineHeight: 18 },
 });

@@ -1,4 +1,12 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { AppState } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import {
@@ -57,6 +65,26 @@ const INVALIDATE_DEBOUNCE_MS = 250;
 type RealtimeTicket = { token: string; expiresAt: string; hub: string };
 type ChangedEvent = { scope?: string };
 
+interface RealtimeConnectionValue {
+  /** Null while the socket is down; consumers can safely wait for it. */
+  connection: HubConnection | null;
+  /** Bumped on every successful (re)connect so consumers can re-subscribe. */
+  revision: number;
+}
+
+const RealtimeConnectionContext = createContext<RealtimeConnectionValue>({
+  connection: null,
+  revision: 0,
+});
+
+/**
+ * Escape hatch for features that need the live socket itself (lesson pens).
+ * Query invalidation stays in the provider; UI code should not join groups
+ * without a concrete reason.
+ */
+export const useRealtimeConnection = () =>
+  useContext(RealtimeConnectionContext);
+
 const resolveHubUrl = (ticket: RealtimeTicket) => {
   const override = (process.env.EXPO_PUBLIC_REALTIME_URL ?? "")
     .trim()
@@ -72,6 +100,10 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = Boolean(user);
   const queryClient = useQueryClient();
   const ticketRef = useRef<RealtimeTicket | null>(null);
+  const [liveConnection, setLiveConnection] = useState<HubConnection | null>(
+    null
+  );
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -157,9 +189,11 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
         next.onreconnected(() => {
           retryAttempts = 0;
           void queryClient.invalidateQueries();
+          setRevision((value) => value + 1);
         });
         next.onclose(() => {
           connection = null;
+          setLiveConnection(null);
           scheduleRetry();
         });
         await next.start();
@@ -169,6 +203,8 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
         }
         connection = next;
         retryAttempts = 0;
+        setLiveConnection(next);
+        setRevision((value) => value + 1);
       } catch {
         scheduleRetry();
       } finally {
@@ -183,6 +219,7 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
       }
       const current = connection;
       connection = null;
+      setLiveConnection(null);
       if (current) {
         try {
           await current.stop();
@@ -222,5 +259,14 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [isAuthenticated, queryClient]);
 
-  return <>{children}</>;
+  const connectionValue = useMemo(
+    () => ({ connection: liveConnection, revision }),
+    [liveConnection, revision]
+  );
+
+  return (
+    <RealtimeConnectionContext.Provider value={connectionValue}>
+      {children}
+    </RealtimeConnectionContext.Provider>
+  );
 };

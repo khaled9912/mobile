@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { getSupportUsers, setUserActive } from "@/api/people";
 import type { UserProfile } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -21,7 +22,7 @@ import { RoleGate } from "@/components/ui/role-gate";
 export default function SupportTeamScreen() {
   const { spacing } = useTheme();
   const queryClient = useQueryClient();
-  const [notice, setNotice] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [actionError, setActionError] = useState<string | null>(null);
 
   const supportQuery = useQuery({
@@ -34,7 +35,7 @@ export default function SupportTeamScreen() {
       setUserActive(input.id, input.isActive),
     onSuccess: async (_, input) => {
       setActionError(null);
-      setNotice(
+      showToast(
         input.isActive
           ? "Reviewer reactivated. They can sign in again."
           : "Reviewer deactivated. Their submitted reviews are kept."
@@ -44,7 +45,6 @@ export default function SupportTeamScreen() {
       });
     },
     onError: (error) => {
-      setNotice(null);
       setActionError(
         error instanceof ApiError
           ? error.message
@@ -100,11 +100,6 @@ export default function SupportTeamScreen() {
           }
         />
 
-        {notice ? (
-          <View style={{ marginBottom: spacing.md }}>
-            <Notice tone="success" message={notice} />
-          </View>
-        ) : null}
         {actionError ? (
           <View style={{ marginBottom: spacing.md }}>
             <Notice tone="error" message={actionError} />

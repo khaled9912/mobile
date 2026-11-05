@@ -26,10 +26,13 @@ const openFirstAvailable = async (urls: string[]) => {
  * the WhatsApp share sheet so the user picks who receives it.
  */
 export const openWhatsApp = (text?: string) => {
-  const urls = text
+  // Pressables call onPress with an event, so only a real string may switch
+  // this into share mode; anything else means "chat with the academy".
+  const message = typeof text === "string" && text.trim() ? text.trim() : null;
+  const urls = message
     ? [
-        `whatsapp://send?text=${encodeURIComponent(text)}`,
-        `https://wa.me/?text=${encodeURIComponent(text)}`,
+        `whatsapp://send?text=${encodeURIComponent(message)}`,
+        `https://wa.me/?text=${encodeURIComponent(message)}`,
       ]
     : [
         `whatsapp://send?phone=${ACADEMY_WHATSAPP}&text=${encodeURIComponent(
@@ -44,7 +47,7 @@ export const openWhatsApp = (text?: string) => {
     if (opened) return;
     Alert.alert(
       "WhatsApp not available",
-      text
+      message
         ? "Install WhatsApp to share the lesson link."
         : "Install WhatsApp to chat with the academy."
     );

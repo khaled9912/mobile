@@ -3,6 +3,7 @@
 #
 #   ./dev ios [expo args]      build and launch on an iOS simulator or device
 #   ./dev android [expo args]  build and launch on an Android emulator or device
+#   ./dev build:android [--aab]  build a release APK (or AAB) and copy it to the Desktop
 #   ./dev start [expo args]    start Metro without a native rebuild
 #   ./dev install              install JS dependencies and iOS pods
 #   ./dev clean [--all]        remove build caches (--all also removes deps)
@@ -20,15 +21,19 @@ usage() {
   cat <<'EOF'
 Usage: ./dev <command> [expo args]
 
-  ios [args]      Build and launch on an iOS simulator or device
-  android [args]  Build and launch on an Android emulator or device
-  start [args]    Start Metro without a native rebuild
-  install         Install JS dependencies and iOS pods
-  clean           Remove build caches (add --all to remove node_modules and pods)
+  ios [args]              Build and launch on an iOS simulator or device
+  android [args]          Build and launch on an Android emulator or device
+  build:android [--aab]   Build a release APK (add --aab for an App Bundle)
+                          and copy it to your Desktop
+  start [args]            Start Metro without a native rebuild
+  install                 Install JS dependencies and iOS pods
+  clean                   Remove build caches (add --all to remove node_modules and pods)
 
 Examples:
   ./dev ios --device "iPhone 17 Pro"
   ./dev android
+  ./dev build:android
+  ./dev build:android --aab
   ./dev clean --all
 EOF
 }
@@ -59,6 +64,50 @@ ensure_android_sdk() {
   export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 }
 
+build_android() {
+  kind=apk
+  case "${1:-}" in
+    "") ;;
+    --aab | aab) kind=aab ;;
+    --apk | apk) kind=apk ;;
+    *) die "Unknown build option: $1. Use --apk (default) or --aab." ;;
+  esac
+
+  [ -d "$HOME/Desktop" ] || die "No Desktop folder at $HOME/Desktop."
+
+  ensure_node
+  ensure_android_sdk
+  command -v java >/dev/null 2>&1 || die \
+    "Java is not installed. Install Android Studio (it bundles a JDK) or JDK 17+."
+
+  if [ "$kind" = "aab" ]; then
+    task=bundleRelease
+    output_dir=android/app/build/outputs/bundle/release
+    label="App Bundle"
+  else
+    task=assembleRelease
+    output_dir=android/app/build/outputs/apk/release
+    label=APK
+  fi
+
+  log "Building Android release $label (this can take a few minutes)"
+  (cd android && ./gradlew "$task")
+
+  artifact=$(find "$output_dir" -maxdepth 1 -type f -name "*.$kind" 2>/dev/null |
+    head -n 1) || true
+  [ -n "$artifact" ] || die "Gradle finished but produced no $label."
+
+  version=$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' \
+    android/app/build.gradle | head -n 1)
+  version=${version:-1.0.0}
+
+  dest="$HOME/Desktop/AnaQuran-v${version}.${kind}"
+  cp -f "$artifact" "$dest"
+
+  log "Android $label ready: $dest"
+  printf '    %s\n' "$(du -h "$dest" | cut -f1)"
+}
+
 case "${1:-}" in
   ios)
     shift
@@ -73,6 +122,10 @@ case "${1:-}" in
     ensure_node
     ensure_android_sdk
     exec npx expo run:android "$@"
+    ;;
+  build:android)
+    shift
+    build_android "$@"
     ;;
   start)
     shift

@@ -9,6 +9,7 @@ import {
 } from "@/api/billing";
 import { formatDateTime, formatMonthKey, formatTime } from "@/lib/format";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -234,6 +235,7 @@ function TeacherBillingView() {
 
 function PayoutForm({ billing }: { billing: TeacherBilling }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [form, setForm] = useState<TeacherPayoutInput>(() => formFrom(billing));
   const saved = formFrom(billing);
   const dirty = fields.some((field) => saved[field.key] !== form[field.key]);
@@ -242,6 +244,7 @@ function PayoutForm({ billing }: { billing: TeacherBilling }) {
   const saveMutation = useMutation({
     mutationFn: () => savePayoutDetails(form),
     onSuccess: async () => {
+      showToast("Payout details saved. The academy will use them for your transfers.");
       await queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
   });
@@ -287,12 +290,6 @@ function PayoutForm({ billing }: { billing: TeacherBilling }) {
               ? saveMutation.error.message
               : "Unable to save your payout details."
           }
-        />
-      ) : null}
-      {saveMutation.isSuccess && !dirty ? (
-        <Notice
-          tone="success"
-          message="Payout details saved. The academy will use them for your transfers."
         />
       ) : null}
     </Card>

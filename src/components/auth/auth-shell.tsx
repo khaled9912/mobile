@@ -50,7 +50,7 @@ export const AuthShell = ({
       <View style={[styles.side, styles.actions]}>
         <PillPressable
           accessibilityLabel="Chat on WhatsApp"
-          onPress={openWhatsApp}
+          onPress={() => openWhatsApp()}
           style={styles.iconButton}
         >
           <Ionicons name="logo-whatsapp" size={19} color={colors.text} />

@@ -35,6 +35,7 @@ import type {
   TeacherPenalty,
 } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -747,10 +748,10 @@ function PolicyForm() {
     queryKey: ["lesson-policy"],
     queryFn: getLessonPolicy,
   });
+  const { showToast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const [payScheduled, setPayScheduled] = useState<boolean | null>(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const policy = query.data;
   const current = (key: string) =>
@@ -775,7 +776,7 @@ function PolicyForm() {
     },
     onSuccess: () => {
       setError("");
-      setNotice("The academy policy was saved.");
+      showToast("The academy policy was saved.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-policy"] });
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops"] });
     },
@@ -822,11 +823,6 @@ function PolicyForm() {
         </View>
         <Switch value={payValue} onValueChange={setPayScheduled} />
       </View>
-      {notice ? (
-        <AppText variant="small" color="success">
-          {notice}
-        </AppText>
-      ) : null}
       {error ? (
         <AppText variant="small" color="danger">
           {error}
@@ -837,7 +833,6 @@ function PolicyForm() {
         loading={save.isPending}
         onPress={() => {
           setError("");
-          setNotice("");
           save.mutate();
         }}
       />

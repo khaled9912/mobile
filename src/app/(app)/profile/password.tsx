@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
 import { changePassword } from "@/api/auth";
 import { passwordProblem } from "@/lib/validation";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -22,9 +23,9 @@ export default function ChangePasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const { showToast } = useToast();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const change = useMutation({
     mutationFn: () => changePassword(currentPassword, newPassword),
@@ -34,12 +35,9 @@ export default function ChangePasswordScreen() {
       setConfirmPassword("");
       setErrors({});
       setFormError(null);
-      setNotice(
-        "Your password has been changed. Other devices were signed out."
-      );
+      showToast("Your password has been changed. Other devices were signed out.");
     },
     onError: (error) => {
-      setNotice(null);
       setFormError(
         error instanceof ApiError
           ? error.message
@@ -65,7 +63,6 @@ export default function ChangePasswordScreen() {
 
     setErrors(nextErrors);
     setFormError(null);
-    setNotice(null);
     if (Object.keys(nextErrors).length > 0) return;
     change.mutate();
   };
@@ -113,7 +110,6 @@ export default function ChangePasswordScreen() {
           />
 
           {formError ? <Notice tone="error" message={formError} /> : null}
-          {notice ? <Notice tone="success" message={notice} /> : null}
 
           <Button
             title={change.isPending ? "Updating…" : "Change password"}

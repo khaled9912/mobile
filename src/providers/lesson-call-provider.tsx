@@ -23,6 +23,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { sendAttendanceEvent } from "@/api/lesson-operations";
 import { getDeviceId } from "@/lib/device-id";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
+import { LessonPenOverlay } from "@/components/lesson/lesson-pen-overlay";
 import { ShareLessonDrawer } from "@/components/lesson/share-lesson-drawer";
 import { BrandMark } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
@@ -248,6 +249,17 @@ const LessonCallHost = ({
   }, [call.lessonId, isLessonRoute, onMinimized]);
 
   const [shareOpen, setShareOpen] = useState(false);
+  const [penActive, setPenActive] = useState(false);
+  const { role } = useAuth();
+  // The server enforces the same rule; this only decides who sees the button.
+  const canMark =
+    role === "teacher" || role === "admin" || role === "super_admin";
+
+  // Marking takes over touches, so shrinking the room must drop it.
+  const minimize = useCallback(() => {
+    setPenActive(false);
+    onMinimized(true);
+  }, [onMinimized]);
 
   const containerStyle: StyleProp<ViewStyle> = expanded
     ? styles.expandedHost
@@ -278,7 +290,7 @@ const LessonCallHost = ({
             accessibilityRole="button"
             accessibilityLabel={joined ? "Minimize lesson" : "Close lesson room"}
             hitSlop={10}
-            onPress={() => (joined ? onMinimized(true) : endAndReturn())}
+            onPress={() => (joined ? minimize() : endAndReturn())}
             style={({ pressed }) => [
               styles.iconButton,
               pressed && styles.pressed,
@@ -302,6 +314,28 @@ const LessonCallHost = ({
               {call.subtitle}
             </AppText>
           </View>
+          {expanded && canMark ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                penActive ? "Stop marking the screen" : "Mark on the screen"
+              }
+              accessibilityState={{ selected: penActive }}
+              hitSlop={10}
+              onPress={() => setPenActive((value) => !value)}
+              style={({ pressed }) => [
+                styles.iconButton,
+                penActive && styles.penActiveButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons
+                name="pencil"
+                size={17}
+                color={penActive ? "#0b0f12" : "#ffffff"}
+              />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Share lesson room link"
@@ -408,9 +442,23 @@ const LessonCallHost = ({
           onLeft={onLeft}
           onClose={endAndReturn}
         />
+        {expanded ? (
+          <LessonPenOverlay
+            lessonId={call.lessonId}
+            active={penActive}
+            canDraw={canMark}
+            onDone={() => setPenActive(false)}
+          />
+        ) : null}
         <View
           pointerEvents="none"
-          style={showMini ? styles.miniLogo : styles.logo}
+          style={
+            penActive && expanded
+              ? styles.logoHidden
+              : showMini
+                ? styles.miniLogo
+                : styles.logo
+          }
         >
           <BrandMark
             size={showMini ? 24 : 46}
@@ -497,6 +545,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#d94a3f",
   },
+  penActiveButton: { backgroundColor: "#ffd166" },
   hangupIcon: { transform: [{ rotate: "135deg" }] },
   pressed: { opacity: 0.7 },
   expandedStage: { flex: 1, backgroundColor: "#05080a" },
@@ -556,6 +605,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },
   },
+  logoHidden: { position: "absolute", opacity: 0 },
   miniLogo: {
     position: "absolute",
     left: 7,

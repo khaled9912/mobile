@@ -13,6 +13,7 @@ import {
 } from "@/api/reviews";
 import { canReviewLessons, useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -413,8 +414,8 @@ export default function LessonReviewScreen() {
   const lessonId = typeof params.id === "string" ? params.id : "";
   const { role } = useAuth();
   const { spacing } = useTheme();
+  const { showToast } = useToast();
   const allowed = canReviewLessons(role);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const workspaceQuery = useQuery({
     queryKey: ["reviews", "workspace", lessonId],
@@ -455,12 +456,6 @@ export default function LessonReviewScreen() {
               subtitle={`${formatDateTime(workspace.lesson.startsAt)} · ${workspace.lesson.status}`}
             />
 
-            {notice ? (
-              <View style={{ marginBottom: spacing.lg }}>
-                <Notice tone="success" message={notice} />
-              </View>
-            ) : null}
-
             <MetricsCard metrics={workspace.metrics} />
 
             <View style={{ height: spacing.xl }} />
@@ -468,11 +463,9 @@ export default function LessonReviewScreen() {
               key={`${lessonId}:${workspace.review?.updatedAt ?? "new"}`}
               lessonId={lessonId}
               review={workspace.review}
-              onSaved={(status) => {
-                setNotice(
-                  status === "submitted" ? "Review submitted." : "Draft saved."
-                );
-              }}
+              onSaved={(status) =>
+                showToast(status === "submitted" ? "Review submitted." : "Draft saved.")
+              }
             />
 
             <View style={{ height: spacing.xl }} />

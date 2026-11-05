@@ -14,6 +14,7 @@ import {
 import type { UserProfile } from "@/api/types";
 import { isValidEmail, isValidPhone, normalizePhone } from "@/lib/validation";
 import { useAuth } from "@/providers/auth-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -85,13 +86,13 @@ async function prepareAvatar(
 
 function EditProfileForm({ profile }: { profile: UserProfile }) {
   const { updateUser } = useAuth();
+  const { showToast } = useToast();
   const [fullName, setFullName] = useState(profile.fullName);
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phoneNumber ?? "");
   const [avatarPreview, setAvatarPreview] = useState(profile.avatarUrl ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const save = useMutation({
@@ -99,10 +100,9 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
     onSuccess: (next) => {
       updateUser({ ...next, avatarUrl: avatarPreview || null });
       setFormError(null);
-      setNotice("Your profile has been updated.");
+      showToast("Your profile has been updated.");
     },
     onError: (error) => {
-      setNotice(null);
       setFormError(
         errorMessage(error, "Unable to save your profile. Please try again.")
       );
@@ -116,10 +116,9 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
       setAvatarPreview(preview);
       updateUser({ ...profile, avatarUrl: preview });
       setAvatarError(null);
-      setNotice("Your profile photo has been updated.");
+      showToast("Your profile photo has been updated.");
     },
     onError: (error) => {
-      setNotice(null);
       setAvatarError(
         errorMessage(error, "Unable to upload the image. Please try again.")
       );
@@ -132,10 +131,9 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
       setAvatarPreview("");
       updateUser({ ...profile, avatarUrl: null });
       setAvatarError(null);
-      setNotice("Your profile photo has been removed.");
+      showToast("Your profile photo has been removed.");
     },
     onError: (error) => {
-      setNotice(null);
       setAvatarError(
         errorMessage(error, "Unable to remove the image. Please try again.")
       );
@@ -146,7 +144,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
 
   const choosePhoto = async () => {
     setAvatarError(null);
-    setNotice(null);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -191,7 +188,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
 
     setErrors(nextErrors);
     setFormError(null);
-    setNotice(null);
     if (Object.keys(nextErrors).length > 0) return;
 
     const input: UpdateProfileInput = { fullName: trimmedName };
@@ -283,7 +279,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
           />
 
           {formError ? <Notice tone="error" message={formError} /> : null}
-          {notice ? <Notice tone="success" message={notice} /> : null}
 
           <Button
             title={save.isPending ? "Saving…" : "Save changes"}

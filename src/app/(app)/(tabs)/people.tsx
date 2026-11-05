@@ -14,6 +14,7 @@ import {
 import type { Assignment, UserProfile } from "@/api/types";
 import { useAuth, isAdminRole } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -45,10 +46,10 @@ export default function PeopleTab() {
   const isAdmin = isAdminRole(role);
   const { colors, radius } = useTheme();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [tab, setTab] = useState<Tab>("students");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [search, setSearch] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const studentsQuery = useQuery({
@@ -79,7 +80,7 @@ export default function PeopleTab() {
       setUserActive(input.id, input.isActive),
     onSuccess: async (_, input) => {
       setActionError(null);
-      setNotice(
+      showToast(
         input.isActive
           ? "Account reactivated. The user can sign in again."
           : "Account deactivated."
@@ -87,7 +88,6 @@ export default function PeopleTab() {
       await invalidatePeople();
     },
     onError: (error) => {
-      setNotice(null);
       setActionError(
         error instanceof ApiError
           ? error.message
@@ -100,11 +100,10 @@ export default function PeopleTab() {
     mutationFn: (assignmentId: string) => deleteAssignment(assignmentId),
     onSuccess: async () => {
       setActionError(null);
-      setNotice("Assignment ended.");
+      showToast("Assignment ended.");
       await invalidatePeople();
     },
     onError: (error) => {
-      setNotice(null);
       setActionError(
         error instanceof ApiError
           ? error.message
@@ -253,11 +252,6 @@ export default function PeopleTab() {
           </View>
         </Card>
 
-        {notice ? (
-          <View style={styles.block}>
-            <Notice tone="success" message={notice} />
-          </View>
-        ) : null}
         {actionError ? (
           <View style={styles.block}>
             <Notice tone="error" message={actionError} />

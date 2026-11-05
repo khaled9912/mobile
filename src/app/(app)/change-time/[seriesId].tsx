@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
 import {
+  endWeeklySeries,
   getMyChangeRequests,
   getMySeries,
   getTeacherProfile,
@@ -36,6 +37,8 @@ import {
   toViewerWeeklyTime,
 } from "@/lib/weekly-time";
 import { TimeZoneNote } from "@/components/student/time-zone-note";
+import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
@@ -44,9 +47,10 @@ export default function ChangeTimeScreen() {
   const params = useLocalSearchParams<{ seriesId?: string }>();
   const seriesId = typeof params.seriesId === "string" ? params.seriesId : "";
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
+  const { showToast } = useToast();
   const [selected, setSelected] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   const seriesQuery = useQuery({
@@ -94,8 +98,8 @@ export default function ChangeTimeScreen() {
         : Promise.reject(new Error("This weekly time no longer exists.")),
     onSuccess: async () => {
       setError("");
-      setNotice(
-        "Request sent. The academy will confirm the new time with your teacher and update your weekly lessons."
+      showToast(
+        "Request sent. The academy will confirm the new time with your teacher."
       );
       await queryClient.invalidateQueries({ queryKey: ["change-requests"] });
       await queryClient.invalidateQueries({ queryKey: ["series"] });
@@ -105,7 +109,6 @@ export default function ChangeTimeScreen() {
       setNote("");
     },
     onError: (mutationError) => {
-      setNotice("");
       setError(
         mutationError instanceof ApiError
           ? mutationError.message
@@ -113,6 +116,46 @@ export default function ChangeTimeScreen() {
       );
     },
   });
+
+  const endSeries = useMutation({
+    mutationFn: () =>
+      series
+        ? endWeeklySeries(series.id)
+        : Promise.reject(new Error("This weekly time no longer exists.")),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["series"] }),
+        queryClient.invalidateQueries({ queryKey: ["change-requests"] }),
+        queryClient.invalidateQueries({ queryKey: ["lessons"] }),
+        queryClient.invalidateQueries({ queryKey: ["assigned-teacher"] }),
+      ]);
+      showToast("Weekly lessons ended. Your teacher has been notified.");
+      router.navigate("/book");
+    },
+    onError: (mutationError) => {
+      setError(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "Unable to end the weekly time. Please try again."
+      );
+    },
+  });
+
+  const confirmEndSeries = () => {
+    if (!series) return;
+    Alert.alert(
+      "End these weekly lessons?",
+      `This cancels your future lessons with ${series.teacherName} and lets your teacher know. You can book a new weekly time at any time.`,
+      [
+        { text: "Keep my weekly time", style: "cancel" },
+        {
+          text: "End weekly lessons",
+          style: "destructive",
+          onPress: () => endSeries.mutate(),
+        },
+      ]
+    );
+  };
 
   const renderRule = ({
     rule,
@@ -126,6 +169,11 @@ export default function ChangeTimeScreen() {
       <Card
         key={rule.id}
         onPress={() => setSelected(isSelected ? null : rule.id)}
+        style={
+          isSelected
+            ? { borderColor: colors.brand, borderWidth: 2 }
+            : undefined
+        }
         accessibilityLabel={`${formatWeeklySlot(
           local.dayOfWeek,
           local.startsAtTime,
@@ -164,11 +212,6 @@ export default function ChangeTimeScreen() {
           subtitle="Pick a new weekly time. The academy will check it with your teacher, then move your lessons."
         />
 
-        {notice ? (
-          <View style={styles.block}>
-            <Notice tone="success" message={notice} />
-          </View>
-        ) : null}
         {error ? (
           <View style={styles.block}>
             <Notice tone="error" message={error} />
@@ -276,7 +319,22 @@ export default function ChangeTimeScreen() {
                 <EmptyState
                   icon="time-outline"
                   title="No other times available"
-                  body={`${series.teacherName} has not announced any other weekly times right now.`}
+                  body={`${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time.`}
+                  action={
+                    <View style={styles.actions}>
+                      <Button
+                        title="Browse other teachers"
+                        onPress={() => router.navigate("/book")}
+                      />
+                      <Button
+                        title="End weekly lessons"
+                        variant="danger"
+                        loading={endSeries.isPending}
+                        disabled={endSeries.isPending}
+                        onPress={confirmEndSeries}
+                      />
+                    </View>
+                  }
                 />
               )}
             </View>
@@ -315,6 +373,7 @@ const styles = StyleSheet.create({
   list: { gap: 18 },
   day: { gap: 8 },
   note: { marginTop: 10 },
+  actions: { gap: 10, alignSelf: "stretch" },
   ruleRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -59,6 +59,11 @@ export const getAssignedWeeklyAvailability = async () =>
 export const getMySeries = () =>
   apiFetch<LessonSeries[]>("/api/student/series");
 
+export const endWeeklySeries = (seriesId: string) =>
+  apiFetch<null>(`/api/student/series/${encodeURIComponent(seriesId)}`, {
+    method: "DELETE",
+  });
+
 export const bookWeeklySlots = (ruleIds: string[]) =>
   apiFetch<{ series: LessonSeries[]; lessons: Lesson[] }>(
     "/api/student/bookings",

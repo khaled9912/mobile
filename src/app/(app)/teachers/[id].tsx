@@ -26,6 +26,7 @@ import {
 import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import {
   formatDateTime,
   formatWeeklySlot,
@@ -48,8 +49,8 @@ export default function TeacherProfileScreen() {
   const teacherId = typeof params.id === "string" ? params.id : "";
   const queryClient = useQueryClient();
   const { colors, radius } = useTheme();
+  const { showToast } = useToast();
   const [selected, setSelected] = useState<string[]>([]);
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   const teacherQuery = useQuery({
@@ -65,7 +66,7 @@ export default function TeacherProfileScreen() {
     onSuccess: async (result) => {
       setError("");
       setSelected([]);
-      setNotice(
+      showToast(
         `${result.series.length} weekly ${
           result.series.length === 1 ? "time is" : "times are"
         } yours. They repeat every week — ask the academy if you need to change one.${
@@ -83,7 +84,6 @@ export default function TeacherProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
     },
     onError: (mutationError) => {
-      setNotice("");
       setError(
         mutationError instanceof ApiError
           ? mutationError.message
@@ -111,7 +111,6 @@ export default function TeacherProfileScreen() {
   }, [teacher?.slots, viewerTimeZone]);
 
   const toggle = (rule: WeeklyRule) => {
-    setNotice("");
     setError("");
     if (rule.status !== "available") return;
     setSelected((current) =>
@@ -198,11 +197,6 @@ export default function TeacherProfileScreen() {
               <StarRating value={teacher.averageRating} size={18} showValue />
             ) : null}
 
-            {notice ? (
-              <View style={styles.block}>
-                <Notice tone="success" message={notice} />
-              </View>
-            ) : null}
             {error ? (
               <View style={styles.block}>
                 <Notice tone="error" message={error} />

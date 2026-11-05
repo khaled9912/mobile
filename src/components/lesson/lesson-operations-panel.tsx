@@ -16,6 +16,7 @@ import {
 } from "@/api/lesson-operations";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { useNow } from "@/hooks/use-now";
 import { formatDateTime, formatTime } from "@/lib/format";
@@ -42,6 +43,7 @@ const outcomeLabels: Record<string, string> = {
   student_no_show: "Student no-show",
   teacher_no_show: "Teacher no-show",
   both_absent: "Both participants absent",
+  series_ended: "Weekly lessons ended",
 };
 
 const rescheduleStatusLabels: Record<string, string> = {
@@ -108,18 +110,6 @@ function SectionCard({
       </View>
       {children}
     </Card>
-  );
-}
-
-function Notice({ children }: { children: ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.notice, { backgroundColor: colors.successSoft }]}>
-      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-      <AppText variant="small" color="success" style={styles.flexText}>
-        {children}
-      </AppText>
-    </View>
   );
 }
 
@@ -222,10 +212,10 @@ function CancellationSection({
   role: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const preview = operations.cancellation;
   const record = operations.cancellationRecord;
   const isAdmin = role === "admin" || role === "super_admin";
@@ -236,7 +226,7 @@ function CancellationSection({
       setConfirming(false);
       setReason("");
       setError("");
-      setNotice("The lesson was cancelled and both sides were notified.");
+      showToast("The lesson was cancelled and both sides were notified.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["student", "credits"] });
@@ -287,7 +277,6 @@ function CancellationSection({
             {record?.reason ?? lesson.cancelReason}
           </AppText>
         ) : null}
-        {notice ? <Notice>{notice}</Notice> : null}
       </SectionCard>
     );
   }
@@ -323,16 +312,12 @@ function CancellationSection({
               : ""}
         </AppText>
       ) : null}
-      {notice ? <Notice>{notice}</Notice> : null}
       {error ? <ErrorNotice>{error}</ErrorNotice> : null}
       {!confirming ? (
         <Button
           title={isAdmin ? "Cancel lesson as academy" : "Cancel lesson"}
           variant="danger"
-          onPress={() => {
-            setNotice("");
-            setConfirming(true);
-          }}
+          onPress={() => setConfirming(true)}
         />
       ) : (
         <View style={styles.form}>
@@ -481,13 +466,13 @@ function RescheduleSection({
   viewerId?: string;
 }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const now = useNow();
   const [startsAt, setStartsAt] = useState(
     () => new Date(new Date(lesson.startsAt).getTime() + 24 * 3600_000)
   );
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const pending = operations.pendingReschedule;
   const isAdmin = role === "admin" || role === "super_admin";
@@ -513,7 +498,7 @@ function RescheduleSection({
       }),
     onSuccess: () => {
       setError("");
-      setNotice(
+      showToast(
         "Your reschedule request was sent. The lesson keeps its time until it is accepted."
       );
       refresh();
@@ -527,7 +512,7 @@ function RescheduleSection({
       respondToRescheduleRequest(pending!.id, action, reply),
     onSuccess: (_, variables) => {
       setError("");
-      setNotice(
+      showToast(
         variables.action === "accept"
           ? "The lesson was moved to the new time."
           : "The lesson stays at its current time."
@@ -542,7 +527,7 @@ function RescheduleSection({
     mutationFn: () => cancelRescheduleRequest(pending!.id),
     onSuccess: () => {
       setError("");
-      setNotice("Your reschedule request was withdrawn.");
+      showToast("Your reschedule request was withdrawn.");
       refresh();
     },
     onError: (failure) =>
@@ -566,7 +551,6 @@ function RescheduleSection({
         A reschedule is a request, not a cancellation. The lesson keeps its time
         until the other side accepts.
       </AppText>
-      {notice ? <Notice>{notice}</Notice> : null}
       {error ? <ErrorNotice>{error}</ErrorNotice> : null}
 
       {pending ? (
@@ -605,7 +589,6 @@ function RescheduleSection({
             disabled={busy}
             onPress={() => {
               setError("");
-              setNotice("");
               if (startsAt.getTime() <= Date.now()) {
                 setError("Choose a future time.");
                 return;
@@ -664,6 +647,7 @@ function MakeupSection({
   role: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const now = useNow();
   const isAdmin = role === "admin" || role === "super_admin";
   const canCreate =
@@ -674,7 +658,6 @@ function MakeupSection({
   const [startsAt, setStartsAt] = useState(() => new Date(Date.now() + 3600_000));
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
 
   const spanMs = durationMs(lesson);
   const proposedEnd = new Date(startsAt.getTime() + spanMs);
@@ -688,7 +671,7 @@ function MakeupSection({
       }),
     onSuccess: () => {
       setError("");
-      setNotice("A make-up lesson was scheduled and the student was notified.");
+      showToast("A make-up lesson was scheduled and the student was notified.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
     },
@@ -754,7 +737,6 @@ function MakeupSection({
         The make-up keeps the original {Math.round(spanMs / 60000)}-minute length
         and adds no extra charge or credit.
       </AppText>
-      {notice ? <Notice>{notice}</Notice> : null}
       {error ? <ErrorNotice>{error}</ErrorNotice> : null}
       <View style={styles.form}>
         <DateTimeField
@@ -776,7 +758,6 @@ function MakeupSection({
           loading={mutation.isPending}
           onPress={() => {
             setError("");
-            setNotice("");
             if (startsAt.getTime() <= Date.now()) {
               setError("Choose a future time.");
               return;
@@ -884,10 +865,10 @@ function ExcuseSection({
   role: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [category, setCategory] = useState<string>("illness");
   const [explanation, setExplanation] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const outcome = lesson.cancellationOutcome;
   const eligible =
     role === "student" &&
@@ -900,7 +881,7 @@ function ExcuseSection({
     mutationFn: () => requestExcuse(lesson.id, { category, explanation }),
     onSuccess: () => {
       setError("");
-      setNotice("Your excuse request was sent for review.");
+      showToast("Your excuse request was sent for review.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
     },
     onError: (failure) =>
@@ -945,7 +926,6 @@ function ExcuseSection({
             ask the academy to review it. An approved excuse restores the lesson
             credit.
           </AppText>
-          {notice ? <Notice>{notice}</Notice> : null}
           {error ? <ErrorNotice>{error}</ErrorNotice> : null}
           <ChoiceChips
             label="Excuse category"
@@ -968,7 +948,6 @@ function ExcuseSection({
             loading={mutation.isPending}
             onPress={() => {
               setError("");
-              setNotice("");
               if (explanation.trim().length < 10) {
                 setError("Explain what happened in at least 10 characters.");
                 return;
@@ -992,10 +971,10 @@ function IncidentSection({
   role: string | null;
 }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [type, setType] = useState<string>("attendance_dispute");
   const [detail, setDetail] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const existing = operations.incident;
   const canReport = role === "teacher" || role === "student";
 
@@ -1003,7 +982,7 @@ function IncidentSection({
     mutationFn: () => reportLessonIncident(lesson.id, { type, detail }),
     onSuccess: () => {
       setError("");
-      setNotice("The issue was reported to the academy.");
+      showToast("The issue was reported to the academy.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
     },
     onError: (failure) =>
@@ -1037,7 +1016,6 @@ function IncidentSection({
             If the attendance record does not match what happened, report it. The
             academy reviews every report.
           </AppText>
-          {notice ? <Notice>{notice}</Notice> : null}
           {error ? <ErrorNotice>{error}</ErrorNotice> : null}
           <ChoiceChips
             label="Issue type"
@@ -1061,7 +1039,6 @@ function IncidentSection({
             loading={mutation.isPending}
             onPress={() => {
               setError("");
-              setNotice("");
               if (detail.trim().length < 5) {
                 setError("Describe the issue in at least 5 characters.");
                 return;

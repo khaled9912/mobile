@@ -20,14 +20,15 @@ import { EmptyState, ErrorView } from "@/components/ui/states";
 import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
 export const AdminChangeQueue = () => {
   const queryClient = useQueryClient();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [filter, setFilter] = useState<ChangeRequestStatus>("pending");
-  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -50,7 +51,7 @@ export const AdminChangeQueue = () => {
       note != null ? rejectChangeRequest(id, note) : approveChangeRequest(id),
     onSuccess: async (_, variables) => {
       setError("");
-      setNotice(
+      showToast(
         variables.note != null
           ? "Change declined. The student keeps their current weekly time."
           : "Change approved. The weekly lessons now use the new time."
@@ -64,7 +65,6 @@ export const AdminChangeQueue = () => {
       await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
     },
     onError: (mutationError) => {
-      setNotice("");
       setError(
         mutationError instanceof ApiError
           ? mutationError.message
@@ -76,7 +76,6 @@ export const AdminChangeQueue = () => {
   const changes = changesQuery.data ?? [];
 
   const approve = (id: string) => {
-    setNotice("");
     Alert.alert(
       "Approve this time change?",
       "Check the new time with the teacher first. Approving moves all future weekly lessons for this student.",
@@ -102,7 +101,6 @@ export const AdminChangeQueue = () => {
         label="Change request filter"
         value={filter}
         onChange={(next) => {
-          setNotice("");
           setError("");
           setFilter(next);
         }}
@@ -113,11 +111,6 @@ export const AdminChangeQueue = () => {
         ]}
       />
 
-      {notice ? (
-        <View style={styles.block}>
-          <Notice tone="success" message={notice} />
-        </View>
-      ) : null}
       {error ? (
         <View style={styles.block}>
           <Notice tone="error" message={error} />
@@ -160,7 +153,6 @@ export const AdminChangeQueue = () => {
                         variant="danger"
                         disabled={decide.isPending}
                         onPress={() => {
-                          setNotice("");
                           setError("");
                           setRejectNote("");
                           setRejecting(change.id);

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { router } from "expo-router";
+import { Platform, StyleSheet, View } from "react-native";
+import { router, useSegments } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
@@ -15,13 +15,18 @@ import { useTheme } from "@/providers/theme-provider";
 export const AppHeader = () => {
   const { colors } = useTheme();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const segments: string[] = useSegments();
+  // Tab roots are the home of the app; every other screen in the app group is
+  // pushed on top of them, so it always has somewhere to go back to.
+  const showBack = segments[0] === "(app)" && segments[1] !== "(tabs)";
 
   const handleBack = () => {
-    if (router.canGoBack()) {
+    // A deep link can land on a stacked screen with no history behind it.
+    if (Platform.OS !== "web" && router.canGoBack()) {
       router.back();
       return;
     }
-    router.navigate("/");
+    router.replace("/");
   };
 
   return (
@@ -32,19 +37,21 @@ export const AppHeader = () => {
       >
         <View style={styles.header}>
           <View style={styles.headerSide}>
-            <PillPressable
-              accessibilityLabel="Go back"
-              onPress={handleBack}
-              style={[
-                styles.iconButton,
-                {
-                  backgroundColor: colors.surfaceMuted,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <Ionicons name="chevron-back" size={20} color={colors.text} />
-            </PillPressable>
+            {showBack && (
+              <PillPressable
+                accessibilityLabel="Go back"
+                onPress={handleBack}
+                style={[
+                  styles.iconButton,
+                  {
+                    backgroundColor: colors.surfaceMuted,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Ionicons name="chevron-back" size={20} color={colors.text} />
+              </PillPressable>
+            )}
           </View>
 
           <AppText style={[styles.brandTitle, { color: colors.text }]}>
@@ -54,7 +61,7 @@ export const AppHeader = () => {
           <View style={[styles.headerSide, styles.headerActions]}>
             <PillPressable
               accessibilityLabel="Chat on WhatsApp"
-              onPress={openWhatsApp}
+              onPress={() => openWhatsApp()}
               style={styles.iconButton}
             >
               <Ionicons name="logo-whatsapp" size={19} color={colors.text} />

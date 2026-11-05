@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
@@ -10,6 +10,7 @@ import {
 } from "@/api/people";
 import type { UserProfile } from "@/api/types";
 import { isValidEmail, passwordProblem } from "@/lib/validation";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -47,6 +48,7 @@ export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ role?: string | string[] }>();
   const rawRole = Array.isArray(params.role) ? params.role[0] : params.role;
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [role, setRole] = useState<AccountRole>(
     isAccountRole(rawRole) ? rawRole : "student"
   );
@@ -57,7 +59,6 @@ export default function NewAccountScreen() {
   const [grade, setGrade] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: async (): Promise<UserProfile> => {
@@ -83,15 +84,10 @@ export default function NewAccountScreen() {
         queryKey: ["admin", "support-users"],
       });
       await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
-      setNotice(`${user.fullName} now has an account.`);
-      Alert.alert(
-        "Account created",
-        `${user.fullName} can sign in with ${user.email}.`,
-        [{ text: "Done", onPress: () => router.back() }]
-      );
+      showToast(`${user.fullName} now has an account.`);
+      router.back();
     },
     onError: (error) => {
-      setNotice(null);
       setFormError(
         error instanceof ApiError
           ? error.message
@@ -112,7 +108,6 @@ export default function NewAccountScreen() {
     }
     setErrors(nextErrors);
     setFormError(null);
-    setNotice(null);
     if (Object.keys(nextErrors).length > 0) return;
     create.mutate();
   };
@@ -121,7 +116,6 @@ export default function NewAccountScreen() {
     setRole(next);
     setErrors({});
     setFormError(null);
-    setNotice(null);
   };
 
   return (
@@ -199,7 +193,6 @@ export default function NewAccountScreen() {
             />
 
             {formError ? <Notice tone="error" message={formError} /> : null}
-            {notice ? <Notice tone="success" message={notice} /> : null}
 
             <Button
               title={create.isPending ? "Creating…" : "Create account"}

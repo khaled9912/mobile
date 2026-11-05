@@ -13,6 +13,7 @@ import {
 } from "@react-navigation/native";
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
+import { ToastProvider } from "@/providers/toast-provider";
 import { RealtimeProvider } from "@/providers/realtime-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
 import { PushTokenProvider } from "@/providers/push-token-provider";
@@ -116,18 +117,20 @@ const RootLayout = () => (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AppThemeProvider>
-          <AuthProvider>
-            <RealtimeProvider>
-              <PushTokenProvider>
-                <LessonReminderProvider>
-                  <LessonCallProvider>
-                    <RootNavigator />
-                  </LessonCallProvider>
-                  <ApiDebugOverlay />
-                </LessonReminderProvider>
-              </PushTokenProvider>
-            </RealtimeProvider>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <RealtimeProvider>
+                <PushTokenProvider>
+                  <LessonReminderProvider>
+                    <LessonCallProvider>
+                      <RootNavigator />
+                    </LessonCallProvider>
+                    <ApiDebugOverlay />
+                  </LessonReminderProvider>
+                </PushTokenProvider>
+              </RealtimeProvider>
+            </AuthProvider>
+          </ToastProvider>
         </AppThemeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

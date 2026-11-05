@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import {
 } from "@/api/people";
 import type { UserProfile } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -61,6 +62,7 @@ export default function AssignTeacherScreen() {
     : params.studentId;
   const queryClient = useQueryClient();
   const { colors } = useTheme();
+  const { showToast } = useToast();
 
   const [studentId, setStudentId] = useState<string | null>(
     rawStudentId ?? null
@@ -106,13 +108,12 @@ export default function AssignTeacherScreen() {
         queryKey: ["assigned-teacher"],
       });
       await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
-      Alert.alert(
-        "Teacher assigned",
+      showToast(
         `${teacher?.fullName ?? "This teacher"} is now ${
           student?.fullName ?? "the student"
-        }'s assigned teacher. Any previous assignment was ended.`,
-        [{ text: "Done", onPress: () => router.back() }]
+        }'s assigned teacher.`
       );
+      router.back();
     },
     onError: (mutationError) =>
       setError(

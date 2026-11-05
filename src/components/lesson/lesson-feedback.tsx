@@ -17,6 +17,7 @@ import {
   progressTone,
 } from "@/lib/status";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Card } from "@/components/ui/card";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
@@ -152,6 +153,7 @@ const TeacherReportSection = ({
   onSaved: (report: LessonReport) => void;
 }) => {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [editing, setEditing] = useState(!report);
   const [classSummary, setClassSummary] = useState(report?.classSummary ?? "");
   const [studentFeedback, setStudentFeedback] = useState(
@@ -161,7 +163,6 @@ const TeacherReportSection = ({
     report?.progress ?? "good"
   );
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -174,7 +175,7 @@ const TeacherReportSection = ({
       onSaved(saved);
       setEditing(false);
       setFormError(null);
-      setNotice("Your class report has been saved.");
+      showToast("Your class report has been saved.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lessons", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["profile", "reports"] });
@@ -190,7 +191,6 @@ const TeacherReportSection = ({
 
   const submit = () => {
     setFormError(null);
-    setNotice(null);
     if (classSummary.trim().length < MIN_LENGTH) {
       setFormError("Summarize the class in at least 10 characters.");
       return;
@@ -222,21 +222,13 @@ const TeacherReportSection = ({
               variant="secondary"
               size="sm"
               icon="create-outline"
-              onPress={() => {
-                setNotice(null);
-                setEditing(true);
-              }}
+              onPress={() => setEditing(true)}
             />
           }
         />
         <View style={styles.sectionBody}>
           <ReportContent report={report} />
         </View>
-        {notice ? (
-          <View style={styles.noticeGap}>
-            <Notice tone="success" message={notice} />
-          </View>
-        ) : null}
       </Card>
     );
   }
@@ -318,11 +310,11 @@ const StudentReviewSection = ({
   onSaved: (review: TeacherReview) => void;
 }) => {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [editing, setEditing] = useState(!review);
   const [rating, setRating] = useState(review?.rating ?? 0);
   const [comment, setComment] = useState(review?.comment ?? "");
   const [formError, setFormError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -336,7 +328,7 @@ const StudentReviewSection = ({
       onSaved(saved);
       setEditing(false);
       setFormError(null);
-      setNotice("Thank you — your review has been saved.");
+      showToast("Thank you — your review has been saved.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lessons", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
@@ -352,7 +344,6 @@ const StudentReviewSection = ({
 
   const submit = () => {
     setFormError(null);
-    setNotice(null);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       setFormError("Choose a rating from 1 to 5 stars.");
       return;
@@ -379,21 +370,13 @@ const StudentReviewSection = ({
               variant="secondary"
               size="sm"
               icon="create-outline"
-              onPress={() => {
-                setNotice(null);
-                setEditing(true);
-              }}
+              onPress={() => setEditing(true)}
             />
           }
         />
         <View style={styles.sectionBody}>
           <ReviewContent review={review} />
         </View>
-        {notice ? (
-          <View style={styles.noticeGap}>
-            <Notice tone="success" message={notice} />
-          </View>
-        ) : null}
       </Card>
     );
   }
@@ -558,7 +541,6 @@ const styles = StyleSheet.create({
   },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionBody: { marginTop: 14 },
-  noticeGap: { marginTop: 14 },
   lede: { marginTop: 6, lineHeight: 19 },
   form: { marginTop: 16, gap: 16 },
   progressRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

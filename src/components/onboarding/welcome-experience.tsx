@@ -38,9 +38,10 @@ type Option = {
 };
 
 const CARD_HEIGHT = 356;
+// Cards behind shrink around their center and step to the right, so only the
+// right edge shows and none of them spill past the front card's bottom.
 const CARD_PEEK_X = 24;
-const CARD_PEEK_Y = 13;
-const CARD_PEEK_SCALE = 0.045;
+const CARD_PEEK_SCALE = 0.04;
 
 const OPTIONS: Option[] = [
   {
@@ -80,7 +81,6 @@ const OPTIONS: Option[] = [
 // All four cards stay mounted so a swap never pops a hidden card into view.
 const OPTIONS_LENGTH = OPTIONS.length;
 const STACK_WIDTH = CARD_PEEK_X * (OPTIONS_LENGTH - 1);
-const STACK_HEIGHT = CARD_HEIGHT + CARD_PEEK_Y * (OPTIONS_LENGTH - 1);
 
 const TABS: {
   key: TabKey;
@@ -333,7 +333,9 @@ export const WelcomeExperience = () => {
   const [activeOption, setActiveOption] = useState(0);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const cardWidth = Math.min(width - 84, 340);
+  // The deck is the card plus its right-side peek, so the card has to give up
+  // whatever width the peek takes to keep breathing room on both edges.
+  const cardWidth = Math.min(width - STACK_WIDTH - 56, 300);
   const pan = useAnimatedValue(0);
   const swap = useAnimatedValue(0);
   const reveal = useAnimatedValue(1);
@@ -407,6 +409,11 @@ export const WelcomeExperience = () => {
   const cardPan = useMemo(
     () =>
       PanResponder.create({
+        // The card body is a Pressable, so a drag has to win from the capture
+        // phase; otherwise the press keeps the gesture and the card sits still.
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          Math.abs(gesture.dx) > 3 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onMoveShouldSetPanResponder: (_, gesture) =>
           Math.abs(gesture.dx) > 8 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
@@ -455,7 +462,7 @@ export const WelcomeExperience = () => {
       <View
         style={[
           styles.stack,
-          { width: cardWidth + STACK_WIDTH, height: STACK_HEIGHT },
+          { width: cardWidth + STACK_WIDTH, height: CARD_HEIGHT },
         ]}
       >
         {OPTIONS.map((option, index) => {
@@ -471,10 +478,6 @@ export const WelcomeExperience = () => {
           const slideX = swap.interpolate({
             inputRange: [0, 1],
             outputRange: [fromOrder * CARD_PEEK_X, toOrder * CARD_PEEK_X],
-          });
-          const slideY = swap.interpolate({
-            inputRange: [0, 1],
-            outputRange: [fromOrder * CARD_PEEK_Y, toOrder * CARD_PEEK_Y],
           });
           const slideScale = swap.interpolate({
             inputRange: [0, 1],
@@ -504,19 +507,13 @@ export const WelcomeExperience = () => {
                   }),
                 },
                 {
-                  translateY: reveal.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [CARD_PEEK_Y, 0],
-                  }),
-                },
-                {
                   scale: reveal.interpolate({
                     inputRange: [0, 1],
                     outputRange: [1 - CARD_PEEK_SCALE, 1],
                   }),
                 },
               ]
-            : [{ translateX: slideX }, { translateY: slideY }, { scale: slideScale }];
+            : [{ translateX: slideX }, { scale: slideScale }];
 
           return (
             <Animated.View
@@ -737,7 +734,7 @@ export const WelcomeExperience = () => {
         <View style={[styles.headerSide, styles.headerActions]}>
           <PillPressable
             accessibilityLabel="Chat on WhatsApp"
-            onPress={openWhatsApp}
+            onPress={() => openWhatsApp()}
             style={styles.iconButton}
           >
             <Ionicons name="logo-whatsapp" size={19} color={colors.text} />
@@ -962,7 +959,7 @@ const styles = StyleSheet.create({
   cardPress: { flex: 1 },
   cardArt: {
     flex: 1,
-    margin: 12,
+    margin: 16,
     marginBottom: 0,
     borderRadius: 18,
     alignItems: "center",
@@ -994,15 +991,15 @@ const styles = StyleSheet.create({
   },
   tag: {
     position: "absolute",
-    top: 24,
-    right: 24,
+    top: 28,
+    right: 28,
     zIndex: 1,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  cardCopy: { padding: 18, gap: 4 },
+  cardCopy: { padding: 20, gap: 4 },
   cardBody: { lineHeight: 18 },
   dots: {
     flexDirection: "row",

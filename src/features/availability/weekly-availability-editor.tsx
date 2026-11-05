@@ -13,6 +13,7 @@ import {
 } from "@/api/scheduling";
 import type { WeeklyRule } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -54,11 +55,11 @@ export const WeeklyAvailabilityEditor = ({
   const isAdmin = mode === "admin";
   const queryClient = useQueryClient();
   const { colors, radius } = useTheme();
+  const { showToast } = useToast();
   const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
   const [start, setStart] = useState(() => dateFromTimeOfDay("17:00"));
   const [end, setEnd] = useState(() => dateFromTimeOfDay("18:00"));
   const [timeZoneOverride, setTimeZoneOverride] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const localTimeZone = useMemo(
@@ -119,7 +120,7 @@ export const WeeklyAvailabilityEditor = ({
     },
     onSuccess: async (created) => {
       setFormError(null);
-      setNotice(
+      showToast(
         `Announced ${created.length} weekly ${
           created.length === 1 ? "time" : "times"
         }. Students can book ${created.length === 1 ? "it" : "them"} now.`
@@ -127,7 +128,6 @@ export const WeeklyAvailabilityEditor = ({
       await invalidate();
     },
     onError: (error) => {
-      setNotice(null);
       setFormError(
         error instanceof ApiError
           ? error.message
@@ -145,7 +145,7 @@ export const WeeklyAvailabilityEditor = ({
     },
     onSuccess: async () => {
       setFormError(null);
-      setNotice("Weekly time removed.");
+      showToast("Weekly time removed.");
       await invalidate();
     },
     onError: (error) =>
@@ -157,7 +157,6 @@ export const WeeklyAvailabilityEditor = ({
   });
 
   const toggleDay = (day: number) => {
-    setNotice(null);
     setDays((current) =>
       current.includes(day)
         ? current.filter((value) => value !== day)
@@ -166,7 +165,6 @@ export const WeeklyAvailabilityEditor = ({
   };
 
   const submit = () => {
-    setNotice(null);
     setFormError(null);
     if (isAdmin && !teacherId) {
       setFormError("Choose a teacher first.");
@@ -315,7 +313,6 @@ export const WeeklyAvailabilityEditor = ({
           </View>
 
           {formError ? <Notice tone="error" message={formError} /> : null}
-          {notice ? <Notice tone="success" message={notice} /> : null}
 
           <Button
             title="Announce availability"

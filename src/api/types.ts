@@ -96,7 +96,8 @@ export type CancellationOutcome =
   | "admin_cancelled"
   | "student_no_show"
   | "teacher_no_show"
-  | "both_absent";
+  | "both_absent"
+  | "series_ended";
 
 export interface Lesson {
   id: string;

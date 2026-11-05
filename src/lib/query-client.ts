@@ -19,11 +19,11 @@ focusManager.setEventListener((handleFocus) => {
 });
 
 /**
- * Class and request screens re-fetch on this cadence while the app is active,
- * so an approval or status change made by another role appears without a manual
- * refresh. True push updates would need a server-side channel.
+ * Class and request screens receive SignalR change events and refetch on
+ * demand. This slow cadence only repairs a missed event while the socket is
+ * down; reconnect triggers a full invalidation.
  */
-export const LIVE_SYNC_INTERVAL = 15_000;
+export const LIVE_SYNC_INTERVAL = 120_000;
 
 const shouldRetry = (failureCount: number, error: unknown) => {
   if (error instanceof ApiError) {

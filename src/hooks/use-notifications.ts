@@ -5,6 +5,7 @@ import {
   markNotificationRead,
 } from "@/api/notifications";
 import { useAuth } from "@/providers/auth-provider";
+import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 
 export const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
 
@@ -18,7 +19,7 @@ export const useNotifications = () => {
     queryKey: NOTIFICATIONS_QUERY_KEY,
     queryFn: getNotifications,
     enabled,
-    refetchInterval: 15_000,
+    refetchInterval: LIVE_SYNC_INTERVAL,
   });
 
   const refresh = () =>

@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Notice } from "@/components/ui/notice";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { PersonRowSkeleton } from "@/components/ui/skeleton";
 import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatWeeklyTimeRange, WEEKDAY_SHORT } from "@/lib/format";
@@ -207,7 +208,11 @@ export default function BookScreen() {
             title={assignedTeacher ? "Other teachers" : "Choose your teacher"}
           />
           {directoryQuery.isLoading || assignedQuery.isLoading ? (
-            <LoadingView label="Loading teacher profiles…" />
+            <View style={styles.list}>
+              {[0, 1, 2].map((key) => (
+                <PersonRowSkeleton key={key} />
+              ))}
+            </View>
           ) : directoryQuery.isError ? (
             <ErrorView
               error={directoryQuery.error}

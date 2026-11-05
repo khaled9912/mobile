@@ -15,8 +15,11 @@ import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard, InfoRow } from "@/components/ui/stat-card";
 import {
   LessonCardSkeleton,
-  Skeleton,
+  PageHeaderSkeleton,
+  PersonRowSkeleton,
+  SectionHeaderSkeleton,
   StatRowSkeleton,
+  TextCardSkeleton,
 } from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
@@ -70,14 +73,22 @@ export const StudentHome = () => {
       teacherQuery.refetch(),
     ])
   );
+  const loading =
+    lessonsQuery.isLoading ||
+    changesQuery.isLoading ||
+    teacherQuery.isLoading;
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader
-        eyebrow="Student portal"
-        title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-        subtitle="Your weekly lessons, teacher, and time changes in one place."
-      />
+      {loading ? (
+        <PageHeaderSkeleton titleLines={2} />
+      ) : (
+        <PageHeader
+          eyebrow="Student portal"
+          title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
+          subtitle="Your weekly lessons, teacher, and time changes in one place."
+        />
+      )}
 
       {offlineSession ? (
         <View style={styles.block}>
@@ -88,205 +99,210 @@ export const StudentHome = () => {
         </View>
       ) : null}
 
-      {lessonsQuery.isLoading ? (
-        <StatRowSkeleton />
+      {loading ? (
+        <>
+          <StatRowSkeleton />
+          <View style={styles.section}>
+            <SectionHeaderSkeleton />
+            <LessonCardSkeleton />
+          </View>
+          <View style={styles.section}>
+            <SectionHeaderSkeleton withAction={false} />
+            <PersonRowSkeleton />
+          </View>
+          <View style={styles.section}>
+            <SectionHeaderSkeleton withAction={false} />
+            <TextCardSkeleton lines={2} action />
+          </View>
+        </>
       ) : (
-        <View style={styles.stats}>
-          <StatCard label="Today" value={today.length} />
-          <StatCard label="Weekly times" value={series.length} />
-          <StatCard label="Changes" value={pendingChanges.length} />
-          <StatCard label="Completed" value={completed.length} />
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <SectionHeader
-          title="Today's lesson"
-          action={
-            <Button
-              title="Schedule"
-              variant="ghost"
-              size="sm"
-              onPress={() => router.navigate("/schedule")}
-            />
-          }
-        />
-        {lessonsQuery.isLoading ? (
-          <LessonCardSkeleton />
-        ) : lessonsQuery.isError ? (
-          <ErrorView
-            error={lessonsQuery.error}
-            onRetry={() => void lessonsQuery.refetch()}
-          />
-        ) : next ? (
-          <LessonCard
-            lesson={next}
-            perspective="student"
-            action={
-              <Button
-                title="Open lesson room"
-                size="sm"
-                onPress={() => router.push(`/lesson/${next.id}`)}
-              />
-            }
-          />
-        ) : hasLaterLessons ? (
-          <EmptyState
-            icon="calendar-outline"
-            title="No lessons today"
-            body="Your next lesson shows here on the day. Open the schedule to see the week ahead."
-            action={
-              <Button
-                title="Open schedule"
-                size="sm"
-                onPress={() => router.navigate("/schedule")}
-              />
-            }
-          />
-        ) : (
-          <EmptyState
-            icon="calendar-outline"
-            title="No lessons booked yet"
-            body="Choose a teacher and pick your weekly times. Your first lesson is a trial."
-            action={
-              <Button
-                title="Book weekly lessons"
-                size="sm"
-                onPress={() => router.navigate("/book")}
-              />
-            }
-          />
-        )}
-      </View>
-
-      {pendingChanges.length ? (
-        <View style={styles.section}>
-          <SectionHeader
-            title="Time changes"
-            action={
-              <Button
-                title="See all"
-                variant="ghost"
-                size="sm"
-                onPress={() => router.navigate("/requests")}
-              />
-            }
-          />
-          <View style={styles.list}>
-            {pendingChanges.slice(0, 2).map((change) => (
-              <ChangeRequestCard
-                key={change.id}
-                request={change}
-                perspective="student"
-              />
-            ))}
+        <>
+          <View style={styles.stats}>
+            <StatCard label="Today" value={today.length} />
+            <StatCard label="Weekly times" value={series.length} />
+            <StatCard label="Changes" value={pendingChanges.length} />
+            <StatCard label="Completed" value={completed.length} />
           </View>
-        </View>
-      ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader title="Your teacher" />
-        {teacherQuery.isLoading ? (
-          <Card>
-            <View style={styles.personRow}>
-              <Skeleton width={52} height={52} radius={26} />
-              <View style={styles.personCopy}>
-                <Skeleton width="55%" height={18} />
-                <Skeleton width="40%" height={12} />
-                <Skeleton width="45%" height={12} />
-              </View>
-            </View>
-          </Card>
-        ) : teacher ? (
-          <Card>
-            <View style={styles.personRow}>
-              <Avatar
-                name={teacher.fullName}
-                avatarUrl={teacher.avatarUrl}
-                size={52}
-              />
-              <View style={styles.personCopy}>
-                <AppText variant="h3">{teacher.fullName}</AppText>
-                <AppText variant="caption" color="muted">
-                  {teacherQuery.data?.averageRating
-                    ? `${teacherQuery.data.averageRating.toFixed(1)} ★ · ${teacherQuery.data.reviewCount} reviews`
-                    : "Your assigned teacher"}
-                </AppText>
-                <AppText variant="caption" color="muted">
-                  {series.length
-                    ? `${series.length} weekly time${series.length === 1 ? "" : "s"} booked`
-                    : "No weekly time yet"}
-                </AppText>
-              </View>
-            </View>
-            {series.length ? (
-              <View style={styles.series}>
-                <TimeZoneNote
-                  zone={viewerTimeZone}
-                  sourceZone={series[0]?.timeZoneId}
+          <View style={styles.section}>
+            <SectionHeader
+              title="Today's lesson"
+              action={
+                <Button
+                  title="Schedule"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => router.navigate("/schedule")}
                 />
-                {series.map((item) => {
-                  const local = toViewerWeeklyTime(item, viewerTimeZone);
-                  return (
-                    <AppText key={item.id} variant="caption" color="muted">
-                      {formatWeeklySlot(
-                        local.dayOfWeek,
-                        local.startsAtTime,
-                        local.endsAtTime
-                      )}
-                    </AppText>
-                  );
-                })}
-              </View>
-            ) : null}
-            <View style={styles.rowActions}>
-              <Button
-                title="View teacher"
-                variant="secondary"
-                size="sm"
-                onPress={() => router.push(`/teachers/${teacher.id}`)}
-              />
-              <Button
-                title={series.length ? "Add weekly time" : "Choose weekly times"}
-                size="sm"
-                onPress={() => router.navigate("/book")}
-              />
-            </View>
-          </Card>
-        ) : (
-          <EmptyState
-            icon="person-add-outline"
-            title="No teacher yet"
-            body="Choose an available teacher and book your first weekly lesson. The academy can also help."
-            action={
-              <Button
-                title="Find a teacher"
-                size="sm"
-                onPress={() => router.navigate("/book")}
-              />
-            }
-          />
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <SectionHeader title="Need help?" />
-        <Card>
-          <InfoRow
-            label="Academy team"
-            value="Time changes, billing, or account questions"
-          />
-          <View style={styles.helpAction}>
-            <Button
-              title="Contact us"
-              variant="secondary"
-              size="sm"
-              fullWidth
-              onPress={() => router.push("/contact")}
+              }
             />
+            {lessonsQuery.isError ? (
+              <ErrorView
+                error={lessonsQuery.error}
+                onRetry={() => void lessonsQuery.refetch()}
+              />
+            ) : next ? (
+              <LessonCard
+                lesson={next}
+                perspective="student"
+                action={
+                  <Button
+                    title="Open lesson room"
+                    size="sm"
+                    onPress={() => router.push(`/lesson/${next.id}`)}
+                  />
+                }
+              />
+            ) : hasLaterLessons ? (
+              <EmptyState
+                icon="calendar-outline"
+                title="No lessons today"
+                body="Your next lesson shows here on the day. Open the schedule to see the week ahead."
+                action={
+                  <Button
+                    title="Open schedule"
+                    size="sm"
+                    onPress={() => router.navigate("/schedule")}
+                  />
+                }
+              />
+            ) : (
+              <EmptyState
+                icon="calendar-outline"
+                title="No lessons booked yet"
+                body="Choose a teacher and pick your weekly times. Your first lesson is a trial."
+                action={
+                  <Button
+                    title="Book weekly lessons"
+                    size="sm"
+                    onPress={() => router.navigate("/book")}
+                  />
+                }
+              />
+            )}
           </View>
-        </Card>
-      </View>
+
+          {pendingChanges.length ? (
+            <View style={styles.section}>
+              <SectionHeader
+                title="Time changes"
+                action={
+                  <Button
+                    title="See all"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => router.navigate("/requests")}
+                  />
+                }
+              />
+              <View style={styles.list}>
+                {pendingChanges.slice(0, 2).map((change) => (
+                  <ChangeRequestCard
+                    key={change.id}
+                    request={change}
+                    perspective="student"
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.section}>
+            <SectionHeader title="Your teacher" />
+            {teacher ? (
+              <Card>
+                <View style={styles.personRow}>
+                  <Avatar
+                    name={teacher.fullName}
+                    avatarUrl={teacher.avatarUrl}
+                    size={52}
+                  />
+                  <View style={styles.personCopy}>
+                    <AppText variant="h3">{teacher.fullName}</AppText>
+                    <AppText variant="caption" color="muted">
+                      {teacherQuery.data?.averageRating
+                        ? `${teacherQuery.data.averageRating.toFixed(1)} ★ · ${teacherQuery.data.reviewCount} reviews`
+                        : "Your assigned teacher"}
+                    </AppText>
+                    <AppText variant="caption" color="muted">
+                      {series.length
+                        ? `${series.length} weekly time${series.length === 1 ? "" : "s"} booked`
+                        : "No weekly time yet"}
+                    </AppText>
+                  </View>
+                </View>
+                {series.length ? (
+                  <View style={styles.series}>
+                    <TimeZoneNote
+                      zone={viewerTimeZone}
+                      sourceZone={series[0]?.timeZoneId}
+                    />
+                    {series.map((item) => {
+                      const local = toViewerWeeklyTime(item, viewerTimeZone);
+                      return (
+                        <AppText key={item.id} variant="caption" color="muted">
+                          {formatWeeklySlot(
+                            local.dayOfWeek,
+                            local.startsAtTime,
+                            local.endsAtTime
+                          )}
+                        </AppText>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                <View style={styles.rowActions}>
+                  <Button
+                    title="View teacher"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => router.push(`/teachers/${teacher.id}`)}
+                  />
+                  <Button
+                    title={
+                      series.length ? "Add weekly time" : "Choose weekly times"
+                    }
+                    size="sm"
+                    onPress={() => router.navigate("/book")}
+                  />
+                </View>
+              </Card>
+            ) : (
+              <EmptyState
+                icon="person-add-outline"
+                title="No teacher yet"
+                body="Choose an available teacher and book your first weekly lesson. The academy can also help."
+                action={
+                  <Button
+                    title="Find a teacher"
+                    size="sm"
+                    onPress={() => router.navigate("/book")}
+                  />
+                }
+              />
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <SectionHeader title="Need help?" />
+            <Card>
+              <InfoRow
+                label="Academy team"
+                value="Time changes, billing, or account questions"
+              />
+              <View style={styles.helpAction}>
+                <Button
+                  title="Contact us"
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  onPress={() => router.push("/contact")}
+                />
+              </View>
+            </Card>
+          </View>
+        </>
+      )}
     </Screen>
   );
 };

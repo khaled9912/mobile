@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { useTheme } from "@/providers/theme-provider";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
@@ -125,7 +126,11 @@ export const AdminChangeQueue = () => {
 
       <View style={styles.list}>
         {changesQuery.isLoading ? (
-          <LoadingView label="Loading time change requests…" />
+          <>
+            <TextCardSkeleton lines={3} action />
+            <TextCardSkeleton lines={3} action />
+            <TextCardSkeleton lines={3} action />
+          </>
         ) : changesQuery.isError ? (
           <ErrorView
             error={changesQuery.error}

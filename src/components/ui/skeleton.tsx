@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   StyleSheet,
+  View,
   type DimensionValue,
   type StyleProp,
   type ViewStyle,
@@ -72,6 +73,94 @@ export const StatRowSkeleton = ({ count = 4 }: { count?: number }) => (
   </Animated.View>
 );
 
+export const PageHeaderSkeleton = ({
+  eyebrow = true,
+  subtitle = true,
+  titleLines = 1,
+}: {
+  eyebrow?: boolean;
+  subtitle?: boolean;
+  titleLines?: 1 | 2;
+}) => (
+  <View style={styles.pageHeader}>
+    {eyebrow ? <Skeleton width={104} height={10} /> : null}
+    <Skeleton
+      width="78%"
+      height={28}
+      style={eyebrow ? styles.gapMd : undefined}
+    />
+    {titleLines === 2 ? (
+      <Skeleton width="54%" height={28} style={styles.gapSm} />
+    ) : null}
+    {subtitle ? (
+      <>
+        <Skeleton width="92%" height={12} style={styles.gapLg} />
+        <Skeleton width="64%" height={12} style={styles.gapSm} />
+      </>
+    ) : null}
+  </View>
+);
+
+export const SectionHeaderSkeleton = ({
+  withAction = true,
+}: {
+  withAction?: boolean;
+}) => (
+  <View style={styles.sectionRow}>
+    <Skeleton width={168} height={22} />
+    {withAction ? <Skeleton width={92} height={30} radius={999} /> : null}
+  </View>
+);
+
+export const TextCardSkeleton = ({
+  lines = 3,
+  action = false,
+}: {
+  lines?: number;
+  action?: boolean;
+}) => {
+  const { colors, radius } = useTheme();
+  return (
+    <View
+      style={[
+        styles.card,
+        { borderColor: colors.border, borderRadius: radius.lg },
+      ]}
+    >
+      <Skeleton width="44%" height={16} />
+      {Array.from({ length: Math.max(0, lines - 1) }, (_, index) => (
+        <Skeleton
+          key={index}
+          width={index % 2 ? "58%" : "86%"}
+          height={11}
+          style={styles.gap}
+        />
+      ))}
+      {action ? <Skeleton height={38} radius={999} style={styles.action} /> : null}
+    </View>
+  );
+};
+
+export const PersonRowSkeleton = ({ avatarSize = 52 }: { avatarSize?: number }) => {
+  const { colors, radius } = useTheme();
+  return (
+    <View
+      style={[
+        styles.card,
+        styles.person,
+        { borderColor: colors.border, borderRadius: radius.lg },
+      ]}
+    >
+      <Skeleton width={avatarSize} height={avatarSize} radius={avatarSize / 2} />
+      <View style={styles.personCopy}>
+        <Skeleton width="58%" height={17} />
+        <Skeleton width="38%" height={11} style={styles.gap} />
+        <Skeleton width="72%" height={11} style={styles.gap} />
+      </View>
+    </View>
+  );
+};
+
 export const LessonCardSkeleton = () => {
   const { colors } = useTheme();
   return (
@@ -88,11 +177,27 @@ const styles = StyleSheet.create({
   block: { overflow: "hidden" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   stat: { flex: 1, minWidth: 140 },
+  pageHeader: { marginBottom: 24 },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  card: {
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    padding: 16,
+  },
+  person: { flexDirection: "row", alignItems: "center", gap: 14 },
+  personCopy: { flex: 1 },
   lesson: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
     padding: 16,
   },
+  gapSm: { marginTop: 8 },
   gap: { marginTop: 10 },
+  gapMd: { marginTop: 12 },
+  gapLg: { marginTop: 14 },
   action: { marginTop: 16 },
 });

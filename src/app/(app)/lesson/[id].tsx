@@ -16,13 +16,15 @@ import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { useLessonCall } from "@/providers/lesson-call-provider";
 import { LessonFeedback } from "@/components/lesson/lesson-feedback";
+import { LessonOperationsPanel } from "@/components/lesson/lesson-operations-panel";
 import { ShareLessonDrawer } from "@/components/lesson/share-lesson-drawer";
 import { KeyboardAwareScrollView } from "@/components/ui/keyboard-aware-scroll-view";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { formatDateTime, formatTimeRange, relativeDay } from "@/lib/format";
 import { lessonRoomName, lessonRoomUrl } from "@/lib/lesson-room";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
@@ -41,6 +43,7 @@ export default function LessonRoomScreen() {
   const { role, user } = useAuth();
   const { colors } = useTheme();
   const isSupport = role === "admin" || role === "super_admin";
+  const trackAttendance = role === "teacher" || role === "student";
   const displayName = user?.fullName ?? "Guest";
   const roomDisplayName = isSupport
     ? `${displayName} (Academy support)`
@@ -111,8 +114,9 @@ export default function LessonRoomScreen() {
       title: "Lesson room",
       subtitle: `${formatDateTime(lesson.startsAt)} · ${lesson.teacherName} with ${lesson.studentName}`,
       shareUrl: lessonRoomUrl(lesson.id),
+      trackAttendance,
     });
-  }, [lesson, roomDisplayName, showingRoom, startCall]);
+  }, [lesson, roomDisplayName, showingRoom, startCall, trackAttendance]);
 
   // A cancelled lesson, or one that ended before anyone joined, closes the room.
   useEffect(() => {
@@ -219,9 +223,10 @@ export default function LessonRoomScreen() {
 
     if (lessonQuery.isLoading) {
       return (
-        <View style={styles.center}>
-          <LoadingView label="Preparing your lesson room…" />
-        </View>
+        <KeyboardAwareScrollView contentContainerStyle={styles.scroll}>
+          <TextCardSkeleton lines={3} />
+          <TextCardSkeleton lines={5} />
+        </KeyboardAwareScrollView>
       );
     }
 
@@ -262,6 +267,7 @@ export default function LessonRoomScreen() {
               <Button title="Back to schedule" size="sm" onPress={goBack} />
             }
           />
+          <LessonOperationsPanel lesson={lesson} role={role} />
         </KeyboardAwareScrollView>
       );
     }
@@ -277,6 +283,7 @@ export default function LessonRoomScreen() {
               <Button title="Back to schedule" size="sm" onPress={goBack} />
             }
           />
+          <LessonOperationsPanel lesson={lesson} role={role} />
         </KeyboardAwareScrollView>
       );
     }
@@ -312,6 +319,7 @@ export default function LessonRoomScreen() {
             </AppText>
           </Card>
           <LessonFeedback lesson={lesson} role={role} />
+          <LessonOperationsPanel lesson={lesson} role={role} />
         </KeyboardAwareScrollView>
       );
     }
@@ -370,7 +378,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 14,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   between: {
     flexDirection: "row",
     alignItems: "center",

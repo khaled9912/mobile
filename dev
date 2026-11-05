@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Ana Quran mobile — one entry point for everyday native work.
+#
+#   ./dev ios [expo args]      build and launch on an iOS simulator or device
+#   ./dev android [expo args]  build and launch on an Android emulator or device
+#   ./dev start [expo args]    start Metro without a native rebuild
+#   ./dev install              install JS dependencies and iOS pods
+#   ./dev clean [--all]        remove build caches (--all also removes deps)
+#
+# Anything after the command is passed straight to the Expo CLI, for example:
+#   ./dev ios --device "iPhone 17 Pro"
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+log() { printf '\n==> %s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+Usage: ./dev <command> [expo args]
+
+  ios [args]      Build and launch on an iOS simulator or device
+  android [args]  Build and launch on an Android emulator or device
+  start [args]    Start Metro without a native rebuild
+  install         Install JS dependencies and iOS pods
+  clean           Remove build caches (add --all to remove node_modules and pods)
+
+Examples:
+  ./dev ios --device "iPhone 17 Pro"
+  ./dev android
+  ./dev clean --all
+EOF
+}
+
+ensure_node() {
+  command -v node >/dev/null 2>&1 || die "Node.js is not installed."
+  command -v npm >/dev/null 2>&1 || die "npm is not installed."
+  if [ ! -d node_modules ]; then
+    log "Dependencies are missing, installing first"
+    npm install
+  fi
+}
+
+ensure_android_sdk() {
+  if [ -z "${ANDROID_HOME:-}" ]; then
+    for dir in "$HOME/Library/Android/sdk" "$HOME/Android/Sdk" \
+               "/usr/local/share/android-sdk"; do
+      if [ -d "$dir" ]; then
+        ANDROID_HOME="$dir"
+        break
+      fi
+    done
+  fi
+  [ -n "${ANDROID_HOME:-}" ] && [ -d "$ANDROID_HOME" ] || die \
+    "Android SDK not found. Install Android Studio, then set ANDROID_HOME."
+  export ANDROID_HOME
+  export ANDROID_SDK_ROOT="$ANDROID_HOME"
+  export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+}
+
+case "${1:-}" in
+  ios)
+    shift
+    [ "$(uname -s)" = "Darwin" ] || die "iOS builds require macOS with Xcode."
+    xcrun --find simctl >/dev/null 2>&1 || die \
+      "Xcode is not available. Install it from the App Store and open it once."
+    ensure_node
+    exec npx expo run:ios "$@"
+    ;;
+  android)
+    shift
+    ensure_node
+    ensure_android_sdk
+    exec npx expo run:android "$@"
+    ;;
+  start)
+    shift
+    ensure_node
+    exec npx expo start "$@"
+    ;;
+  install)
+    ensure_node
+    log "Installing JavaScript dependencies"
+    npm install
+    if [ "$(uname -s)" = "Darwin" ] && [ -f ios/Podfile ]; then
+      command -v pod >/dev/null 2>&1 || die \
+        "CocoaPods is not installed. Run: brew install cocoapods"
+      log "Installing iOS pods"
+      (cd ios && pod install)
+    fi
+    log "Dependencies installed"
+    ;;
+  clean)
+    deep=false
+    [ "${2:-}" = "--all" ] && deep=true
+    log "Removing build caches"
+    rm -rf .expo dist ios/build android/app/build android/build \
+      android/.gradle node_modules/.cache
+    if [ "$(uname -s)" = "Darwin" ]; then
+      rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/AnaQuran-* 2>/dev/null || true
+    fi
+    if $deep; then
+      log "Removing installed dependencies"
+      rm -rf node_modules ios/Pods ios/Podfile.lock
+    fi
+    log "Clean complete. Reinstall with: ./dev install"
+    ;;
+  help | -h | --help)
+    usage
+    ;;
+  "")
+    usage
+    exit 1
+    ;;
+  *)
+    usage >&2
+    die "Unknown command: $1"
+    ;;
+esac

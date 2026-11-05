@@ -17,7 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  PageHeaderSkeleton,
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { StarRating } from "@/components/ui/star-rating";
 import { RoleGate } from "@/components/ui/role-gate";
 import { useTheme } from "@/providers/theme-provider";
@@ -154,7 +159,15 @@ export default function TeacherProfileScreen() {
         onRefresh={onRefresh}
       >
         {teacherQuery.isLoading ? (
-          <LoadingView label="Loading teacher profile…" />
+          <>
+            <PageHeaderSkeleton titleLines={1} />
+            <View style={styles.section}>
+              <SectionHeaderSkeleton withAction={false} />
+              <TextCardSkeleton lines={3} />
+              <TextCardSkeleton lines={3} />
+              <TextCardSkeleton lines={3} />
+            </View>
+          </>
         ) : teacherQuery.isError ? (
           <ErrorView
             error={teacherQuery.error}

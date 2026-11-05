@@ -11,7 +11,8 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 
 const PAGE_SIZE = 10;
 
@@ -56,7 +57,11 @@ export default function LessonReportsScreen() {
       />
 
       {reportsQuery.isLoading ? (
-        <LoadingView label="Loading lesson reports…" />
+        <View style={styles.list}>
+          <TextCardSkeleton lines={4} action />
+          <TextCardSkeleton lines={4} action />
+          <TextCardSkeleton lines={4} action />
+        </View>
       ) : reportsQuery.isError && !reports.length ? (
         <ErrorView
           error={reportsQuery.error}

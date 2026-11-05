@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { PersonRowSkeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 
 export default function SupportTeamScreen() {
@@ -111,7 +112,11 @@ export default function SupportTeamScreen() {
         ) : null}
 
         {supportQuery.isLoading ? (
-          <LoadingView label="Loading the support team…" />
+          <View style={{ gap: spacing.md }}>
+            <PersonRowSkeleton avatarSize={46} />
+            <PersonRowSkeleton avatarSize={46} />
+            <PersonRowSkeleton avatarSize={46} />
+          </View>
         ) : supportQuery.isError ? (
           <ErrorView
             error={supportQuery.error}

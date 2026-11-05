@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/auth-provider";
+import { sendAttendanceEvent } from "@/api/lesson-operations";
+import { getDeviceId } from "@/lib/device-id";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
 import { ShareLessonDrawer } from "@/components/lesson/share-lesson-drawer";
 import { BrandMark } from "@/components/ui/brand";
@@ -33,7 +35,12 @@ export interface ActiveLessonCall {
   title: string;
   subtitle: string;
   shareUrl: string;
+  /** Only teachers and students count toward attendance; support does not. */
+  trackAttendance?: boolean;
 }
+
+const newEventId = (action: string) =>
+  `${action}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 interface LessonCallContextValue {
   call: ActiveLessonCall | null;
@@ -77,27 +84,77 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const endCall = useCallback(() => {
-    setCall(null);
-    setJoined(false);
-    setMinimized(false);
-  }, []);
+  const cycleRef = useRef<{
+    lessonId: string;
+    room: string;
+    deviceId: string;
+  } | null>(null);
 
-  const endCallForLesson = useCallback((lessonId: string) => {
-    if (callRef.current?.lessonId !== lessonId) return;
+  const sendBeat = useCallback(
+    (lessonId: string, action: "join" | "leave", deviceId: string) => {
+      void sendAttendanceEvent(lessonId, {
+        action,
+        deviceId,
+        eventId: newEventId(action),
+        clientAt: new Date().toISOString(),
+      }).catch(() => {
+        // Attendance is best-effort; the server closes open intervals.
+      });
+    },
+    []
+  );
+
+  const leaveCycle = useCallback(() => {
+    const cycle = cycleRef.current;
+    if (!cycle) return;
+    cycleRef.current = null;
+    sendBeat(cycle.lessonId, "leave", cycle.deviceId);
+  }, [sendBeat]);
+
+  const handleJoined = useCallback(() => {
+    setJoined(true);
+    if (!call?.trackAttendance) return;
+    void getDeviceId()
+      .then((deviceId) => {
+        // The room may have changed while the device id was loading.
+        if (callRef.current?.room !== call.room) return;
+        cycleRef.current = {
+          lessonId: call.lessonId,
+          room: call.room,
+          deviceId,
+        };
+        sendBeat(call.lessonId, "join", deviceId);
+      })
+      .catch(() => {});
+  }, [call, sendBeat]);
+
+  const endCall = useCallback(() => {
+    leaveCycle();
     setCall(null);
     setJoined(false);
     setMinimized(false);
-  }, []);
+  }, [leaveCycle]);
+
+  const endCallForLesson = useCallback(
+    (lessonId: string) => {
+      if (callRef.current?.lessonId !== lessonId) return;
+      leaveCycle();
+      setCall(null);
+      setJoined(false);
+      setMinimized(false);
+    },
+    [leaveCycle]
+  );
 
   const activeRoom = call?.room ?? null;
   const roomRef = useRef<string | null>(null);
   useEffect(() => {
     if (roomRef.current === activeRoom) return;
     roomRef.current = activeRoom;
+    leaveCycle();
     setJoined(false);
     setMinimized(false);
-  }, [activeRoom]);
+  }, [activeRoom, leaveCycle]);
 
   useEffect(() => {
     if (status !== "unauthenticated") return;
@@ -126,7 +183,8 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
           call={call}
           joined={joined}
           minimized={minimized}
-          onJoined={() => setJoined(true)}
+          onJoined={handleJoined}
+          onLeft={leaveCycle}
           onMinimized={setMinimized}
           onEnd={endCall}
         />
@@ -140,6 +198,7 @@ const LessonCallHost = ({
   joined,
   minimized,
   onJoined,
+  onLeft,
   onMinimized,
   onEnd,
 }: {
@@ -147,6 +206,7 @@ const LessonCallHost = ({
   joined: boolean;
   minimized: boolean;
   onJoined: () => void;
+  onLeft: () => void;
   onMinimized: (minimized: boolean) => void;
   onEnd: () => void;
 }) => {
@@ -345,6 +405,7 @@ const LessonCallHost = ({
           room={call.room}
           displayName={call.displayName}
           onJoined={onJoined}
+          onLeft={onLeft}
           onClose={endAndReturn}
         />
         <View

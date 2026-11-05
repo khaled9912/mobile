@@ -20,6 +20,7 @@ type Props = {
   room: string;
   displayName: string;
   onJoined?: () => void;
+  onLeft?: () => void;
   onClose: () => void;
 };
 
@@ -28,7 +29,14 @@ const SERVER_URL = `https://${JITSI_DOMAIN}/`;
 
 // Mirrors the web room's toolbar so both clients offer the same controls,
 // including the screen share button (native ReplayKit / MediaProjection).
-const TOOLBAR_BUTTONS = ["microphone", "camera", "desktop", "chat", "hangup"];
+const TOOLBAR_BUTTONS = [
+  "microphone",
+  "camera",
+  "desktop",
+  "whiteboard",
+  "chat",
+  "hangup",
+];
 
 const buildConfig = (mode: JoinMode) => ({
   prejoinPageEnabled: false,
@@ -44,7 +52,6 @@ const buildConfig = (mode: JoinMode) => ({
   toolbarButtons: TOOLBAR_BUTTONS,
   disableReactions: true,
   disablePolls: true,
-  disableWhiteboard: true,
   disableVirtualBackground: true,
   hideConferenceSubject: true,
   hideConferenceTimer: true,
@@ -63,6 +70,7 @@ export const JitsiRoom = ({
   room,
   displayName,
   onJoined,
+  onLeft,
   onClose,
 }: Props) => {
   const { colors, radius } = useTheme();
@@ -75,10 +83,12 @@ export const JitsiRoom = ({
   // through refs instead of freezing the values from the first render.
   const onCloseRef = useRef(onClose);
   const onJoinedRef = useRef(onJoined);
+  const onLeftRef = useRef(onLeft);
   useEffect(() => {
     onCloseRef.current = onClose;
     onJoinedRef.current = onJoined;
-  }, [onClose, onJoined]);
+    onLeftRef.current = onLeft;
+  }, [onClose, onJoined, onLeft]);
 
   const close = useCallback(() => {
     if (closedRef.current) return;
@@ -92,12 +102,19 @@ export const JitsiRoom = ({
     onJoinedRef.current?.();
   }, []);
 
+  const handleLeft = useCallback(() => {
+    if (!joinedRef.current) return;
+    joinedRef.current = false;
+    onLeftRef.current?.();
+  }, []);
+
   const eventListeners = useMemo(
     () => ({
       onConferenceJoined: handleJoined,
+      onConferenceLeft: handleLeft,
       onReadyToClose: close,
     }),
-    [close, handleJoined]
+    [close, handleJoined, handleLeft]
   );
 
   const config = useMemo(

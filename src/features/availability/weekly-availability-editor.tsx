@@ -22,7 +22,8 @@ import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { TimeOfDayField } from "@/components/ui/time-of-day-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 import {
   WEEKDAY_SHORT,
   dateFromTimeOfDay,
@@ -328,7 +329,11 @@ export const WeeklyAvailabilityEditor = ({
       <View style={styles.listSection}>
         <SectionHeader title={`Announced times (${rules.length})`} />
         {rulesQuery.isLoading ? (
-          <LoadingView label="Loading availability…" />
+          <View style={styles.list}>
+            <TextCardSkeleton lines={3} action />
+            <TextCardSkeleton lines={3} action />
+            <TextCardSkeleton lines={3} action />
+          </View>
         ) : rulesQuery.isError ? (
           <ErrorView
             error={rulesQuery.error}

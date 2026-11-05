@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import type { AppNotification, NotificationKind } from "@/api/types";
 import { AppText } from "@/components/ui/app-text";
 import { PillPressable } from "@/components/ui/pill-pressable";
+import { Skeleton } from "@/components/ui/skeleton";
 import { timeAgo } from "@/lib/format";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useTheme } from "@/providers/theme-provider";
@@ -224,11 +224,16 @@ export const NotificationsSheet = ({ visible, onClose }: Props) => {
               </AppText>
             </View>
           ) : isLoading ? (
-            <View style={styles.empty}>
-              <ActivityIndicator color={colors.brand} />
-              <AppText variant="small" color="muted">
-                Loading your notifications…
-              </AppText>
+            <View style={styles.loadingRows}>
+              {[0, 1, 2].map((key) => (
+                <View key={key} style={styles.loadingRow}>
+                  <Skeleton width={38} height={38} radius={19} />
+                  <View style={styles.loadingCopy}>
+                    <Skeleton width="46%" height={13} />
+                    <Skeleton width="86%" height={11} style={styles.loadingGap} />
+                  </View>
+                </View>
+              ))}
             </View>
           ) : isError ? (
             <View style={styles.empty}>
@@ -349,6 +354,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   list: { flexGrow: 0 },
+  loadingRows: { gap: 10, paddingBottom: 4 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  loadingCopy: { flex: 1 },
+  loadingGap: { marginTop: 8 },
   listContent: { gap: 8, paddingBottom: 4 },
   row: {
     flexDirection: "row",

@@ -17,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatDateTime } from "@/lib/format";
 
@@ -129,7 +130,11 @@ export default function ReviewsTab() {
         <View style={{ height: spacing.lg }} />
 
         {queueQuery.isLoading ? (
-          <LoadingView label="Loading the review queue…" />
+          <View style={{ gap: spacing.md }}>
+            <TextCardSkeleton lines={3} />
+            <TextCardSkeleton lines={3} />
+            <TextCardSkeleton lines={3} />
+          </View>
         ) : queueQuery.isError ? (
           <ErrorView
             error={queueQuery.error}

@@ -6,7 +6,11 @@ import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
@@ -36,7 +40,15 @@ export const StudentChangeRequests = () => {
       />
 
       {changesQuery.isLoading ? (
-        <LoadingView label="Loading your time changes…" />
+        <View style={styles.sections}>
+          <View style={styles.section}>
+            <SectionHeaderSkeleton withAction={false} />
+            <View style={styles.list}>
+              <TextCardSkeleton lines={3} />
+              <TextCardSkeleton lines={3} />
+            </View>
+          </View>
+        </View>
       ) : changesQuery.isError ? (
         <ErrorView
           error={changesQuery.error}

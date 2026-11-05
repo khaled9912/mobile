@@ -14,6 +14,7 @@ import {
 import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { AppThemeProvider, useTheme } from "@/providers/theme-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
+import { PushTokenProvider } from "@/providers/push-token-provider";
 import { LessonCallProvider } from "@/providers/lesson-call-provider";
 import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
 import { LaunchIntro } from "@/components/onboarding/launch-intro";
@@ -115,12 +116,14 @@ const RootLayout = () => (
       <QueryClientProvider client={queryClient}>
         <AppThemeProvider>
           <AuthProvider>
-            <LessonReminderProvider>
-              <LessonCallProvider>
-                <RootNavigator />
-              </LessonCallProvider>
-              <ApiDebugOverlay />
-            </LessonReminderProvider>
+            <PushTokenProvider>
+              <LessonReminderProvider>
+                <LessonCallProvider>
+                  <RootNavigator />
+                </LessonCallProvider>
+                <ApiDebugOverlay />
+              </LessonReminderProvider>
+            </PushTokenProvider>
           </AuthProvider>
         </AppThemeProvider>
       </QueryClientProvider>

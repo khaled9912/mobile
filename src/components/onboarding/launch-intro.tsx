@@ -10,8 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
 import { BrandMark } from "@/components/ui/brand";
-import { useTheme } from "@/providers/theme-provider";
+import { palettes } from "@/theme/tokens";
 
+const INTRO_COLORS = palettes.light;
 const PRODUCT = "Ana Quran";
 const SUBTITLE = "Quran & Arabic Academy";
 const TICK_MS = 32;
@@ -25,7 +26,9 @@ type Props = {
 };
 
 export const LaunchIntro = ({ onDone }: Props) => {
-  const { colors } = useTheme();
+  // The first thing a learner sees stays light even when the device or the
+  // saved preference is dark; the rest of the app follows the user's choice.
+  const colors = INTRO_COLORS;
   const [tick, setTick] = useState(0);
   const [caretOn, setCaretOn] = useState(true);
   const [logoOpacity] = useState(() => new Animated.Value(0));
@@ -122,12 +125,6 @@ export const LaunchIntro = ({ onDone }: Props) => {
 
             <Animated.View style={{ opacity: logoOpacity }}>
               <View style={styles.wordBlock}>
-                <AppText
-                  weight="700"
-                  style={[styles.arabic, { color: colors.brand }]}
-                >
-                  أنا قرآن
-                </AppText>
                 <View style={styles.wordRow}>
                   {PRODUCT.split("").map((char, index) => (
                     <AppText
@@ -192,7 +189,6 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18 },
   wordBlock: { alignItems: "center", gap: 2 },
-  arabic: { fontSize: 38, lineHeight: 54 },
   wordRow: { flexDirection: "row", alignItems: "flex-end" },
   wordmark: { fontSize: 42, lineHeight: 50, letterSpacing: -1 },
   subtitleRow: {

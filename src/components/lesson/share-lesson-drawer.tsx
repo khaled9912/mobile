@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Clipboard from "@react-native-clipboard/clipboard";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,11 @@ export const ShareLessonDrawer = ({ visible, shareUrl, onClose }: Props) => {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState(() => defaultMessage(shareUrl));
   const [copied, setCopied] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The Jitsi host serves the same image its link previews use.
+  const origin = shareUrl.match(/^https?:\/\/[^/]+/i)?.[0] ?? "";
+  const previewImage = origin ? `${origin}/branding/ana-quran.png` : "";
 
   useEffect(
     () => () => {
@@ -104,9 +109,9 @@ export const ShareLessonDrawer = ({ visible, shareUrl, onClose }: Props) => {
         >
           <View style={styles.header}>
             <View
-              style={[styles.penBadge, { backgroundColor: colors.brandSoft }]}
+              style={[styles.penBadge, { backgroundColor: colors.brand }]}
             >
-              <Ionicons name="create-outline" size={18} color={colors.brand} />
+              <Ionicons name="create-outline" size={18} color={colors.onBrand} />
             </View>
             <View style={styles.headerCopy}>
               <AppText variant="h3">Share lesson room</AppText>
@@ -186,6 +191,46 @@ export const ShareLessonDrawer = ({ visible, shareUrl, onClose }: Props) => {
             </PillPressable>
           </View>
 
+          <View
+            style={[
+              styles.preview,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+              },
+            ]}
+          >
+            {previewImage && !previewFailed ? (
+              <Image
+                source={{ uri: previewImage }}
+                style={styles.previewImage}
+                contentFit="cover"
+                transition={150}
+                onError={() => setPreviewFailed(true)}
+                accessibilityLabel="Lesson room link preview"
+              />
+            ) : (
+              <View
+                style={[
+                  styles.previewImage,
+                  styles.previewFallback,
+                  { backgroundColor: colors.brandSoft },
+                ]}
+              >
+                <Ionicons name="videocam" size={22} color={colors.brand} />
+              </View>
+            )}
+            <View style={styles.previewCopy}>
+              <AppText variant="caption" weight="700">
+                Ana Quran lesson room
+              </AppText>
+              <AppText variant="caption" color="muted" numberOfLines={1}>
+                Join a live Quran lesson with your teacher on Ana Quran.
+              </AppText>
+            </View>
+          </View>
+
           <View style={styles.actions}>
             <Button
               title="Share on WhatsApp"
@@ -249,6 +294,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   linkText: { flex: 1 },
+  preview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    padding: 8,
+  },
+  previewImage: { width: 64, height: 48, borderRadius: 10 },
+  previewFallback: { alignItems: "center", justifyContent: "center" },
+  previewCopy: { flex: 1, gap: 2 },
   copyButton: {
     flexDirection: "row",
     alignItems: "center",

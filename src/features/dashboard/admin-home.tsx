@@ -12,6 +12,13 @@ import { Card } from "@/components/ui/card";
 import { AppText } from "@/components/ui/app-text";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { StatCard } from "@/components/ui/stat-card";
+import {
+  LessonCardSkeleton,
+  PageHeaderSkeleton,
+  SectionHeaderSkeleton,
+  StatRowSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { ChangeRequestCard } from "@/components/lesson/change-request-card";
 import { firstName, upcomingLessons } from "@/lib/lesson-selectors";
@@ -50,96 +57,131 @@ export const AdminHome = () => {
       teachersQuery.refetch(),
     ])
   );
+  const loading =
+    lessonsQuery.isLoading ||
+    changesQuery.isLoading ||
+    studentsQuery.isLoading ||
+    teachersQuery.isLoading;
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
-      <PageHeader
-        eyebrow="Academy administration"
-        title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-        subtitle="Review time change requests, monitor the weekly schedule, and keep the academy running."
-      />
+      {loading ? (
+        <PageHeaderSkeleton titleLines={2} />
+      ) : (
+        <PageHeader
+          eyebrow="Academy administration"
+          title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
+          subtitle="Review time change requests, monitor the weekly schedule, and keep the academy running."
+        />
+      )}
 
-      <View style={styles.stats}>
-        <StatCard label="Changes waiting" value={changes.length} />
-        <StatCard label="Upcoming lessons" value={upcoming.length} />
-        <StatCard label="Students" value={studentsQuery.data?.length ?? 0} />
-        <StatCard label="Teachers" value={teachersQuery.data?.length ?? 0} />
-      </View>
+      {loading ? (
+        <StatRowSkeleton />
+      ) : (
+        <View style={styles.stats}>
+          <StatCard label="Changes waiting" value={changes.length} />
+          <StatCard label="Upcoming lessons" value={upcoming.length} />
+          <StatCard label="Students" value={studentsQuery.data?.length ?? 0} />
+          <StatCard label="Teachers" value={teachersQuery.data?.length ?? 0} />
+        </View>
+      )}
 
       <View style={styles.section}>
-        <SectionHeader
-          title="Time change queue"
-          action={
-            <Button
-              title="Open queue"
-              variant="ghost"
-              size="sm"
-              onPress={() => router.navigate("/requests")}
-            />
-          }
-        />
-        {changesQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading change requests…
-          </AppText>
-        ) : changesQuery.isError ? (
-          <ErrorView
-            error={changesQuery.error}
-            onRetry={() => void changesQuery.refetch()}
-          />
-        ) : changes.length ? (
-          <View style={styles.list}>
-            {changes.slice(0, 3).map((change) => (
-              <ChangeRequestCard
-                key={change.id}
-                request={change}
-                perspective="admin"
-              />
-            ))}
-          </View>
+        {loading ? (
+          <>
+            <SectionHeaderSkeleton />
+            <TextCardSkeleton lines={3} />
+            <TextCardSkeleton lines={3} />
+          </>
         ) : (
-          <EmptyState
-            icon="shield-checkmark-outline"
-            title="Nothing waiting"
-            body="Students asking to move a weekly lesson appear here. Check the new time with the teacher before approving."
-          />
+          <>
+            <SectionHeader
+              title="Time change queue"
+              action={
+                <Button
+                  title="Open queue"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => router.navigate("/requests")}
+                />
+              }
+            />
+            {changesQuery.isError ? (
+              <ErrorView
+                error={changesQuery.error}
+                onRetry={() => void changesQuery.refetch()}
+              />
+            ) : changes.length ? (
+              <View style={styles.list}>
+                {changes.slice(0, 3).map((change) => (
+                  <ChangeRequestCard
+                    key={change.id}
+                    request={change}
+                    perspective="admin"
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="shield-checkmark-outline"
+                title="Nothing waiting"
+                body="Students asking to move a weekly lesson appear here. Check the new time with the teacher before approving."
+              />
+            )}
+          </>
         )}
       </View>
 
       <View style={styles.section}>
-        <SectionHeader
-          title="Coming up"
-          action={
-            <Button
-              title="Schedule"
-              variant="ghost"
-              size="sm"
-              onPress={() => router.navigate("/schedule")}
-            />
-          }
-        />
-        {lessonsQuery.isLoading ? (
-          <AppText variant="small" color="muted">
-            Loading lessons…
-          </AppText>
-        ) : upcoming.length ? (
-          <View style={styles.list}>
-            {upcoming.slice(0, 3).map((lesson) => (
-              <LessonCard key={lesson.id} lesson={lesson} perspective="admin" />
-            ))}
-          </View>
+        {loading ? (
+          <>
+            <SectionHeaderSkeleton />
+            <LessonCardSkeleton />
+          </>
         ) : (
-          <EmptyState
-            icon="calendar-outline"
-            title="No upcoming lessons"
-            body="Booked weekly lessons will appear in the academy schedule."
-          />
+          <>
+            <SectionHeader
+              title="Coming up"
+              action={
+                <Button
+                  title="Schedule"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => router.navigate("/schedule")}
+                />
+              }
+            />
+            {upcoming.length ? (
+              <View style={styles.list}>
+                {upcoming.slice(0, 3).map((lesson) => (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    perspective="admin"
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="calendar-outline"
+                title="No upcoming lessons"
+                body="Booked weekly lessons will appear in the academy schedule."
+              />
+            )}
+          </>
         )}
       </View>
 
       <View style={styles.section}>
         <SectionHeader title="Academy directory" />
         <View style={styles.quickLinks}>
+          <Card onPress={() => router.push("/admin/lesson-ops")}>
+            <AppText variant="h3">Lesson operations</AppText>
+            <AppText variant="small" color="muted" style={styles.linkBody}>
+              Monitor live lessons, review attendance, approve pay, and manage
+              the cancellation policy.
+            </AppText>
+          </Card>
           <Card onPress={() => router.navigate("/people")}>
             <AppText variant="h3">People</AppText>
             <AppText variant="small" color="muted" style={styles.linkBody}>

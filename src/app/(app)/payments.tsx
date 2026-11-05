@@ -21,7 +21,11 @@ import { Card } from "@/components/ui/card";
 import { MonthChips } from "@/components/ui/month-chips";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 
 const usd = (value: number) => `$${value.toFixed(2)}`;
@@ -114,7 +118,14 @@ function StudentBillingView() {
       />
 
       {billingQuery.isLoading ? (
-        <LoadingView label="Loading your statement…" />
+        <>
+          <TextCardSkeleton lines={2} />
+          <View style={styles.loadingSection}>
+            <SectionHeaderSkeleton withAction={false} />
+            <TextCardSkeleton lines={4} />
+            <TextCardSkeleton lines={4} />
+          </View>
+        </>
       ) : billingQuery.isError ? (
         <ErrorView
           error={billingQuery.error}
@@ -350,6 +361,7 @@ function StudentBillingView() {
 
 const styles = StyleSheet.create({
   summary: { marginTop: 14 },
+  loadingSection: { marginTop: 22, gap: 10 },
   summaryRow: {
     flexDirection: "row",
     alignItems: "flex-start",

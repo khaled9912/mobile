@@ -24,7 +24,11 @@ import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  PersonRowSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatDateTime } from "@/lib/format";
 
@@ -294,7 +298,15 @@ export default function PeopleTab() {
         </View>
 
         {query.isLoading ? (
-          <LoadingView label="Loading people…" />
+          <View style={styles.list}>
+            {[0, 1, 2].map((key) =>
+              tab === "assignments" ? (
+                <TextCardSkeleton key={key} lines={3} action />
+              ) : (
+                <PersonRowSkeleton key={key} avatarSize={46} />
+              )
+            )}
+          </View>
         ) : query.isError ? (
           <ErrorView error={query.error} onRetry={() => void query.refetch()} />
         ) : tab === "assignments" ? (

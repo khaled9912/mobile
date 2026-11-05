@@ -7,7 +7,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 
 export default function ContactSubmissionsScreen() {
@@ -32,7 +33,11 @@ export default function ContactSubmissionsScreen() {
         />
 
         {submissionsQuery.isLoading ? (
-          <LoadingView label="Loading messages…" />
+          <View style={styles.list}>
+            <TextCardSkeleton lines={4} />
+            <TextCardSkeleton lines={4} />
+            <TextCardSkeleton lines={4} />
+          </View>
         ) : submissionsQuery.isError ? (
           <ErrorView
             error={submissionsQuery.error}

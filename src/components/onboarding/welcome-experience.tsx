@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -20,7 +20,6 @@ import {
   NotificationsBell,
   NotificationsSheet,
 } from "@/components/notifications/notifications-sheet";
-import { PrayerArt } from "@/components/onboarding/prayer-art";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 import type { ThemeColors } from "@/theme/tokens";
@@ -42,7 +41,6 @@ const CARD_HEIGHT = 356;
 const CARD_PEEK_X = 24;
 const CARD_PEEK_Y = 13;
 const CARD_PEEK_SCALE = 0.045;
-const STACK_WIDTH = 52;
 
 const OPTIONS: Option[] = [
   {
@@ -78,6 +76,11 @@ const OPTIONS: Option[] = [
     tag: "Reports",
   },
 ];
+
+// All four cards stay mounted so a swap never pops a hidden card into view.
+const OPTIONS_LENGTH = OPTIONS.length;
+const STACK_WIDTH = CARD_PEEK_X * (OPTIONS_LENGTH - 1);
+const STACK_HEIGHT = CARD_HEIGHT + CARD_PEEK_Y * (OPTIONS_LENGTH - 1);
 
 const TABS: {
   key: TabKey;
@@ -116,24 +119,6 @@ const PERKS: { title: string; body: string; icon: IconName }[] = [
     title: "A guided experience",
     body: "A clear weekly plan keeps students, teachers, and lesson times coordinated.",
     icon: "shield-checkmark-outline",
-  },
-];
-
-const STEPS: { number: string; title: string; body: string }[] = [
-  {
-    number: "01",
-    title: "Meet your teacher",
-    body: "We connect each student with a dedicated teacher who understands their goals and learning pace.",
-  },
-  {
-    number: "02",
-    title: "Choose your weekly times",
-    body: "See each teacher's weekly schedule and pick the times that fit your routine — as many as you need.",
-  },
-  {
-    number: "03",
-    title: "Learn one-to-one every week",
-    body: "Your times lock in instantly and repeat every week. Join each lesson online, starting with a trial.",
   },
 ];
 
@@ -350,7 +335,10 @@ export const WelcomeExperience = () => {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const cardWidth = Math.min(width - 84, 340);
   const pan = useAnimatedValue(0);
-  const settle = useAnimatedValue(0);
+  const swap = useAnimatedValue(0);
+  const reveal = useAnimatedValue(1);
+  const [swapTarget, setSwapTarget] = useState<number | null>(null);
+  const [animating, setAnimating] = useState(false);
   const navBackground = scheme === "dark" ? colors.tabBar : "#10283a";
   const navBorder = scheme === "dark" ? colors.border : "#173d3f";
   const navMuted = "rgba(255,255,255,0.66)";
@@ -361,46 +349,60 @@ export const WelcomeExperience = () => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
-  const openCard = () => router.push(user ? "/book" : "/signup");
+  // Anonymous learners see how it works before choosing sign-up or sign-in.
+  const openCard = () => router.push(user ? "/book" : "/steps");
 
-  // Dots swap the deck instead of jumping: the front card folds back, the
-  // chosen card comes forward, then the stack settles.
-  const swapTo = (index: number) => {
-    if (index === activeOption) return;
-    Animated.timing(settle, {
-      toValue: 1,
-      duration: 150,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start(() => {
-      setActiveOption(index);
-      Animated.spring(settle, {
-        toValue: 0,
-        tension: 120,
-        friction: 12,
+  // Dots swap the deck along one progress value: every card travels from its
+  // current slot to its target slot, so the outgoing card slides to the back
+  // instead of overlapping the new front card.
+  const swapTo = useCallback(
+    (index: number) => {
+      if (index === activeOption || animating) return;
+      setAnimating(true);
+      swap.setValue(0);
+      setSwapTarget(index);
+      Animated.timing(swap, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
-    });
-  };
+      }).start(() => {
+        setActiveOption(index);
+        setSwapTarget(null);
+        swap.setValue(0);
+        setAnimating(false);
+      });
+    },
+    [activeOption, animating, swap]
+  );
 
-  const dismissCard = (direction: 1 | -1) => {
-    Animated.timing(pan, {
-      toValue: direction * (cardWidth + 80),
-      duration: 190,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      pan.setValue(0);
-      settle.setValue(1);
-      setActiveOption((prev) => (prev + 1) % OPTIONS.length);
-      Animated.spring(settle, {
-        toValue: 0,
-        tension: 120,
-        friction: 12,
+  // A swipe removes the front card, then the new front card grows from the
+  // peek position. No two cards are ever mid-transition on top of each other.
+  const dismissCard = useCallback(
+    (direction: 1 | -1) => {
+      if (animating) return;
+      setAnimating(true);
+      Animated.timing(pan, {
+        toValue: direction * (cardWidth + 100),
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
-    });
-  };
+      }).start(() => {
+        pan.setValue(0);
+        reveal.setValue(0);
+        setActiveOption((prev) => (prev + 1) % OPTIONS_LENGTH);
+        Animated.timing(reveal, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start(() => {
+          setAnimating(false);
+        });
+      });
+    },
+    [animating, cardWidth, pan, reveal]
+  );
 
   const cardPan = useMemo(
     () =>
@@ -433,34 +435,11 @@ export const WelcomeExperience = () => {
           }).start();
         },
       }),
-    // dismissCard closes over cardWidth and the shared pan value.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cardWidth, pan]
+    [cardWidth, dismissCard, pan]
   );
 
   const renderHome = () => (
     <View style={styles.section}>
-      <View
-        style={[
-          styles.hero,
-          { backgroundColor: colors.brandSoft, borderColor: colors.border },
-        ]}
-      >
-        <View style={styles.heroCopy}>
-          <AppText variant="caption" weight="700" color="gold">
-            PERSONAL GUIDANCE
-          </AppText>
-          <AppText variant="h2">
-            Grow your connection with the Qur&apos;an and Arabic.
-          </AppText>
-          <AppText variant="small" color="muted" style={styles.cardBody}>
-            Learn with dedicated teachers through personal online lessons,
-            flexible scheduling, and a learning experience built around you.
-          </AppText>
-        </View>
-        <PrayerArt width={124} height={140} />
-      </View>
-
       <View
         style={[
           styles.trust,
@@ -476,134 +455,129 @@ export const WelcomeExperience = () => {
       <View
         style={[
           styles.stack,
-          { width: cardWidth + STACK_WIDTH, height: CARD_HEIGHT + 30 },
+          { width: cardWidth + STACK_WIDTH, height: STACK_HEIGHT },
         ]}
       >
-        {(() => {
-          const settleX = settle.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, CARD_PEEK_X],
-          });
-          const settleY = settle.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, CARD_PEEK_Y],
-          });
-          const settleScale = settle.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, CARD_PEEK_SCALE],
-          });
-          const revealScale = Animated.add(
-            1,
-            Animated.multiply(settleScale, -1)
-          );
+        {OPTIONS.map((option, index) => {
+          const fromOrder =
+            (index - activeOption + OPTIONS_LENGTH) % OPTIONS_LENGTH;
+          const toOrder =
+            swapTarget === null
+              ? fromOrder
+              : (index - swapTarget + OPTIONS_LENGTH) % OPTIONS_LENGTH;
+          const accent = accentFor(colors, option.tone);
+          const front = fromOrder === 0 && swapTarget === null;
 
-          return OPTIONS.map((option, index) => {
-            const order =
-              (index - activeOption + OPTIONS.length) % OPTIONS.length;
-            if (order > 2) return null;
-            const accent = accentFor(colors, option.tone);
-            const front = order === 0;
-            const transform = front
-              ? [
-                  { translateX: pan },
-                  {
-                    rotate: pan.interpolate({
-                      inputRange: [-cardWidth, 0, cardWidth],
-                      outputRange: ["-8deg", "0deg", "8deg"],
-                    }),
-                  },
-                  { translateX: settleX },
-                  { translateY: settleY },
-                  { scale: revealScale },
-                ]
-              : [
-                  {
-                    translateX: Animated.add(
-                      settleX,
-                      order * CARD_PEEK_X
-                    ),
-                  },
-                  {
-                    translateY: Animated.add(
-                      settleY,
-                      order * CARD_PEEK_Y
-                    ),
-                  },
-                  {
-                    scale: Animated.add(
-                      revealScale,
-                      -order * CARD_PEEK_SCALE
-                    ),
-                  },
-                ];
+          const slideX = swap.interpolate({
+            inputRange: [0, 1],
+            outputRange: [fromOrder * CARD_PEEK_X, toOrder * CARD_PEEK_X],
+          });
+          const slideY = swap.interpolate({
+            inputRange: [0, 1],
+            outputRange: [fromOrder * CARD_PEEK_Y, toOrder * CARD_PEEK_Y],
+          });
+          const slideScale = swap.interpolate({
+            inputRange: [0, 1],
+            outputRange: [
+              1 - fromOrder * CARD_PEEK_SCALE,
+              1 - toOrder * CARD_PEEK_SCALE,
+            ],
+          });
+          const slideOpacity = swap.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1 - fromOrder * 0.08, 1 - toOrder * 0.08],
+          });
 
-            return (
-              <Animated.View
-                key={option.key}
-                style={[
-                  styles.card,
-                  {
-                    width: cardWidth,
-                    height: CARD_HEIGHT,
-                    zIndex: 10 - order,
-                    opacity: Animated.add(
-                      1 - order * 0.08,
-                      Animated.multiply(settle, -0.08)
-                    ),
-                    transform,
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                    shadowColor: colors.shadow,
-                    elevation: 6 - order * 2,
-                  },
-                ]}
-                {...(front ? cardPan.panHandlers : {})}
+          const transform = front
+            ? [
+                { translateX: pan },
+                {
+                  rotate: pan.interpolate({
+                    inputRange: [-cardWidth, 0, cardWidth],
+                    outputRange: ["-8deg", "0deg", "8deg"],
+                  }),
+                },
+                {
+                  translateX: reveal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [CARD_PEEK_X, 0],
+                  }),
+                },
+                {
+                  translateY: reveal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [CARD_PEEK_Y, 0],
+                  }),
+                },
+                {
+                  scale: reveal.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1 - CARD_PEEK_SCALE, 1],
+                  }),
+                },
+              ]
+            : [{ translateX: slideX }, { translateY: slideY }, { scale: slideScale }];
+
+          return (
+            <Animated.View
+              key={option.key}
+              style={[
+                styles.card,
+                {
+                  width: cardWidth,
+                  height: CARD_HEIGHT,
+                  zIndex: 10 - toOrder,
+                  opacity: slideOpacity,
+                  transform,
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+              {...(front ? cardPan.panHandlers : {})}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${option.title}. ${
+                  user ? "Browse available teachers" : "How it works"
+                }`}
+                accessibilityHint={
+                  user
+                    ? "Opens the teacher directory"
+                    : "Opens the steps before sign up"
+                }
+                onPress={openCard}
+                style={styles.cardPress}
               >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`${option.title}. ${
-                    user ? "Browse available teachers" : "Create an account"
-                  }`}
-                  accessibilityHint={
-                    user ? "Opens the teacher directory" : "Opens sign up"
-                  }
-                  onPress={openCard}
-                  style={styles.cardPress}
+                <CardArt icon={option.icon} accent={accent} index={index} />
+                <View
+                  style={[
+                    styles.tag,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: accent.solid,
+                    },
+                  ]}
                 >
-                  <CardArt icon={option.icon} accent={accent} index={index} />
-                  <View
-                    style={[
-                      styles.tag,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: accent.solid,
-                      },
-                    ]}
-                  >
-                    <AppText
-                      variant="caption"
-                      weight="700"
-                      color={accent.solid}
-                    >
-                      {option.tag}
-                    </AppText>
-                  </View>
+                  <AppText variant="caption" weight="700" color={accent.solid}>
+                    {option.tag}
+                  </AppText>
+                </View>
 
-                  <View style={styles.cardCopy}>
-                    <AppText variant="h2">{option.title}</AppText>
-                    <AppText
-                      variant="small"
-                      color="muted"
-                      style={styles.cardBody}
-                    >
-                      {option.body}
-                    </AppText>
-                  </View>
-                </Pressable>
-              </Animated.View>
-            );
-          });
-        })()}
+                <View style={styles.cardCopy}>
+                  <AppText variant="h2">{option.title}</AppText>
+                  <AppText
+                    variant="small"
+                    color="muted"
+                    style={styles.cardBody}
+                  >
+                    {option.body}
+                  </AppText>
+                </View>
+              </Pressable>
+            </Animated.View>
+          );
+        })}
       </View>
 
       <View style={styles.dots}>
@@ -680,33 +654,6 @@ export const WelcomeExperience = () => {
             </View>
           ))}
         </View>
-      </View>
-
-      <View style={styles.steps}>
-        <AppText variant="h3">Simple steps. Personal progress.</AppText>
-        <AppText variant="small" color="muted">
-          From your first sign-up to your next lesson, we make it easy to stay
-          connected and keep learning.
-        </AppText>
-        {STEPS.map((step) => (
-          <View
-            key={step.number}
-            style={[
-              styles.stepCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <AppText variant="h3" color="gold" weight="800">
-              {step.number}
-            </AppText>
-            <View style={styles.optionCopy}>
-              <AppText variant="h3">{step.title}</AppText>
-              <AppText variant="caption" color="muted">
-                {step.body}
-              </AppText>
-            </View>
-          </View>
-        ))}
       </View>
     </View>
   );
@@ -820,7 +767,7 @@ export const WelcomeExperience = () => {
           </AppText>
           <PillPressable
             accessibilityLabel="Sign up"
-            onPress={openCard}
+            onPress={() => router.push("/signup")}
             style={styles.greetingLink}
           >
             <AppText variant="h3" weight="800">
@@ -990,26 +937,6 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   section: { gap: 16 },
-  hero: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 24,
-    paddingLeft: 18,
-    paddingRight: 4,
-    paddingVertical: 10,
-  },
-  heroCopy: { flex: 1, gap: 6 },
-  steps: { gap: 10, paddingTop: 8 },
-  stepCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-  },
   trust: {
     alignSelf: "center",
     flexDirection: "row",
@@ -1027,10 +954,10 @@ const styles = StyleSheet.create({
     top: 0,
     borderWidth: 1,
     borderRadius: 24,
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
   cardPress: { flex: 1 },
   cardArt: {

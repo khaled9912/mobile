@@ -24,46 +24,49 @@ export const BrandMark = ({
   const { colors, scheme } = useTheme();
   const stroke = color ?? (scheme === "dark" ? "#bfe3c6" : "#217a34");
   const fill = fillColor ?? (scheme === "dark" ? colors.card : "#f2faf3");
+  const width = (size * 242) / 340;
 
   return (
-    <Svg
-      width={(size * 242) / 340}
-      height={size}
-      viewBox="18 22 242 340"
-      accessibilityLabel="Ana Quran logo"
-    >
-      <Path
-        d={ARCH}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={8}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <Path
-        d={PAGE_LEFT}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={7}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <Path
-        d={PAGE_RIGHT}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={7}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <Path
-        d={SPINE}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={7}
-        strokeLinecap="round"
-      />
-    </Svg>
+    <View style={{ width, height: size }}>
+      <Svg
+        width={width}
+        height={size}
+        viewBox="18 22 242 340"
+        accessibilityLabel="Ana Quran logo"
+      >
+        <Path
+          d={ARCH}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={8}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <Path
+          d={PAGE_LEFT}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={7}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <Path
+          d={PAGE_RIGHT}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={7}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <Path
+          d={SPINE}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={7}
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
   );
 };
 

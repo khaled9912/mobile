@@ -17,7 +17,11 @@ import { Card } from "@/components/ui/card";
 import { MonthChips } from "@/components/ui/month-chips";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 
 const egp = (value: number) =>
@@ -117,7 +121,14 @@ function TeacherBillingView() {
       />
 
       {billingQuery.isLoading ? (
-        <LoadingView label="Loading your earnings…" />
+        <>
+          <TextCardSkeleton lines={3} />
+          <View style={styles.loadingSection}>
+            <SectionHeaderSkeleton withAction={false} />
+            <TextCardSkeleton lines={4} />
+            <TextCardSkeleton lines={4} />
+          </View>
+        </>
       ) : billingQuery.isError ? (
         <ErrorView
           error={billingQuery.error}
@@ -290,6 +301,7 @@ function PayoutForm({ billing }: { billing: TeacherBilling }) {
 
 const styles = StyleSheet.create({
   summary: { marginTop: 14, gap: 2 },
+  loadingSection: { marginTop: 22, gap: 10 },
   openNote: { marginTop: 6 },
   lessonRow: {
     flexDirection: "row",

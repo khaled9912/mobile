@@ -21,7 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  PageHeaderSkeleton,
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatDateTime } from "@/lib/format";
 
@@ -426,7 +431,16 @@ export default function LessonReviewScreen() {
         onRefresh={() => void workspaceQuery.refetch()}
       >
         {workspaceQuery.isLoading ? (
-          <LoadingView label="Loading the lesson and transcript…" />
+          <>
+            <PageHeaderSkeleton titleLines={1} />
+            <View style={{ gap: spacing.lg }}>
+              <TextCardSkeleton lines={4} />
+              <TextCardSkeleton lines={6} />
+            </View>
+            <View style={{ height: spacing.xl }} />
+            <SectionHeaderSkeleton withAction={false} />
+            <TextCardSkeleton lines={4} />
+          </>
         ) : workspaceQuery.isError || !workspace ? (
           <ErrorView
             error={workspaceQuery.error}

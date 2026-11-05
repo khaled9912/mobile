@@ -66,11 +66,9 @@ const config: ExpoConfig = {
         image: "./assets/splash-icon.png",
         imageWidth: 220,
         resizeMode: "contain",
+        // Launch stays light even on a dark device: a dark splash followed by
+        // the light intro read as a flash.
         backgroundColor: "#fbfaf6",
-        dark: {
-          backgroundColor: "#1a3a52",
-          image: "./assets/splash-icon-dark.png",
-        },
       },
     ],
     [

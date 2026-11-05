@@ -19,7 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import { PersonRowSkeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 
 const PersonRow = ({
@@ -206,7 +207,11 @@ export default function AssignTeacherScreen() {
         ) : null}
 
         {studentsQuery.isLoading || teachersQuery.isLoading ? (
-          <LoadingView label="Loading people…" />
+          <View style={styles.list}>
+            <PersonRowSkeleton avatarSize={44} />
+            <PersonRowSkeleton avatarSize={44} />
+            <PersonRowSkeleton avatarSize={44} />
+          </View>
         ) : studentsQuery.isError ? (
           <ErrorView
             error={studentsQuery.error}

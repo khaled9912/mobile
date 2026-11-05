@@ -18,7 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 import {
   formatWeeklySlot,
@@ -189,7 +193,10 @@ export default function ChangeTimeScreen() {
         ) : null}
 
         {seriesQuery.isLoading ? (
-          <LoadingView label="Loading your weekly time…" />
+          <>
+            <SectionHeaderSkeleton withAction={false} />
+            <TextCardSkeleton lines={3} />
+          </>
         ) : seriesQuery.isError ? (
           <ErrorView
             error={seriesQuery.error}
@@ -234,7 +241,11 @@ export default function ChangeTimeScreen() {
             <View style={styles.section}>
               <SectionHeader title="Choose a new time" />
               {teacherQuery.isLoading ? (
-                <LoadingView label="Loading available times…" />
+                <View style={styles.list}>
+                  <TextCardSkeleton lines={3} />
+                  <TextCardSkeleton lines={3} />
+                  <TextCardSkeleton lines={3} />
+                </View>
               ) : teacherQuery.isError ? (
                 <ErrorView
                   error={teacherQuery.error}

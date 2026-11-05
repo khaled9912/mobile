@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Segmented } from "@/components/ui/segmented";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { LessonCardSkeleton } from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { AppText } from "@/components/ui/app-text";
 import {
@@ -118,7 +119,11 @@ export default function ScheduleTab() {
 
       <View style={styles.list}>
         {lessonsQuery.isLoading ? (
-          <LoadingView label="Loading your schedule…" />
+          <>
+            <LessonCardSkeleton />
+            <LessonCardSkeleton />
+            <LessonCardSkeleton />
+          </>
         ) : lessonsQuery.isError ? (
           <ErrorView
             error={lessonsQuery.error}

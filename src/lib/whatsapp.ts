@@ -1,18 +1,47 @@
 import { Alert, Linking } from "react-native";
 
-const ACADEMY_WHATSAPP = "201501223115";
+// The academy's WhatsApp account. Keep digits only; wa.me rejects "+" and
+// spaces. EXPO_PUBLIC_ACADEMY_WHATSAPP lets staging point elsewhere without
+// editing code.
+const ACADEMY_WHATSAPP = (
+  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP?.trim() || "201501223115"
+).replace(/\D/g, "");
 const DEFAULT_MESSAGE =
   "Assalamu alaikum, I'd like to know more about Ana Quran lessons.";
 
+const openFirstAvailable = async (urls: string[]) => {
+  for (const url of urls) {
+    try {
+      await Linking.openURL(url);
+      return true;
+    } catch {
+      // Try the next scheme; Android and iOS disagree about which one exists.
+    }
+  }
+  return false;
+};
+
 /**
- * With no text this opens the academy's WhatsApp chat. With text it opens the
- * WhatsApp share sheet so the user picks who receives it.
+ * With no text this opens a chat with the academy account. With text it opens
+ * the WhatsApp share sheet so the user picks who receives it.
  */
 export const openWhatsApp = (text?: string) => {
-  const url = text
-    ? `whatsapp://send?text=${encodeURIComponent(text)}`
-    : `https://wa.me/${ACADEMY_WHATSAPP}?text=${encodeURIComponent(DEFAULT_MESSAGE)}`;
-  void Linking.openURL(url).catch(() => {
+  const urls = text
+    ? [
+        `whatsapp://send?text=${encodeURIComponent(text)}`,
+        `https://wa.me/?text=${encodeURIComponent(text)}`,
+      ]
+    : [
+        `whatsapp://send?phone=${ACADEMY_WHATSAPP}&text=${encodeURIComponent(
+          DEFAULT_MESSAGE
+        )}`,
+        `https://wa.me/${ACADEMY_WHATSAPP}?text=${encodeURIComponent(
+          DEFAULT_MESSAGE
+        )}`,
+      ];
+
+  void openFirstAvailable(urls).then((opened) => {
+    if (opened) return;
     Alert.alert(
       "WhatsApp not available",
       text

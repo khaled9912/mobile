@@ -15,7 +15,11 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { EmptyState, ErrorView, LoadingView } from "@/components/ui/states";
+import { EmptyState, ErrorView } from "@/components/ui/states";
+import {
+  SectionHeaderSkeleton,
+  TextCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
 import { formatDateTime } from "@/lib/format";
 
@@ -276,7 +280,13 @@ export default function WeeklyDigestScreen() {
         />
 
         {digestQuery.isLoading ? (
-          <LoadingView label="Building the digest…" />
+          <View style={{ gap: spacing.lg }}>
+            <TextCardSkeleton lines={2} />
+            <View>
+              <SectionHeaderSkeleton withAction={false} />
+              <TextCardSkeleton lines={5} />
+            </View>
+          </View>
         ) : digestQuery.isError || !digest ? (
           <ErrorView
             error={digestQuery.error}

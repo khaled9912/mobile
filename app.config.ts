@@ -129,7 +129,9 @@ const config: ExpoConfig = {
       {
         icon: "./assets/android-icon-monochrome.png",
         color: "#1a3a52",
-        defaultChannel: "lesson-reminders",
+        // Must match DEFAULT_NOTIFICATION_CHANNEL_ID in
+        // src/lib/notification-channels.ts and the API's PushOptions.
+        defaultChannel: "academy-notifications",
         // prebuild copies this into the iOS bundle and Android res/raw, so a
         // push can ring something other than the system default.
         sounds: ["./assets/sounds/lesson_call.wav"],

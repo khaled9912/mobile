@@ -10,15 +10,15 @@ import {
   cancelLessonReminders,
   syncLessonReminders,
 } from "@/lib/lesson-notifications";
-import { isLessonCall } from "@/lib/lesson-call-notifications";
 
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => ({
+  handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
-    // Only a call earns a badge; reminders and routine notices stay uncounted.
-    shouldSetBadge: isLessonCall(notification),
+    // Pushes carry the unread count as their badge, so the icon matches the
+    // tray even while the app is foregrounded. Local reminders carry none.
+    shouldSetBadge: true,
   }),
 });
 

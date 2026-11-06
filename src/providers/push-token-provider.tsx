@@ -8,6 +8,7 @@ import {
   registerDeviceToken,
   unregisterDeviceToken,
 } from "@/api/lesson-operations";
+import { ensureNotificationChannel } from "@/lib/notification-channels";
 
 const PUSH_TOKEN_KEY = "anaquran.push-token.v1";
 
@@ -64,10 +65,14 @@ export const PushTokenProvider = ({ children }: { children: ReactNode }) => {
 
     void (async () => {
       try {
+        // Android 13 only shows the permission prompt once a channel exists,
+        // and the token is useless if the channel the server names is missing.
+        await ensureNotificationChannel();
+
         let permission = await Notifications.getPermissionsAsync();
         if (!permission.granted && permission.canAskAgain) {
           permission = await Notifications.requestPermissionsAsync({
-            ios: { allowAlert: true, allowBadge: false, allowSound: true },
+            ios: { allowAlert: true, allowBadge: true, allowSound: true },
           });
         }
         if (!permission.granted || cancelled) return;

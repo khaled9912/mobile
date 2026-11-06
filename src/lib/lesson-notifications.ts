@@ -168,7 +168,7 @@ const runSync = async (
     if (!permission.granted && permission.canAskAgain && !permissionRequested) {
       permissionRequested = true;
       permission = await Notifications.requestPermissionsAsync({
-        ios: { allowAlert: true, allowBadge: false, allowSound: true },
+        ios: { allowAlert: true, allowBadge: true, allowSound: true },
       });
     }
     if (!permission.granted) return;

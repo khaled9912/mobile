@@ -648,11 +648,36 @@ reminders keep working.
    - Background or quit the student's app, start the lesson window, and press
      **Call the student**. The phone should vibrate with `lesson_call.wav` on
      the `lesson-calls-2` channel.
+   - Ask the other side to book or change something. The notification should
+     arrive in the system tray with the default sound and, on iOS, a number on
+     the Ana Quran icon. If it only appears inside the app, the push token was
+     never accepted — see the API log line below.
    - If a push silently disappears, the API log says why: Expo accepts the
      request even when it refuses the token, and the sender logs
      `Expo rejected a push token: {...}`. A `DeviceTokenNotRegistered` detail
      means the binary on that phone is stale — reinstall, then sign in again to
      store a fresh token.
+
+### What the app enforces on its side
+
+- **OS-level, not in-app.** `expo-notifications` presents foreground pushes as
+  banners in the tray with sound (`shouldShowBanner`, `shouldShowList`,
+  `shouldPlaySound`). The in-app bell is a history, not the delivery path.
+- **Android channel.** Ordinary pushes name `academy-notifications`, created at
+  sign-in with `HIGH` importance, the default sound and vibration. Android
+  ignores payload volume, so that channel is what makes a notification slide in
+  and ring. If you change its settings, bump the id in
+  `src/lib/notification-channels.ts`, `app.config.ts`, and `PushOptions` in the
+  API — Android refuses to edit an existing channel.
+- **Icon badge.** The API stamps every push with the recipient's unread count,
+  and the app mirrors the feed count with `setBadgeCountAsync` while it runs.
+  iOS shows the number; Android launchers vary between a dot and a number, and
+  some ignore it entirely. iOS also needs `allowBadge` in the permission
+  request — if the user denied badges, only Settings can restore them
+  (`getPermissionsAsync().ios.allowsBadge` reports the current choice).
+- **Sound.** iOS plays the push `sound` ("default"); Android plays the channel
+  sound. The phone's silent switch / Focus mode still wins, as it does in
+  WhatsApp.
 
 Android may still defer a push while the phone is dozing. Two settings help and
 both are already surfaced in the app: the notification permission prompt, and

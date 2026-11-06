@@ -37,6 +37,10 @@ export default function SignupScreen() {
       fail("Enter your full name.");
       return;
     }
+    if (fullName.includes("@")) {
+      fail("Enter your name, not an email address.");
+      return;
+    }
     if (!isValidEmail(email)) {
       fail("Enter a valid email address.");
       return;

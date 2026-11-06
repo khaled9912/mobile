@@ -126,6 +126,10 @@ export default function LoginScreen() {
       fail("Enter your full name to finish creating your account.");
       return;
     }
+    if (needsName && fullName.includes("@")) {
+      fail("Enter your name, not an email address.");
+      return;
+    }
     if (!sentTo) {
       fail("Request a new code to continue.");
       return;

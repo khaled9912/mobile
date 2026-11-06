@@ -165,20 +165,8 @@ export const deleteTeacherAvailabilityAsAdmin = (
     { method: "DELETE" }
   );
 
-// Admin queue for student time-change requests.
+// Read-only history of weekly times students moved themselves.
 export const getAdminChangeRequests = (status?: ChangeRequestStatus) =>
   apiFetch<LessonChangeRequest[]>(
     `/api/admin/change-requests${status ? `?status=${status}` : ""}`
-  );
-
-export const approveChangeRequest = (requestId: string) =>
-  apiFetch<LessonChangeRequest>(
-    `/api/admin/change-requests/${encodeURIComponent(requestId)}/approve`,
-    { method: "POST" }
-  );
-
-export const rejectChangeRequest = (requestId: string, note?: string) =>
-  apiFetch<LessonChangeRequest>(
-    `/api/admin/change-requests/${encodeURIComponent(requestId)}/reject`,
-    { method: "POST", json: note ? { note } : {} }
   );

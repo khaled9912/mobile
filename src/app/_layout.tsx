@@ -18,6 +18,7 @@ import { RealtimeProvider } from "@/providers/realtime-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
 import { PushTokenProvider } from "@/providers/push-token-provider";
 import { LessonCallProvider } from "@/providers/lesson-call-provider";
+import { LessonRingProvider } from "@/providers/lesson-ring-provider";
 import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
 import { LaunchIntro } from "@/components/onboarding/launch-intro";
 import { queryClient } from "@/lib/query-client";
@@ -123,7 +124,9 @@ const RootLayout = () => (
                 <PushTokenProvider>
                   <LessonReminderProvider>
                     <LessonCallProvider>
-                      <RootNavigator />
+                      <LessonRingProvider>
+                        <RootNavigator />
+                      </LessonRingProvider>
                     </LessonCallProvider>
                     <ApiDebugOverlay />
                   </LessonReminderProvider>

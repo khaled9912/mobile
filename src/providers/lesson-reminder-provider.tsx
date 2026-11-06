@@ -10,19 +10,29 @@ import {
   cancelLessonReminders,
   syncLessonReminders,
 } from "@/lib/lesson-notifications";
+import { isLessonCall } from "@/lib/lesson-call-notifications";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
+  handleNotification: async (notification) => ({
     shouldShowBanner: true,
     shouldShowList: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    // Only a call earns a badge; reminders and routine notices stay uncounted.
+    shouldSetBadge: isLessonCall(notification),
   }),
 });
 
 const lessonIdFrom = (response: Notifications.NotificationResponse | null) => {
   const lessonId = response?.notification.request.content.data?.lessonId;
   return typeof lessonId === "string" && lessonId ? lessonId : null;
+};
+
+/** Server-side pushes carry the screen to open; local reminders carry a lesson id. */
+const linkFrom = (response: Notifications.NotificationResponse | null) => {
+  const link = response?.notification.request.content.data?.link;
+  return typeof link === "string" && link.startsWith("/") && !link.startsWith("//")
+    ? link
+    : null;
 };
 
 const openLesson = (lessonId: string) => {
@@ -78,6 +88,11 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
       const identifier = response?.notification.request.identifier;
       if (!identifier || handled.current.has(identifier)) return;
       handled.current.add(identifier);
+      const link = linkFrom(response);
+      if (link) {
+        router.push(link);
+        return;
+      }
       const lessonId = lessonIdFrom(response);
       if (lessonId) openLesson(lessonId);
     };

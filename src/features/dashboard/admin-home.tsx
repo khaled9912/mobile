@@ -33,8 +33,8 @@ export const AdminHome = () => {
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const changesQuery = useQuery({
-    queryKey: ["change-requests", "admin", "pending"],
-    queryFn: () => getAdminChangeRequests("pending"),
+    queryKey: ["change-requests", "admin", "recent"],
+    queryFn: () => getAdminChangeRequests(),
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
   const studentsQuery = useQuery({
@@ -71,7 +71,7 @@ export const AdminHome = () => {
         <PageHeader
           eyebrow="Academy administration"
           title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
-          subtitle="Review time change requests, monitor the weekly schedule, and keep the academy running."
+          subtitle="See the weekly times students moved, monitor the schedule, and keep the academy running."
         />
       )}
 
@@ -79,7 +79,7 @@ export const AdminHome = () => {
         <StatRowSkeleton />
       ) : (
         <View style={styles.stats}>
-          <StatCard label="Changes waiting" value={changes.length} />
+          <StatCard label="Time changes" value={changes.length} />
           <StatCard label="Upcoming lessons" value={upcoming.length} />
           <StatCard label="Students" value={studentsQuery.data?.length ?? 0} />
           <StatCard label="Teachers" value={teachersQuery.data?.length ?? 0} />
@@ -96,10 +96,10 @@ export const AdminHome = () => {
         ) : (
           <>
             <SectionHeader
-              title="Time change queue"
+              title="Recent time changes"
               action={
                 <Button
-                  title="Open queue"
+                  title="Open log"
                   variant="ghost"
                   size="sm"
                   onPress={() => router.navigate("/requests")}
@@ -123,9 +123,9 @@ export const AdminHome = () => {
               </View>
             ) : (
               <EmptyState
-                icon="shield-checkmark-outline"
-                title="Nothing waiting"
-                body="Students asking to move a weekly lesson appear here. Check the new time with the teacher before approving."
+                icon="calendar-outline"
+                title="No time changes"
+                body="Students move their own weekly time between the slots their teacher publishes. Every move is recorded here and you get a notification."
               />
             )}
           </>

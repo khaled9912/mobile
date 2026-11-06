@@ -50,6 +50,14 @@ const Palette = ({
   return <>{children(accent, soft)}</>;
 };
 
+const ctaFor = (link: string | null) => {
+  if (!link) return null;
+  if (link.startsWith("/lesson/")) return "Open lesson";
+  if (link.startsWith("/schedule") || link.startsWith("/teacher/schedule"))
+    return "Open schedule";
+  return "Open";
+};
+
 const NotificationRow = ({
   item,
   onPress,
@@ -60,11 +68,12 @@ const NotificationRow = ({
   const { colors, radius } = useTheme();
   const unread = !item.readAt;
   const meta = ICONS[item.kind] ?? ICONS.system;
+  const cta = ctaFor(item.link);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}. ${item.body}`}
+      accessibilityLabel={`${item.title}. ${item.body}${cta ? `. ${cta}` : ""}`}
       onPress={() => onPress(item)}
       style={({ pressed }) => [
         styles.row,
@@ -98,6 +107,14 @@ const NotificationRow = ({
         <AppText variant="caption" color="muted">
           {item.body}
         </AppText>
+        {cta ? (
+          <View style={styles.rowCta}>
+            <AppText variant="caption" weight="700" color="link">
+              {cta}
+            </AppText>
+            <Ionicons name="chevron-forward" size={12} color={colors.link} />
+          </View>
+        ) : null}
       </View>
       {unread ? (
         <View style={[styles.unreadDot, { backgroundColor: colors.brand }]} />
@@ -381,6 +398,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowTitle: { flex: 1 },
+  rowCta: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   empty: { alignItems: "center", gap: 8, paddingVertical: 26 },
   emptyIcon: {

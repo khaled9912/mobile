@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { StyleSheet, View } from "react-native";
 import {
   getAssignedWeeklyAvailability,
-  getMyChangeRequests,
   getTeacherDirectory,
 } from "@/api/scheduling";
 import { useAuth } from "@/providers/auth-provider";
@@ -15,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
-import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { PersonRowSkeleton } from "@/components/ui/skeleton";
 import { StarRating } from "@/components/ui/star-rating";
@@ -47,27 +45,12 @@ export default function BookScreen() {
     enabled: role === "student",
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const changesQuery = useQuery({
-    queryKey: ["change-requests", "student"],
-    queryFn: getMyChangeRequests,
-    enabled: role === "student",
-    refetchInterval: LIVE_SYNC_INTERVAL,
-  });
-
   const teachers = directoryQuery.data ?? [];
   const assigned = assignedQuery.data;
   const assignedTeacher = assigned?.teacher ?? null;
   const series = assigned?.series ?? [];
-  const pendingChanges = (changesQuery.data ?? []).filter(
-    (change) => change.status === "pending"
-  );
-  const pendingChange = pendingChanges[0];
   const { refreshing, onRefresh } = usePullRefresh(() =>
-    Promise.all([
-      directoryQuery.refetch(),
-      assignedQuery.refetch(),
-      changesQuery.refetch(),
-    ])
+    Promise.all([directoryQuery.refetch(), assignedQuery.refetch()])
   );
 
   return (
@@ -78,16 +61,6 @@ export default function BookScreen() {
           title="Book your weekly lessons"
           subtitle="Pick any weekly times that suit you. Once booked, the time is yours every week — no approval needed."
         />
-
-        {pendingChange ? (
-          <View style={styles.block}>
-            <Notice
-              tone="warning"
-              title="Time change awaiting review"
-              message="The academy is checking your requested time with the teacher. Your current weekly time stays booked until they respond."
-            />
-          </View>
-        ) : null}
 
         {!assignedQuery.isLoading && !assignedTeacher ? (
           <StudentOpenOffers />
@@ -168,9 +141,6 @@ export default function BookScreen() {
                             title="Change"
                             size="sm"
                             variant="secondary"
-                            disabled={pendingChanges.some(
-                              (change) => change.seriesId === item.id
-                            )}
                             onPress={() =>
                               router.push(`/change-time/${item.id}`)
                             }
@@ -308,7 +278,6 @@ export default function BookScreen() {
 }
 
 const styles = StyleSheet.create({
-  block: { marginBottom: 16 },
   assigned: { marginTop: 22, gap: 12 },
   series: { gap: 10 },
   directory: { marginTop: 28, gap: 12 },

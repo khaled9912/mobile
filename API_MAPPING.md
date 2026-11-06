@@ -4,6 +4,7 @@ This document maps every feature in the mobile app to the existing ASP.NET Core
 API. The mobile client adds no endpoints, no tables, and no business rules of
 its own: each call below already existed for the web app.
 
+- Product and business rules: [`../docs/business-requirements/`](../docs/business-requirements/README.md)
 - API origin: `https://anaquran.runasp.net` (override with `EXPO_PUBLIC_API_URL`)
 - All paths are relative to that origin and start with `/api`.
 - Every response is JSON unless noted. `204 No Content` becomes `null` in the
@@ -48,6 +49,7 @@ app's JavaScript either way.
 | API policy | Accepted role(s) |
 | --- | --- |
 | `AdminOnly` | `admin`, `super_admin` |
+| `ReviewerOnly` | `admin`, `super_admin`, `support` |
 | `TeacherOnly` | `teacher` |
 | `StudentOnly` | `student` |
 | `RequireAuthorization()` | any signed-in role; endpoint applies its own checks |
@@ -134,7 +136,7 @@ The Home tab renders one of three dashboards from `src/features/dashboard/`.
 | --- | --- |
 | Student | `GET /api/lessons`, `GET /api/student/change-requests`, `GET /api/student/teacher/weekly-availability` |
 | Teacher | `GET /api/lessons`, `GET /api/teacher/availability-rules` |
-| Admin | `GET /api/lessons`, `GET /api/admin/change-requests?status=pending`, `GET /api/students`, `GET /api/teachers` |
+| Admin | `GET /api/lessons`, `GET /api/admin/change-requests`, `GET /api/students`, `GET /api/teachers` |
 
 All are GETs with no payload. Lessons are filtered server-side by role:
 students see their own, teachers see theirs, admins see every lesson. The
@@ -204,7 +206,7 @@ student took it), or `yours` (already booked by the caller).
 
 Students can be in a different zone from their teacher (US/UK students with a
 teacher elsewhere), so every student-facing weekly time — directory day chips,
-teacher profile groups, assigned series, and change-request times — is converted
+teacher profile groups, assigned series, and weekly time-change history — is converted
 from the rule's IANA `timeZoneId` to the device zone by
 `lib/weekly-time.ts`. The conversion anchors on the next occurrence, so day
 shifts (e.g. Monday 00:30 London → Sunday evening in New York) and US/UK
@@ -215,30 +217,36 @@ still sends rule ids only — no API change.
 
 ---
 
-## 6. Weekly time changes (student → admin only)
+## 6. Weekly time changes (self-serve, admin is informed)
 
-Students never see a request/approval screen on the teacher side. To move an
-existing weekly time they submit a change request, which only the admin handles;
-the admin checks with the teacher out of band and then approves or declines.
+A student moves their own weekly time. They can only pick a slot their teacher
+publishes as open, and the move is applied the moment they ask — there is no
+approval step. The teacher and every admin get a notification, and the admin
+screen is a read-only history.
 
 | Feature | Mobile caller | Request | Response |
 | --- | --- | --- | --- |
-| My requests | `scheduling.getMyChangeRequests` | `GET /api/student/change-requests` | `LessonChangeRequestDto[]` |
-| Request a new time | `scheduling.requestTimeChange(seriesId, requestedRuleId, note?)` | `POST /api/student/series/{seriesId}/change-requests` `{ requestedRuleId, note? }` | `201 LessonChangeRequestDto` |
-| Admin queue | `scheduling.getAdminChangeRequests(status?)` | `GET /api/admin/change-requests[?status=pending\|approved\|rejected]` | `LessonChangeRequestDto[]` |
-| Approve | `scheduling.approveChangeRequest(id)` | `POST /api/admin/change-requests/{id}/approve` | `LessonChangeRequestDto` |
-| Decline | `scheduling.rejectChangeRequest(id, note?)` | `POST /api/admin/change-requests/{id}/reject` `{ note? }` | `LessonChangeRequestDto` |
+| My changes | `scheduling.getMyChangeRequests` | `GET /api/student/change-requests` | `LessonChangeRequestDto[]` |
+| Move to another open time | `scheduling.requestTimeChange(seriesId, requestedRuleId, note?)` | `POST /api/student/series/{seriesId}/change-requests` `{ requestedRuleId, note? }` | `201 LessonChangeRequestDto` (`status: "applied"`) |
+| History | `scheduling.getAdminChangeRequests(status?)` | `GET /api/admin/change-requests[?status=applied\|pending\|approved\|rejected]` | `LessonChangeRequestDto[]` |
 
 `LessonChangeRequestDto` carries the series id, teacher/student names, the
-current and requested weekday/times, `timeZoneId`, `status`
-(`pending`, `approved`, `rejected`), `studentNote`, `adminNote`, `createdAt`,
-and `adminRespondedAt`.
+previous and new weekday/times, `timeZoneId`, `status` (`applied` for every
+self-serve move; `pending`, `approved` and `rejected` only exist on rows the old
+approval queue left behind), `studentNote`, `adminNote`, `createdAt`, and
+`adminRespondedAt`.
 
-The API allows one pending request per series (`409`), only targets another open
-rule of the same teacher (`404`/`409`), and on approval retargets the series and
-materializes its lessons again. Conflicts return `409` and the admin is asked to
-refresh. The student sees the pending state (and the resulting schedule or the
-admin's note) on their dashboard.
+The API checks the move inside a serializable transaction: the series must still
+be active, the target rule must belong to the same teacher and be free, the
+student must not already have another weekly time then, and no materialized
+lesson may clash. A clash returns `409` and the student picks another slot; the
+same `409` covers two students taking the slot at the same moment. On success the
+series is retargeted, future lessons are deleted and rebuilt, and the old slot
+opens up for other students.
+
+Requests left as `pending` by the removed approval queue are settled at API
+start-up: each one is applied if the slot is still open, otherwise closed with an
+`adminNote` explaining why.
 
 ---
 
@@ -281,6 +289,30 @@ screen; other roles only open the lesson room.
   and leave actions; the Ana Quran mark overlays both the full and mini stages.
 - The lesson header has a share action that opens the native share sheet with
   `https://{JITSI_DOMAIN}/ana-quran-{lessonId}`. No API call is involved.
+
+### Calling a participant who has not joined
+
+| Feature | Mobile caller | Request | Response | Access |
+| --- | --- | --- | --- | --- |
+| Ring the other side | `lesson-ops.callLesson` | `POST /api/lessons/{id}/call` `{ targetRole }` | `LessonCallDto` | Participant (own side) or staff (`targetRole` required) |
+| Recent incoming calls | `lesson-ops.getRecentCalls` | `GET /api/calls/recent` | `LessonCallDto[]` (newest 20, last 30 min) | Signed in |
+
+`GET /api/lessons/{id}/operations` and the admin lesson-ops detail both embed
+`calls`, so the attendance panel renders the ring history without an extra
+request.
+
+The attendance panel puts a Call button on every participant row that is not
+`joined`, but the press is gated client-side exactly like the server: from 15
+minutes before `startsAt` until `endsAt`, at most 30 seconds between calls from
+one person, and at most 3 calls from one person per lesson. A row that is
+already in the room shows no button, and a call to `joined` returns `409 "{Name}
+is already in the lesson room."` The other `409` copies are "This lesson was
+cancelled.", "The lesson time has already passed.", "Calls open shortly before
+the lesson starts.", "You just called. Wait a moment before calling again." and
+"You have used the 3 calls allowed for this lesson."; an out-of-window press
+that reaches the server shows the message as a toast. Teachers ring the student
+and students ring the teacher, so both directions use the same endpoint with an
+empty `targetRole`; staff in the lesson-ops panel must name the side.
 
 ---
 
@@ -424,9 +456,9 @@ reconnect, no mutation retries.
 | --- | --- |
 | `["lessons"]` | Lesson list |
 | `["lessons", id]` | Lesson detail |
-| `["change-requests", "student"]` | Student's time-change requests |
-| `["change-requests", "admin", status]` | Admin change-request queue |
-| `["change-requests"]` | Mutation prefix invalidated after a change request |
+| `["change-requests", "student"]` | Student's weekly time-change history |
+| `["change-requests", "admin", filter]` | Admin weekly time-change history |
+| `["change-requests"]` | Prefix invalidated after a student moves a weekly time |
 | `["teacher-directory"]` | Teachers and their announced weekly rules |
 | `["teacher-profile", id]` | Weekly availability, series, and reviews for one teacher |
 | `["assigned-teacher"]` | Student's active teacher and their weekly rules |
@@ -438,6 +470,12 @@ reconnect, no mutation retries.
 | `["admin", "assignments"]` | Active assignments |
 | `["admin", "contact-submissions"]` | Contact inbox |
 | `["profile", "reports"]` | Infinite lesson-report pages |
+| `["notifications"]` | In-app notification feed |
+| `["lesson-ops", id]` | Lesson detail with operations state |
+| `["lesson-calls"]` | Calls addressed to me in the last 30 minutes (ringer) |
+| `["billing", …]` | Student statement or teacher earnings |
+| `["open-offers", …]` | Student offers or teacher offer inbox |
+| `["reviews", …]` | Support review queue, workspace, digest |
 
 Mutations invalidate the prefixes they affect. Sign-out and a global `401`
 clear the entire cache.
@@ -456,7 +494,7 @@ clear the entire cache.
 | `GET/POST /api/admin/teachers/{id}/availability` (legacy one-off) | Admin weekly rules use `/availability-rules`; one-off slot management remains web-only |
 | `GET/POST/DELETE /api/teacher/availability`, `/api/teacher/student-availability` | Superseded by `/api/teacher/availability-rules` |
 | `/api/lesson-requests` (student, teacher, admin variants) | Superseded by instant `POST /api/student/bookings`; the teacher and admin approval screens were removed |
-| `PATCH /api/lessons/{id}`, `DELETE /api/lessons/{id}` | Rescheduling and cancelling lessons remain a web-only flow |
+| `PATCH /api/lessons/{id}`, `DELETE /api/lessons/{id}` (raw) | Mobile mutates through `/cancel`, `/reschedule-requests`, and `/replacement`, which apply the lesson policy; the raw status/delete routes are not called |
 | `GET /api/lessons/{id}/report`, `GET /api/lessons/{id}/review` | Both are embedded in `LessonDto` |
 | `PATCH /api/admin/users/{id}` with name/email/password | Mobile only toggles activation; profile editing is self-service |
 
@@ -467,23 +505,42 @@ endpoint.
 
 ## 15. Features with no API and therefore no mobile screen
 
-- Server-sent push and announcements — no endpoint exists. Lesson reminders are
-  scheduled locally from `GET /api/lessons` (section 16), not delivered by the
-  API.
-- Course/program catalog, enrollment, and payments — no endpoint exists. The
-  the teacher directory plus instant weekly booking is the API's equivalent of
-  browsing and enrolling.
+- Academy-wide announcements/broadcasts — no endpoint exists. Event push and
+  the in-app feed do exist.
+- Course/program catalog, enrollment, homework, or invoices — no endpoint.
+  The web pages with those names are hardcoded mocks.
 - In-app messaging outside the Jitsi room — no endpoint exists.
-- Attendance history — no endpoint exists.
 - Group classes — lessons are one teacher and one student.
+- Parent/guardian dashboards — there is no parent role.
+- Admin billing (rates, claims, academy account) — the API exists for web, but
+  mobile has no screen; use `/admin/payments`.
+- One-off slot management on a teacher's behalf — weekly rules are supported in
+  mobile, but one-off slots remain web-only.
+- Editing another user's name, email, or password — mobile only
+  activates/deactivates accounts.
 
 ---
 
-## 16. Lesson reminders (local notifications)
+## 16. Notifications (in-app, push, and local reminders)
 
-No notification endpoint is used or needed. `LessonReminderProvider` reads the
-same `GET /api/lessons` response the Schedule screen uses and schedules local
-notifications with `expo-notifications`:
+The API has an in-app feed and Expo push. Local reminders remain a per-device
+fallback.
+
+| Feature | Mobile caller | Request | Response |
+| --- | --- | --- | --- |
+| In-app feed | `notifications.getNotifications` | `GET /api/notifications` | `{ items: NotificationDto[], unread }` (newest 50) |
+| Mark one read | `notifications.markNotificationRead` | `POST /api/notifications/{id}/read` | `204` |
+| Mark all read | `notifications.markAllNotificationsRead` | `POST /api/notifications/read-all` | `204` |
+| Register push | `lesson-ops.registerDeviceToken` | `POST /api/devices/register` `{ token, platform }` | `204` |
+| Unregister push | `lesson-ops.unregisterDeviceToken` | `POST /api/devices/unregister` `{ token, platform? }` | `204` |
+
+Push registration needs an EAS `projectId`; without it the app silently relies
+on local reminders. Tapping a push opens the notification `link` (for example
+`/lesson/{id}`).
+
+`LessonReminderProvider` also reads the same `GET /api/lessons` response the
+Schedule screen uses and schedules local notifications with
+`expo-notifications`:
 
 | Behaviour | Detail |
 | --- | --- |
@@ -501,3 +558,32 @@ Delivery is per device: an account receives reminders on each phone where it
 has opened the app and synced the lesson list. Guaranteed delivery to a device
 that has never run the app would require server push (token registration plus a
 scheduler), which the current API does not provide.
+
+### Lesson calls
+
+`LessonRingProvider` owns the incoming-call layer and reads `GET
+/api/calls/recent` (query key `["lesson-calls"]`) on launch, every 20 seconds,
+whenever the `calls` realtime scope arrives, and whenever any push is received.
+The newest unseen call younger than 90 seconds renders `IncomingCallBanner`
+over every screen, loops `assets/sounds/lesson_call.wav` through `expo-audio`,
+starts repeating haptics, and stops 45 seconds after it rings or as soon as the
+user joins or dismisses. Each call id rings once per session.
+
+The audio player is the reason an in-app call is actually heard: a push's sound
+comes from an Android channel that cannot be reconfigured after its first
+creation, and from a `res/raw` copy that only exists in a build made after the
+sound plugin was added. Playing the bundled asset from JavaScript works in every
+build.
+
+| Surface | Detail |
+| --- | --- |
+| Android channel | `lesson-calls-2`: `IMPORTANCE_MAX`, `bypassDnd`, sound `lesson_call.wav`, vibration `[0, 500, 400, 500, 400]`, public on the lock screen. No custom `audioAttributes`: a communication-request usage plays on the ringer stream, which is silent whenever the phone is on vibrate or silent. The id is bumped whenever these settings change, because Android will not reconfigure an existing channel |
+| Push payload | The API sends the call with `channelId: lesson-calls-2`, `sound: lesson_call.wav`, `priority: high`, `interruptionLevel: time-sensitive`, `tag: lesson-call`, `ttl: 60`, `badge: 1` |
+| Sound asset | `assets/sounds/lesson_call.wav`, used twice: `require`d by `expo-audio` for the in-app ring, and registered through the `expo-notifications` config plugin so prebuild copies it to the iOS bundle and to `android/app/src/main/res/raw` for the notification. Until the app is rebuilt, Android falls back to the system notification sound instead of silence |
+| Badge | `shouldSetBadge` is true only for a notification whose sound is `lesson_call.wav`, so lesson reminders never badge |
+| iOS | A time-sensitive notification still follows the Silent switch and Focus, so an iPhone on silent rings visually only. There is no Critical Alerts entitlement yet. |
+| App closed | Only the push can wake the app (push must be enabled — see the README). Reopening inside the 90-second window still rings; after that the call exists only as a notification-feed entry and a row on the lesson. |
+
+Push needs the one-time enablement described in the README (`eas init`, the
+Firebase `google-services.json`, and an APNs key). Without it the call still
+rings any device that happens to be running the app.

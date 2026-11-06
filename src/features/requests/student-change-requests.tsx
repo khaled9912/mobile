@@ -23,20 +23,16 @@ export const StudentChangeRequests = () => {
   });
   const { refreshing, onRefresh } = usePullRefresh(changesQuery.refetch);
 
-  const changes = changesQuery.data ?? [];
-  const pending = changes
-    .filter((change) => change.status === "pending")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const history = changes
-    .filter((change) => change.status !== "pending")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const changes = [...(changesQuery.data ?? [])].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
 
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
       <PageHeader
         eyebrow="Student portal"
         title="Time changes"
-        subtitle="Ask the academy for a different weekly time. Your current time stays booked while they check with your teacher."
+        subtitle="You choose any open weekly time your teacher publishes, and your lessons move straight away. This is the record of your changes."
       />
 
       {changesQuery.isLoading ? (
@@ -57,10 +53,10 @@ export const StudentChangeRequests = () => {
       ) : (
         <View style={styles.sections}>
           <View style={styles.section}>
-            <SectionHeader title="Awaiting the academy" />
-            {pending.length ? (
+            <SectionHeader title="Your changes" />
+            {changes.length ? (
               <View style={styles.list}>
-                {pending.map((change) => (
+                {changes.map((change) => (
                   <ChangeRequestCard
                     key={change.id}
                     request={change}
@@ -71,8 +67,8 @@ export const StudentChangeRequests = () => {
             ) : (
               <EmptyState
                 icon="mail-open-outline"
-                title="No change waiting"
-                body="You can request a different weekly time from any of your booked lessons in the Schedule tab."
+                title="No changes yet"
+                body="You can move a weekly time from any of your booked lessons in the Schedule tab."
                 action={
                   <Button
                     title="Open schedule"
@@ -84,26 +80,11 @@ export const StudentChangeRequests = () => {
             )}
           </View>
 
-          {history.length ? (
-            <View style={styles.section}>
-              <SectionHeader title="History" />
-              <View style={styles.list}>
-                {history.map((change) => (
-                  <ChangeRequestCard
-                    key={change.id}
-                    request={change}
-                    perspective="student"
-                  />
-                ))}
-              </View>
-            </View>
-          ) : null}
-
           <View style={styles.section}>
             <Notice
               tone="info"
-              title="Your weekly time is permanent"
-              message="Booked weekly lessons repeat automatically and stay yours until the academy approves a change."
+              title="Your weekly time is yours"
+              message="Booked weekly lessons repeat automatically and stay yours until you move them to another open time."
             />
           </View>
         </View>

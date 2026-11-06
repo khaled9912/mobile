@@ -265,6 +265,23 @@ export interface LessonIncident {
   resolutionNote?: string | null;
 }
 
+/** One in-app ring between the two participants, or from staff to one side. */
+export interface LessonCall {
+  id: string;
+  lessonId: string;
+  callerId: string;
+  callerName: string;
+  callerRole: string;
+  calleeId: string;
+  calleeName: string;
+  calleeRole: string;
+  /** room: a participant pressed it | monitor: staff pressed it */
+  origin: string;
+  /** not_joined | left | absent */
+  calleeStatus: string;
+  createdAt: string;
+}
+
 export interface TeacherHours {
   id: string;
   lessonId: string;
@@ -296,6 +313,7 @@ export interface LessonOperations {
   incident?: LessonIncident | null;
   replacementLesson?: Lesson | null;
   originalLesson?: Lesson | null;
+  calls: LessonCall[];
 }
 
 export interface ReliabilityEvent {
@@ -417,6 +435,7 @@ export interface AdminLessonOpsDetail {
   excuse?: ExcuseRequest | null;
   credits: LessonCreditTransaction[];
   scheduleChanges: LessonScheduleChange[];
+  calls: LessonCall[];
 }
 
 export interface ReportPage {
@@ -471,7 +490,12 @@ export interface LessonSeries {
   createdAt: string;
 }
 
-export type ChangeRequestStatus = "pending" | "approved" | "rejected";
+/** `pending`/`approved`/`rejected` only appear on rows the old approval queue left behind. */
+export type ChangeRequestStatus =
+  | "applied"
+  | "pending"
+  | "approved"
+  | "rejected";
 
 export interface LessonChangeRequest {
   id: string;

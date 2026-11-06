@@ -1,12 +1,13 @@
 # Ana Quran Mobile
 
-The iOS and Android app for **Ana Quran** (Rayan Academy), built with
-Expo/React Native and TypeScript. It is a native client for the existing
-ASP.NET Core API — no backend changes, no duplicated endpoints, and no mock
-production data.
+The iOS and Android app for **Ana Quran Academy** (shown as **Ana Quran** in the
+UI), built with Expo/React Native and TypeScript. It is a native client for the
+existing ASP.NET Core API — no backend changes, no duplicated endpoints, and no
+mock production data.
 
 - Endpoint-by-endpoint mapping: [`API_MAPPING.md`](./API_MAPPING.md)
 - Shared API contract: [`../FE/docs/dotnet-integration.md`](../FE/docs/dotnet-integration.md)
+- Product and business rules: [`../docs/business-requirements/`](../docs/business-requirements/README.md)
 - Repository overview: [`../README.md`](../README.md)
 
 ---
@@ -23,7 +24,7 @@ production data.
 | Secure storage | `expo-secure-store` (identity cache and theme only) |
 | Live lessons | Native `@jitsi/react-native-sdk` (`JitsiMeeting`) |
 | Media | `expo-camera`, `expo-audio`, `expo-image-picker`, `expo-image-manipulator` |
-| Notifications | `expo-notifications` (local lesson reminders only) |
+| Notifications | `expo-notifications` (local lesson reminders + Expo push token registration) |
 | Connectivity | `@react-native-community/netinfo` |
 | Tests | Vitest |
 
@@ -118,7 +119,7 @@ src/
   features/            Role dashboards and change-request list features
   hooks/               use-online-status
   lib/                 Formatting, status logic, selectors, validation, storage, query client
-  providers/           Auth, theme, lesson-reminder, and lesson-call providers
+  providers/           Auth, theme, lesson-reminder, lesson-ring, and Jitsi call providers
   theme/               Design tokens (light and dark)
 ```
 
@@ -132,7 +133,8 @@ Navigation rules:
   **Sign in** / **Create account** actions. It is not a replica of the web
   marketing page and makes no API calls.
 - Tab visibility is role-aware: Book is student-only, Requests is
-  student/admin-only (weekly time changes), People is admin-only.
+  student/admin-only (weekly time changes), Reviews is
+  admin/super-admin/support-only, and People is admin-only.
 - Pushed screens use the native stack header and back gesture. Screens under an
   existing header pass `edges={["left", "right"]}` to avoid a double top inset.
 - Android system back (button or edge swipe) walks the stack and the visited tab
@@ -154,6 +156,12 @@ Navigation rules:
 | Schedule / upcoming sessions | `(app)/(tabs)/schedule` |
 | Live classroom | `(app)/lesson/[id]` |
 | Lesson reports | `(app)/profile/reports` + report form in lesson |
+| Lesson operations (cancel/reschedule/attendance/excuse/incident) | lesson screen panel + `(app)/admin/lesson-ops` |
+| Student payments | `(app)/payments` |
+| Teacher earnings and payout details | `(app)/earnings` |
+| Admin lesson-ops monitor | `(app)/admin/lesson-ops` |
+| Support review queue / rubric / weekly digest | `(app)/(tabs)/reviews`, `reviews/[id]`, `reviews/weekly` |
+| In-app notifications | notifications surface from Home/Profile |
 | Teacher weekly availability | `(app)/availability` |
 | Student weekly time change | `(app)/change-time/[seriesId]` (from Home or Requests) |
 | Admin time-change queue | `(app)/(tabs)/requests` |
@@ -172,7 +180,10 @@ Navigation rules:
 | Book | ✓ | — | — |
 | Requests | ✓ (mine) | — | ✓ (queue) |
 | Schedule | ✓ | ✓ | ✓ |
+| Reviews | — | — | ✓ |
 | People | — | — | ✓ |
+| Payments / Earnings | ✓ payments | ✓ earnings | — |
+| Lesson ops | ✓ own lesson | ✓ own lesson | ✓ admin monitor |
 | Profile | ✓ | ✓ | ✓ |
 | Availability | — | ✓ (own) | ✓ (on a teacher's behalf) |
 | Contact messages | — | — | ✓ |
@@ -327,8 +338,54 @@ for whichever account is signed in on the device:
   notifications at 64).
   Sign-out cancels every pending lesson reminder.
 - Delivery is per device and needs that account to have opened the app at least
-  once since the lesson was booked. There is no server push — the API has no
-  device-token or notification endpoint.
+  once since the lesson was booked. These two local alarms are separate from the
+  server notices (`Lesson tomorrow`, `Lesson in 1 hour`, `Lesson starting now`)
+  and the call ring, which arrive as push once it is enabled.
+
+---
+
+## Lesson calls
+
+When someone has not joined a live lesson, the other participant can ring them
+from the attendance panel on the lesson screen, and staff can ring either side
+from the lesson-operations panel. Both use
+`POST /api/lessons/{id}/call`; see `API_MAPPING.md` §8 for the guards.
+
+- Teachers see "Call the student" on the student row, students see "Call the
+  teacher" on the teacher row. The button is disabled while a 30-second cooldown
+  is running and after 3 calls in this lesson, and a row that is already in the
+  room shows no button. A rejected call surfaces the server's message as a
+  toast.
+- The callee sees `IncomingCallBanner` — a fixed card at the top of whatever
+  screen they are on — with "Join the lesson" and "Not now". Repeating haptics
+  run alongside it and both stop 45 seconds after the ring starts, so an
+  ignored call cannot keep vibrating the phone.
+- `src/providers/lesson-ring-provider.tsx` owns the ring. It polls
+  `GET /api/calls/recent` every 20 seconds, and the SignalR `calls` scope plus
+  any incoming push make it refetch immediately. Each call id rings once per
+  session and only while it is younger than 90 seconds, so a call that happened
+  an hour ago does not wake the phone.
+- The audible part is `expo-audio`: `startCallRinger()` loops the bundled
+  `assets/sounds/lesson_call.wav` with `playsInSilentMode: true` and
+  `duckOthers`, so the ring is heard with the ringer on silent and does not
+  depend on the notification channel at all. It is skipped while a Jitsi room is
+  live and stops with the banner.
+- The Android channel is `lesson-calls-2` at `IMPORTANCE_MAX`, with
+  `bypassDnd`, a public lock-screen presentation, and `lesson_call.wav` — the
+  two-tone ring in `assets/sounds/`. The id carries the `-2`: Android refuses to
+  change a channel that already exists, so the settings can only ship under a
+  fresh id. The `expo-notifications` config plugin
+  copies that file into the iOS bundle and `android/app/src/main/res/raw`
+  during `expo prebuild`, so a push can name it as its sound. Changing the
+  sound is a native change: it needs a new build, not just an OTA update, and a
+  binary built before the plugin entry simply has no `res/raw` file — Android
+  then falls back to the system sound and the in-app player still works.
+- On iOS the notification still obeys the Silent switch and Focus modes. Without
+  Apple's Critical Alerts entitlement an iPhone on silent gets the banner and
+  the badge but no audio, so the unread badge plus the "Call from your
+  teacher/student" entry in the notification feed are the fallback.
+- Nothing rings if the app is closed and push is not enabled — see the
+  one-time enablement under **Building and releasing**.
 
 ---
 
@@ -337,11 +394,12 @@ for whichever account is signed in on the device:
 **Persistent bottom bar.** `src/components/navigation/persistent-tab-bar.tsx` is
 rendered by `src/app/(app)/_layout.tsx` underneath the stack, so it stays
 visible on every internal screen (teacher profile, availability, settings,
-forms) instead of only on the five tab roots. The Expo Router tab bar is hidden;
+forms) instead of only on the tab roots. The Expo Router tab bar is hidden;
 the stack keeps its native headers and swipe-back gestures.
 
 - Tabs are role-filtered: Home, Book (`student`), Requests (students see their
-own time changes, admins see the queue), Schedule, People (`admin`), Profile.
+own time changes, admins see the queue), Schedule, Reviews
+(`admin`/`super_admin`/`support`), People (`admin`), Profile.
   Teachers have no request screen at all.
 - Screens inside a section keep their tab highlighted via `sectionTab()`
   (e.g. `/teachers/[id]` highlights Book, `/profile/edit` highlights Profile).
@@ -349,10 +407,10 @@ own time changes, admins see the queue), Schedule, People (`admin`), Profile.
   `TAB_BAR_CONTENT_HEIGHT` when the bar is present. A call left running outside
   the lesson screen floats above the bar as a mini player.
 
-**Cross-role status.** The API has no push or streaming channel, so the app
-polls while it is in the foreground. `LIVE_SYNC_INTERVAL` in
-`src/lib/query-client.ts` (60s) is set on the queries whose state another role
-can change:
+**Cross-role status.** The app holds a SignalR connection to the API for change
+hints (short-lived ticket; REST stays authoritative), and polls in the
+foreground as a fallback. `LIVE_SYNC_INTERVAL` in `src/lib/query-client.ts`
+(120s) covers the queries whose state another role can change:
 
 - `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
   reminders all update together) and `["lessons", id]` in the lesson room.
@@ -360,14 +418,19 @@ can change:
 - `["teacher-directory"]`, `["assigned-teacher"]`, `["series"]` and
   `["availability-rules","teacher"]` so a booking, a published rule, or an
   admin change appears for the other role without a refresh.
+- Notifications, lesson operations, billing, and review queues.
 
-Polling pauses automatically when the app is backgrounded (TanStack Query's
-focus manager) and resumes on return. Pull-to-refresh uses
+SignalR scope hints invalidate the matching query keys immediately. Polling
+pauses automatically when the app is backgrounded (TanStack Query's focus
+manager) and resumes on return. Pull-to-refresh uses
 `src/hooks/use-pull-refresh.ts` instead of `isFetching`, so a background poll
 never flashes the refresh spinner. A booking or an approved change therefore
-reaches the other role within about a minute, or immediately on pull-to-refresh. Instant delivery
-would need a server-side push/SSE channel, which is out of scope while the API
-stays unchanged.
+reaches the other role immediately when the socket is up, within about two
+minutes otherwise, or immediately on pull-to-refresh.
+
+Device tokens are registered for Expo push, so server-side notices (lesson
+reminders, payment confirmations, review results) can arrive while the app is
+closed. Local reminders remain as a per-device fallback.
 
 ---
 
@@ -481,6 +544,69 @@ a build at staging, set `EXPO_PUBLIC_API_URL` and
 Use `eas update` only for JavaScript changes; any change to native modules,
 permissions, icons, or the splash screen requires a new binary build.
 
+### Push notifications: one-time enablement
+
+Push is the only way a lesson call can ring a phone whose app is closed, and it
+is inert until all four steps below are done. Think of it like wiring an
+analytics key into a web app: nothing in the code changes, but without the
+secret the calls silently no-op. Until then the app still rings every device
+that is currently open (SignalR + the `["lesson-calls"]` query), and local
+reminders keep working.
+
+1. **Create the EAS project** so the Expo push service knows which app is
+   sending. In `mobile/`:
+
+   ```bash
+   npx eas-cli@latest login
+   npx eas-cli@latest init
+   ```
+
+   `app.config.ts` does not hard-code the id, so every build has to be told:
+   export `EAS_PROJECT_ID` with the project id `eas init` prints (it is also in
+   the EAS dashboard under your project's settings). `npx eas-cli build` sets it
+   automatically for cloud builds; a local build needs it in the environment.
+   Verify with `npx expo config --type public | grep projectId` — if it prints
+   nothing, `PushTokenProvider` bails out before requesting a token.
+
+2. **Android — Firebase.** Firebase hands out `google-services.json` per app and
+   it cannot be committed, so point a build at your own copy:
+
+   - Create a Firebase project, add an Android app with package name
+     `com.anaquran.academy`, download `google-services.json`.
+   - `EXPO_GOOGLE_SERVICES_FILE=./google-services.json npx expo prebuild --clean`
+   - Upload the Firebase **service account key** JSON (Project settings →
+     Service accounts → Generate new private key) with
+     `npx eas-cli@latest credentials`, choose Android → Firebase Cloud
+     Messaging (HTTP v1). Expo's push service signs the request to FCM with it.
+   - Rebuild the binary: `googleServicesFile` is native, so an OTA update will
+     not pick it up.
+
+3. **iOS — APNs key.** In Apple Developer, create a key under *Apple Push
+   Notification service* (APNs) and note the Key ID and your Team ID. Then
+   `npx eas-cli@latest credentials` → iOS → upload the `.p8` for the
+   distribution profile you already build with. Expo uses it automatically.
+
+4. **Check it works.** On two physical dev builds, signed in as teacher and
+   student:
+   - Sign in, and in the API debugger (Profile → version label ×7) confirm
+     `POST /api/devices/register` returned `204` — that means this device now
+     has an Expo push token stored server-side.
+   - Background or quit the student's app, start the lesson window, and press
+     **Call the student**. The phone should vibrate with `lesson_call.wav` on
+     the `lesson-calls-2` channel.
+   - If a push silently disappears, the API log says why: Expo accepts the
+     request even when it refuses the token, and the sender logs
+     `Expo rejected a push token: {...}`. A `DeviceTokenNotRegistered` detail
+     means the binary on that phone is stale — reinstall, then sign in again to
+     store a fresh token.
+
+Android may still defer a push while the phone is dozing. Two settings help and
+both are already surfaced in the app: the notification permission prompt, and
+the one-time **Alarms & reminders** prompt from the reminder scheduler, which
+grants the exact-alarm permission that also keeps a scheduled wake-up on time.
+If a student regularly misses calls, check that they allowed notifications for
+Ana Quran and did not put the app under battery optimisation.
+
 Before every release:
 
 ```bash
@@ -512,13 +638,13 @@ Manual device QA still matters because unit tests do not exercise native UI:
    landing page every time, both actions work, and signing out returns here.
 2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
-3. Student: browse teachers, book one or more weekly times, request a time
-   change, join the room at the start time, submit a review after the lesson.
+3. Student: browse teachers, book one or more weekly times, move one to another
+   open slot, join the room at the start time, submit a review after the lesson.
 4. Teacher: announce weekly rules, start the room, submit a report after the end
    time.
-5. Admin: approve or decline a time-change request, create/deactivate/reactivate
-   an account, assign a teacher, manage a teacher's weekly rules from People,
-   read contact messages.
+5. Admin: open the time-change history and confirm the move is recorded and
+   notified, create/deactivate/reactivate an account, assign a teacher, manage a
+   teacher's weekly rules from People, read contact messages.
 6. Time zones: set the device to a US or UK zone while the teacher is in another
    zone and confirm the Book, teacher profile, Home, and change-time screens show
    converted times and the "Times shown in your time zone" note; teacher and
@@ -540,26 +666,42 @@ Manual device QA still matters because unit tests do not exercise native UI:
 11. Android: press back or swipe from the screen edge on a detail screen and
     after switching tabs; confirm it walks back through the screens and visited
     tabs and only exits from the Home tab.
+12. Calls: with two accounts on two devices, open the lesson while one side is
+    still out of the room and press **Call the student** / **Call the
+    teacher**. Confirm the callee gets the banner with **Join the lesson** and
+    haptics on the screen they were on, that the row disappears from the panel
+    once they join, that a second press is blocked for 30 seconds, and that the
+    fourth press in the lesson reports the limit. Background the callee's app
+    and repeat — the push should ring with `lesson_call.wav` (needs the
+    enablement above).
 
 No automated end-to-end suite is committed.
 
 ---
 
-## Not implemented (no backend feature)
+## Not implemented or mobile-only gaps
 
-- Server-sent push notifications and announcements. Lesson reminders are local
-  to each device (see above); the API has no push endpoint.
-- Course/program catalog, enrollment, payments, or billing.
+- Announcements/broadcasts. Push exists for event notices, but there is no
+  academy-wide announcement feature.
+- Course/program catalog, enrollment, homework, or invoices. The web pages with
+  those names are hardcoded mocks, not API features.
 - In-app chat outside the Jitsi room.
-- Attendance history (no endpoint exists).
 - Group classes (lessons are one teacher and one student).
-- Mobile lesson rescheduling/cancellation; those remain web-only.
+- Admin billing (rates, claims, academy account). Use the web
+  `/admin/payments` page.
 - One-off slot management on a teacher's behalf; weekly rules are supported in
   mobile, but one-off slots remain web-only.
 - Schedule history older than the past week is reachable only through the
   completed-lesson **Load more** control, not as a full archive.
 - Editing another user's name, email, or password from the admin screens;
   mobile only activates/deactivates accounts.
+- A parent/guardian experience; there is no parent role.
+
+Implemented on mobile and previously missing from older docs: student payments
+and teacher earnings, lesson operations (cancel/reschedule/make-up/attendance/
+excuse/incident), attendance summaries inside the lesson panel with the call
+button, the incoming-call banner and its own Android channel, support review
+queue and weekly digest, in-app notifications, and Expo push registration.
 
 The optional "Grade" field when an admin creates a student is accepted by the
 API contract but not persisted or returned by the backend, so it is

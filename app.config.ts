@@ -12,6 +12,19 @@ const jitsiDomain =
   process.env.EXPO_PUBLIC_JITSI_DOMAIN?.trim() ||
   "meet.143-47-237-128.sslip.io";
 
+/**
+ * Expo push only reaches a build that knows which EAS project owns its APNs
+ * key and FCM credential. `eas init` writes `extra.eas.projectId` into this
+ * file; the variable lets CI supply it instead. Until one exists the app
+ * stays on local reminders and in-app notifications, which is why the
+ * registration code returns early rather than failing.
+ */
+const easProjectId = process.env.EAS_PROJECT_ID?.trim() || "";
+// Firebase hands out google-services.json per app and it cannot be committed.
+// Point a build at your copy to turn on Android push:
+//   EXPO_GOOGLE_SERVICES_FILE=./google-services.json npx expo prebuild --clean
+const googleServicesFile = process.env.EXPO_GOOGLE_SERVICES_FILE?.trim();
+
 const config: ExpoConfig = {
   name: "Ana Quran",
   slug: "ana-quran",
@@ -43,6 +56,7 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/android-icon-foreground.png",
       monochromeImage: "./assets/android-icon-monochrome.png",
     },
+    googleServicesFile: googleServicesFile || undefined,
     permissions: [
       "CAMERA",
       "RECORD_AUDIO",
@@ -103,6 +117,9 @@ const config: ExpoConfig = {
         icon: "./assets/android-icon-monochrome.png",
         color: "#1a3a52",
         defaultChannel: "lesson-reminders",
+        // prebuild copies this into the iOS bundle and Android res/raw, so a
+        // push can ring something other than the system default.
+        sounds: ["./assets/sounds/lesson_call.wav"],
       },
     ],
     "./plugins/withLessonScreenShare",
@@ -110,6 +127,7 @@ const config: ExpoConfig = {
   extra: {
     apiUrl,
     jitsiDomain,
+    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };
 

@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
 import {
   endWeeklySeries,
-  getMyChangeRequests,
   getMySeries,
   getTeacherProfile,
   requestTimeChange,
@@ -31,11 +30,7 @@ import {
   WEEKDAY_LABELS,
   WEEKDAY_SHORT,
 } from "@/lib/format";
-import {
-  getViewerTimeZone,
-  toViewerWeeklySlotLabel,
-  toViewerWeeklyTime,
-} from "@/lib/weekly-time";
+import { getViewerTimeZone, toViewerWeeklyTime } from "@/lib/weekly-time";
 import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { useTheme } from "@/providers/theme-provider";
 import { useToast } from "@/providers/toast-provider";
@@ -71,16 +66,6 @@ export default function ChangeTimeScreen() {
     enabled: Boolean(teacherId),
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const changesQuery = useQuery({
-    queryKey: ["change-requests", "student"],
-    queryFn: getMyChangeRequests,
-    refetchInterval: LIVE_SYNC_INTERVAL,
-  });
-
-  const pending = (changesQuery.data ?? []).find(
-    (change) => change.status === "pending" && change.seriesId === seriesId
-  );
-
   const available = (teacherQuery.data?.slots ?? [])
     .filter((rule) => rule.status === "available")
     .map((rule) => ({ rule, local: toViewerWeeklyTime(rule, viewerTimeZone) }))
@@ -98,9 +83,7 @@ export default function ChangeTimeScreen() {
         : Promise.reject(new Error("This weekly time no longer exists.")),
     onSuccess: async () => {
       setError("");
-      showToast(
-        "Request sent. The academy will confirm the new time with your teacher."
-      );
+      showToast("Your weekly time is changed. Upcoming lessons are on it now.");
       await queryClient.invalidateQueries({ queryKey: ["change-requests"] });
       await queryClient.invalidateQueries({ queryKey: ["series"] });
       await queryClient.invalidateQueries({ queryKey: ["lessons"] });
@@ -209,29 +192,12 @@ export default function ChangeTimeScreen() {
         <PageHeader
           eyebrow="Weekly lessons"
           title="Change your time"
-          subtitle="Pick a new weekly time. The academy will check it with your teacher, then move your lessons."
+          subtitle="Pick any open weekly time your teacher publishes. Your lessons move as soon as you choose it."
         />
 
         {error ? (
           <View style={styles.block}>
             <Notice tone="error" message={error} />
-          </View>
-        ) : null}
-        {pending ? (
-          <View style={styles.block}>
-            <Notice
-              tone="warning"
-              title="A change is already being reviewed"
-              message={`You asked to move this weekly time to ${toViewerWeeklySlotLabel(
-                {
-                  dayOfWeek: pending.requestedDayOfWeek,
-                  startsAtTime: pending.requestedStartsAtTime,
-                  endsAtTime: pending.requestedEndsAtTime,
-                  timeZoneId: pending.timeZoneId,
-                },
-                viewerTimeZone
-              )}. Wait for the academy to respond first.`}
-            />
           </View>
         ) : null}
 
@@ -349,14 +315,14 @@ export default function ChangeTimeScreen() {
                   multiline
                 />
                 <Button
-                  title={submit.isPending ? "Sending…" : "Request this time"}
+                  title={submit.isPending ? "Moving…" : "Move to this time"}
                   loading={submit.isPending}
-                  disabled={!selected || Boolean(pending) || submit.isPending}
+                  disabled={!selected || submit.isPending}
                   onPress={() => selected && submit.mutate(selected)}
                 />
                 <AppText variant="caption" color="muted">
-                  Your current weekly time stays booked until the academy
-                  approves the change.
+                  Your lessons move to the new time right away. Your teacher and
+                  the academy are told about it.
                 </AppText>
               </View>
             ) : null}

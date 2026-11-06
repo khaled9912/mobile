@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge";
 type Perspective = "student" | "admin";
 
 const statusLabel = {
-  pending: "Pending",
+  applied: "Applied",
+  pending: "Waiting",
   approved: "Approved",
   rejected: "Declined",
 } as const;
 
 const statusTone = {
+  applied: "success",
   pending: "warning",
   approved: "success",
   rejected: "danger",

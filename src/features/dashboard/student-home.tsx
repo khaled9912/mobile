@@ -60,9 +60,9 @@ export const StudentHome = () => {
   const today = todayLessons(lessons);
   const next = today[0];
   const hasLaterLessons = upcomingLessons(lessons).length > 0;
-  const pendingChanges = (changesQuery.data ?? [])
-    .filter((change) => change.status === "pending")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const changes = [...(changesQuery.data ?? [])].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
   const teacher = teacherQuery.data?.teacher ?? null;
   const series = teacherQuery.data?.series ?? [];
   const completed = lessons.filter((lesson) => lesson.status === "completed");
@@ -120,7 +120,7 @@ export const StudentHome = () => {
           <View style={styles.stats}>
             <StatCard label="Today" value={today.length} />
             <StatCard label="Weekly times" value={series.length} />
-            <StatCard label="Changes" value={pendingChanges.length} />
+            <StatCard label="Changes" value={changes.length} />
             <StatCard label="Completed" value={completed.length} />
           </View>
 
@@ -182,7 +182,7 @@ export const StudentHome = () => {
             )}
           </View>
 
-          {pendingChanges.length ? (
+          {changes.length ? (
             <View style={styles.section}>
               <SectionHeader
                 title="Time changes"
@@ -196,7 +196,7 @@ export const StudentHome = () => {
                 }
               />
               <View style={styles.list}>
-                {pendingChanges.slice(0, 2).map((change) => (
+                {changes.slice(0, 2).map((change) => (
                   <ChangeRequestCard
                     key={change.id}
                     request={change}

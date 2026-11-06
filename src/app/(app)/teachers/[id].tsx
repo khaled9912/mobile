@@ -69,7 +69,7 @@ export default function TeacherProfileScreen() {
       showToast(
         `${result.series.length} weekly ${
           result.series.length === 1 ? "time is" : "times are"
-        } yours. They repeat every week — ask the academy if you need to change one.${
+        } yours. Change one any time from your schedule.${
           result.lessons.some((lesson) => lesson.isTrial)
             ? " Your first lesson is a trial."
             : ""
@@ -137,7 +137,7 @@ export default function TeacherProfileScreen() {
       `Book ${selected.length} weekly ${
         selected.length === 1 ? "time" : "times"
       }?`,
-      `${labels}\n\nThese repeat every week and are yours until the academy changes them.${
+      `${labels}\n\nThese repeat every week and are yours. Change the time any time.${
         teacher.hasLessons ? "" : "\n\nYour first lesson is a trial."
       }`,
       [
@@ -234,7 +234,7 @@ export default function TeacherProfileScreen() {
                               )}
                             </AppText>
                             <AppText variant="caption" color="muted">
-                              Repeats every week. Ask the academy to move it.
+                              Repeats every week. Move it any time.
                             </AppText>
                           </View>
                           <Button

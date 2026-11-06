@@ -11,6 +11,7 @@ import type {
   LessonCreditTransaction,
   LessonIncident,
   LessonOperations,
+  LessonCall,
   ReliabilityEvent,
   RescheduleRequest,
   SalaryPeriod,
@@ -47,6 +48,15 @@ export const getLessonOperations = (id: string) =>
   apiFetch<LessonOperations>(`${lessonPath(id)}/operations`);
 export const getCancellationPreview = (id: string) =>
   apiFetch<CancellationPreview>(`${lessonPath(id)}/cancellation-preview`);
+
+export const callLesson = (id: string, targetRole?: string) =>
+  apiFetch<LessonCall>(`${lessonPath(id)}/call`, {
+    method: "POST",
+    json: { targetRole: targetRole ?? "" },
+  });
+
+/** Rings addressed to the signed-in user that are still worth acting on. */
+export const getRecentCalls = () => apiFetch<LessonCall[]>("/api/calls/recent");
 
 export const getRescheduleRequests = (id: string) =>
   apiFetch<RescheduleRequest[]>(`${lessonPath(id)}/reschedule-requests`);

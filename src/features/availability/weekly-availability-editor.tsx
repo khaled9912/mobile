@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
+import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { TimeOfDayField } from "@/components/ui/time-of-day-field";
 import { EmptyState, ErrorView } from "@/components/ui/states";
@@ -34,12 +35,15 @@ import {
 } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
+import { TeacherOpenOffers } from "@/features/offers/teacher-open-offers";
 
 const DAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
 const DEFAULT_DAYS = [6, 0, 1, 2, 3, 4];
-const MAX_SLOT_MINUTES = 240;
-
-const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
+const DURATION_OPTIONS = [
+  { value: "30", label: "30 min" },
+  { value: "45", label: "45 min" },
+  { value: "60", label: "1 hour" },
+];
 
 type Props = {
   mode: "self" | "admin";
@@ -58,9 +62,10 @@ export const WeeklyAvailabilityEditor = ({
   const { showToast } = useToast();
   const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
   const [start, setStart] = useState(() => dateFromTimeOfDay("17:00"));
-  const [end, setEnd] = useState(() => dateFromTimeOfDay("18:00"));
+  const [duration, setDuration] = useState("60");
   const [timeZoneOverride, setTimeZoneOverride] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const end = new Date(start.getTime() + Number(duration) * 60_000);
 
   const localTimeZone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -174,15 +179,6 @@ export const WeeklyAvailabilityEditor = ({
       setFormError("Choose at least one weekday.");
       return;
     }
-    const duration = minutesOf(end) - minutesOf(start);
-    if (duration <= 0) {
-      setFormError("The end time must be after the start time.");
-      return;
-    }
-    if (duration > MAX_SLOT_MINUTES) {
-      setFormError("A weekly slot can last up to 4 hours.");
-      return;
-    }
     publish.mutate();
   };
 
@@ -231,6 +227,8 @@ export const WeeklyAvailabilityEditor = ({
             : "Announce the weekly times you teach. A student's booking is instant and repeats every week."
         }
       />
+
+      {isAdmin ? null : <TeacherOpenOffers />}
 
       <Card>
         <SectionHeader title="Announce weekly times" />
@@ -283,10 +281,16 @@ export const WeeklyAvailabilityEditor = ({
                 onChange={setStart}
               />
             </View>
-            <View style={styles.timeField}>
-              <TimeOfDayField label="Ends at" value={end} onChange={setEnd} />
-            </View>
           </View>
+          <Segmented
+            label="Lesson length"
+            options={DURATION_OPTIONS}
+            value={duration}
+            onChange={setDuration}
+          />
+          <AppText variant="caption" color="muted">
+            Ends at {timeOfDayFromDate(end)}
+          </AppText>
 
           {isAdmin ? (
             <TextField

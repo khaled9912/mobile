@@ -504,6 +504,23 @@ export interface WeeklyAvailability {
   hasLessons: boolean;
 }
 
+export type OpenOfferStatus = "open" | "claimed" | "withdrawn";
+
+/** A one-off time an unassigned student offers to every active teacher. */
+export interface OpenStudentOffer {
+  id: string;
+  studentId: string;
+  studentName: string;
+  startsAt: string;
+  endsAt: string;
+  status: OpenOfferStatus;
+  claimedByTeacherId: string | null;
+  claimedByTeacherName: string | null;
+  lessonId: string | null;
+  createdAt: string;
+  claimedAt: string | null;
+}
+
 export type NotificationKind =
   | "booking"
   | "lesson"

@@ -47,6 +47,7 @@ const SCOPE_QUERY_KEYS: Record<string, string[][]> = {
     ["teacher-profile"],
     ["series"],
   ],
+  offers: [["open-offers"], ["assigned-teacher"], ["teacher-directory"]],
   billing: [
     ["billing"],
     ["admin", "salary"],

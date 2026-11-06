@@ -320,7 +320,7 @@ objects ship inside `LessonDto`.
 
 One call announces the same hours on several weekdays (for example Saturday
 through Thursday). The API requires at least one weekday, end after start, a
-range of at most 4 hours, a valid IANA time zone, and no overlap with the
+30-, 45-, or 60-minute lesson, a valid IANA time zone, and no overlap with the
 teacher's existing rules (`400`). A rule that a student has booked — or that is
 part of a pending change request — cannot be deleted (`409`). The screen
 defaults to Saturday–Thursday and refreshes the dashboard and directory after
@@ -338,6 +338,26 @@ changes are handled by the admin. The legacy one-off endpoints
 `/api/student/availability`, `/api/admin/teachers/{id}/availability`) still
 exist in the API but are not called by mobile; one-off slot management remains a
 web-only flow.
+
+### Open student offers
+
+A student with no active teacher can post one-off times. Every active teacher is
+notified; the first teacher to accept books a one-off lesson instantly. The
+student panel lives on the Book tab when there is no assigned teacher, and the
+teacher inbox sits above the weekly rules on `(app)/availability`.
+
+| Feature | Mobile caller | Request | Response |
+| --- | --- | --- | --- |
+| My offers | `scheduling.getMyOpenOffers` | `GET /api/student/open-offers` | `OpenStudentOfferDto[]` |
+| Offer a time | `scheduling.publishOpenOffer(startsAt, endsAt)` | `POST /api/student/open-offers` `{ startsAt, endsAt }` | `201 OpenStudentOfferDto` |
+| Withdraw | `scheduling.withdrawOpenOffer(offerId)` | `DELETE /api/student/open-offers/{offerId}` | `204` |
+| Teacher inbox | `scheduling.getTeacherOpenOffers` | `GET /api/teacher/open-offers` | `OpenStudentOfferDto[]` |
+| Accept and book | `scheduling.acceptOpenOffer(offerId)` | `POST /api/teacher/open-offers/{offerId}/accept` | `200 { lessonId, offer }` |
+
+Offers must be future 30-, 45-, or 60-minute lessons; up to 4 open offers per
+student; and no overlap with existing offers or lessons. Accepting is atomic: one
+teacher wins, the student is notified, other notified teachers see that the
+student picked another teacher, and the student's remaining offers are withdrawn.
 
 ---
 

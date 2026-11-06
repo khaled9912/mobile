@@ -29,6 +29,7 @@ import {
 import { TimeZoneNote } from "@/components/student/time-zone-note";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
+import { StudentOpenOffers } from "@/features/offers/student-open-offers";
 
 export default function BookScreen() {
   const { role } = useAuth();
@@ -86,6 +87,10 @@ export default function BookScreen() {
               message="The academy is checking your requested time with the teacher. Your current weekly time stays booked until they respond."
             />
           </View>
+        ) : null}
+
+        {!assignedQuery.isLoading && !assignedTeacher ? (
+          <StudentOpenOffers />
         ) : null}
 
         {assignedTeacher ? (

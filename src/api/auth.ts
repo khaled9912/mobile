@@ -20,11 +20,12 @@ export async function login(
 export async function register(
   fullName: string,
   email: string,
-  password: string
+  password: string,
+  country?: string
 ): Promise<UserProfile> {
   const response = await apiFetch<UserEnvelope>("/api/auth/register", {
     method: "POST",
-    json: { fullName, email, password },
+    json: { fullName, email, password, ...(country ? { country } : {}) },
   });
   return normalizeUser(response.user);
 }
@@ -95,14 +96,20 @@ export const requestOtp = (phone: string) =>
 export async function verifyOtp(
   phone: string,
   code: string,
-  fullName?: string
+  fullName?: string,
+  country?: string
 ): Promise<OtpVerifyResponse> {
   const response = await apiFetch<{
     requiresProfile?: boolean;
     user?: UserDto;
   }>("/api/auth/otp/verify", {
     method: "POST",
-    json: { phone, code, ...(fullName ? { fullName } : {}) },
+    json: {
+      phone,
+      code,
+      ...(fullName ? { fullName } : {}),
+      ...(country ? { country } : {}),
+    },
   });
   return {
     requiresProfile: response.requiresProfile,

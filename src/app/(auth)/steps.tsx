@@ -3,6 +3,12 @@ import { router } from "expo-router";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
+import {
+  REGISTRATION_BLOCKED_MESSAGE,
+  getDeviceCountry,
+  isRegistrationAllowed,
+} from "@/lib/registration";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 
@@ -27,6 +33,7 @@ const STEPS: { number: string; title: string; body: string }[] = [
 export default function StepsScreen() {
   const { colors, radius } = useTheme();
   const { user } = useAuth();
+  const blocked = !user && !isRegistrationAllowed(getDeviceCountry());
 
   return (
     <AuthShell
@@ -59,12 +66,16 @@ export default function StepsScreen() {
       ))}
 
       <View style={styles.actions}>
-        <Button
-          title={user ? "Browse teachers" : "Create an account"}
-          icon="arrow-forward"
-          fullWidth
-          onPress={() => router.push(user ? "/book" : "/signup")}
-        />
+        {blocked ? (
+          <Notice tone="warning" message={REGISTRATION_BLOCKED_MESSAGE} />
+        ) : (
+          <Button
+            title={user ? "Browse teachers" : "Create an account"}
+            icon="arrow-forward"
+            fullWidth
+            onPress={() => router.push(user ? "/book" : "/signup")}
+          />
+        )}
         {user ? null : (
           <Button
             title="I already have an account"

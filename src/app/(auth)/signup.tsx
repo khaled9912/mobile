@@ -11,10 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { isValidEmail, passwordProblem } from "@/lib/validation";
+import {
+  REGISTRATION_BLOCKED_MESSAGE,
+  getDeviceCountry,
+  isRegistrationAllowed,
+} from "@/lib/registration";
+import { openWhatsApp } from "@/lib/whatsapp";
 
 export default function SignupScreen() {
   const { applySession } = useAuth();
   const { showToast } = useToast();
+  const blocked = !isRegistrationAllowed(getDeviceCountry());
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +53,12 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const user = await register(fullName.trim(), email.trim(), password);
+      const user = await register(
+        fullName.trim(),
+        email.trim(),
+        password,
+        getDeviceCountry() ?? undefined
+      );
       applySession(user);
       router.replace("/");
     } catch (error) {
@@ -66,59 +78,79 @@ export default function SignupScreen() {
       title="Create your account"
       subtitle="Student accounts are free to create. Teachers and administrators are invited by the academy."
     >
-      <View style={styles.form}>
-        <TextField
-          label="Full name"
-          value={fullName}
-          onChangeText={setFullName}
-          autoComplete="name"
-          textContentType="name"
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-        <TextField
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoComplete="email"
-          textContentType="emailAddress"
-          returnKeyType="next"
-        />
-        <TextField
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secure
-          autoCapitalize="none"
-          autoComplete="new-password"
-          textContentType="newPassword"
-          hint="At least 8 characters, including a digit and a lowercase letter."
-          returnKeyType="next"
-        />
-        <TextField
-          label="Confirm password"
-          value={confirm}
-          onChangeText={setConfirm}
-          secure
-          autoCapitalize="none"
-          autoComplete="new-password"
-          textContentType="newPassword"
-          returnKeyType="done"
-          onSubmitEditing={() => void handleSubmit()}
-        />
-        <Button
-          title={loading ? "Creating account…" : "Create account"}
-          onPress={() => void handleSubmit()}
-          loading={loading}
-          fullWidth
-        />
-        <Notice
-          tone="info"
-          message="After registration you can choose a teacher and request your first lesson."
-        />
-      </View>
+      {blocked ? (
+        <View style={styles.form}>
+          <Notice
+            tone="warning"
+            title="Registration unavailable in your region"
+            message={REGISTRATION_BLOCKED_MESSAGE}
+          />
+          <Button
+            title="Chat with the academy"
+            icon="logo-whatsapp"
+            fullWidth
+            onPress={() => void openWhatsApp()}
+          />
+          <Notice
+            tone="info"
+            message="Our team can still help you get started. If you already have an account, sign in below."
+          />
+        </View>
+      ) : (
+        <View style={styles.form}>
+          <TextField
+            label="Full name"
+            value={fullName}
+            onChangeText={setFullName}
+            autoComplete="name"
+            textContentType="name"
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+          <TextField
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+          />
+          <TextField
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secure
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            hint="At least 8 characters, including a digit and a lowercase letter."
+            returnKeyType="next"
+          />
+          <TextField
+            label="Confirm password"
+            value={confirm}
+            onChangeText={setConfirm}
+            secure
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="done"
+            onSubmitEditing={() => void handleSubmit()}
+          />
+          <Button
+            title={loading ? "Creating account…" : "Create account"}
+            onPress={() => void handleSubmit()}
+            loading={loading}
+            fullWidth
+          />
+          <Notice
+            tone="info"
+            message="After registration you can choose a teacher and request your first lesson."
+          />
+        </View>
+      )}
 
       <View style={styles.footer}>
         <AppText variant="small" color="muted">

@@ -17,6 +17,10 @@ import { AppText } from "@/components/ui/app-text";
 import { PillPressable } from "@/components/ui/pill-pressable";
 import { openWhatsApp } from "@/lib/whatsapp";
 import {
+  getDeviceCountry,
+  isRegistrationAllowed,
+} from "@/lib/registration";
+import {
   NotificationsBell,
   NotificationsSheet,
 } from "@/components/notifications/notifications-sheet";
@@ -328,6 +332,8 @@ const PillButton = ({
 export const WelcomeExperience = () => {
   const { colors, radius, scheme } = useTheme();
   const { user } = useAuth();
+  const registrationBlocked =
+    !user && !isRegistrationAllowed(getDeviceCountry());
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<TabKey>("home");
   const [activeOption, setActiveOption] = useState(0);
@@ -759,18 +765,22 @@ export const WelcomeExperience = () => {
               Log in
             </AppText>
           </PillPressable>
-          <AppText variant="h3" weight="800" color="muted">
-            or
-          </AppText>
-          <PillPressable
-            accessibilityLabel="Sign up"
-            onPress={() => router.push("/signup")}
-            style={styles.greetingLink}
-          >
-            <AppText variant="h3" weight="800">
-              Sign up
-            </AppText>
-          </PillPressable>
+          {registrationBlocked ? null : (
+            <>
+              <AppText variant="h3" weight="800" color="muted">
+                or
+              </AppText>
+              <PillPressable
+                accessibilityLabel="Sign up"
+                onPress={() => router.push("/signup")}
+                style={styles.greetingLink}
+              >
+                <AppText variant="h3" weight="800">
+                  Sign up
+                </AppText>
+              </PillPressable>
+            </>
+          )}
         </View>
       </View>
 

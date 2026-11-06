@@ -19,6 +19,10 @@ import {
   isValidPhone,
   normalizePhone,
 } from "@/lib/validation";
+import {
+  getDeviceCountry,
+  isRegistrationAllowed,
+} from "@/lib/registration";
 
 type Mode = "email" | "phone";
 
@@ -26,6 +30,7 @@ export default function LoginScreen() {
   const { applySession, restoreError } = useAuth();
   const { colors } = useTheme();
   const { showToast } = useToast();
+  const registrationBlocked = !isRegistrationAllowed(getDeviceCountry());
 
   const [mode, setMode] = useState<Mode>("email");
 
@@ -130,7 +135,8 @@ export default function LoginScreen() {
       const result = await verifyOtp(
         sentTo,
         code.trim(),
-        needsName ? fullName.trim() : undefined
+        needsName ? fullName.trim() : undefined,
+        getDeviceCountry() ?? undefined
       );
       if (result.requiresProfile) {
         setNeedsName(true);
@@ -303,21 +309,23 @@ export default function LoginScreen() {
         </View>
       )}
 
-      <View style={styles.footer}>
-        <AppText variant="small" color="muted">
-          New here?
-        </AppText>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Create an account"
-          onPress={() => router.push("/signup")}
-          hitSlop={8}
-        >
-          <AppText variant="small" weight="700" color="link">
-            Create account
+      {registrationBlocked ? null : (
+        <View style={styles.footer}>
+          <AppText variant="small" color="muted">
+            New here?
           </AppText>
-        </Pressable>
-      </View>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Create an account"
+            onPress={() => router.push("/signup")}
+            hitSlop={8}
+          >
+            <AppText variant="small" weight="700" color="link">
+              Create account
+            </AppText>
+          </Pressable>
+        </View>
+      )}
 
       <Pressable
         accessibilityRole="link"

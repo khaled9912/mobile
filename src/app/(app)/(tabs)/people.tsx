@@ -22,7 +22,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { EmptyState, ErrorView } from "@/components/ui/states";
@@ -50,7 +49,6 @@ export default function PeopleTab() {
   const [tab, setTab] = useState<Tab>("students");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [search, setSearch] = useState("");
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const studentsQuery = useQuery({
     queryKey: ["admin", "students", includeInactive],
@@ -79,7 +77,6 @@ export default function PeopleTab() {
     mutationFn: (input: { id: string; isActive: boolean }) =>
       setUserActive(input.id, input.isActive),
     onSuccess: async (_, input) => {
-      setActionError(null);
       showToast(
         input.isActive
           ? "Account reactivated. The user can sign in again."
@@ -88,10 +85,11 @@ export default function PeopleTab() {
       await invalidatePeople();
     },
     onError: (error) => {
-      setActionError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to update this account. Please try again."
+          : "Unable to update this account. Please try again.",
+        "error"
       );
     },
   });
@@ -99,15 +97,15 @@ export default function PeopleTab() {
   const endAssignment = useMutation({
     mutationFn: (assignmentId: string) => deleteAssignment(assignmentId),
     onSuccess: async () => {
-      setActionError(null);
       showToast("Assignment ended.");
       await invalidatePeople();
     },
     onError: (error) => {
-      setActionError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to end this assignment. Please try again."
+          : "Unable to end this assignment. Please try again.",
+        "error"
       );
     },
   });
@@ -251,12 +249,6 @@ export default function PeopleTab() {
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </View>
         </Card>
-
-        {actionError ? (
-          <View style={styles.block}>
-            <Notice tone="error" message={actionError} />
-          </View>
-        ) : null}
 
         <View style={styles.filters}>
           <TextField

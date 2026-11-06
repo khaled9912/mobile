@@ -83,15 +83,6 @@ export const cancelRescheduleRequest = (requestId: string) =>
     { method: "POST" }
   );
 
-export const createReplacementLesson = (
-  id: string,
-  input: { startsAt: string; endsAt: string; note?: string }
-) =>
-  apiFetch<Lesson>(`${lessonPath(id)}/replacement`, {
-    method: "POST",
-    json: input,
-  });
-
 export const getAttendance = (id: string) =>
   apiFetch<AttendanceSummary>(`${lessonPath(id)}/attendance`);
 export const sendAttendanceEvent = (

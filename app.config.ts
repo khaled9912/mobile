@@ -4,13 +4,26 @@ import type { ExpoConfig } from "expo/config";
  * The API and Jitsi hosts live here so production builds never depend on a
  * developer's local .env. Override with EXPO_PUBLIC_* when targeting staging.
  */
-const apiUrl =
-  process.env.EXPO_PUBLIC_API_URL?.trim() || "https://anaquran.runasp.net";
+const productionApiUrl = "https://anaquran.runasp.net";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL?.trim() || productionApiUrl;
 // Must be the self-hosted Jitsi the web app uses. meet.jit.si requires an
 // account before it will create a room, so anonymous lesson joins fail there.
 const jitsiDomain =
   process.env.EXPO_PUBLIC_JITSI_DOMAIN?.trim() ||
   "meet.143-47-237-128.sslip.io";
+
+/**
+ * Which academy the build talks to. Set EXPO_PUBLIC_APP_ENV=development when
+ * pointing a build at a local API; any other API origin (a LAN address, a
+ * tunnel) is treated as development too, so a build that forgot the variable
+ * cannot silently dress up as production.
+ */
+const appEnv =
+  process.env.EXPO_PUBLIC_APP_ENV?.trim() ||
+  (apiUrl.replace(/\/+$/, "") === productionApiUrl
+    ? "production"
+    : "development");
+const isDev = appEnv !== "production";
 
 /**
  * Expo push only reaches a build that knows which EAS project owns its APNs
@@ -123,10 +136,12 @@ const config: ExpoConfig = {
       },
     ],
     "./plugins/withLessonScreenShare",
+    ["./plugins/withDevCleartext", { enabled: isDev }],
   ],
   extra: {
     apiUrl,
     jitsiDomain,
+    appEnv,
     ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };

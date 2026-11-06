@@ -11,7 +11,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 
 type FieldErrors = {
@@ -29,7 +28,6 @@ export default function ContactScreen() {
   const [email, setEmail] = useState(user?.email ?? "");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
 
   const send = useMutation({
     mutationFn: sendContactMessage,
@@ -37,7 +35,6 @@ export default function ContactScreen() {
       Keyboard.dismiss();
       setMessage("");
       setErrors({});
-      setFormError(null);
       showToast("Thank you! Your message has been sent successfully.");
     },
     onError: (error) => {
@@ -56,14 +53,14 @@ export default function ContactScreen() {
         }
         if (Object.keys(mapped).length > 0) {
           setErrors(mapped);
-          setFormError(null);
           return;
         }
       }
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "We could not send your message. Please try again."
+          : "We could not send your message. Please try again.",
+        "error"
       );
     },
   });
@@ -91,7 +88,6 @@ export default function ContactScreen() {
     }
 
     setErrors(nextErrors);
-    setFormError(null);
     if (Object.keys(nextErrors).length > 0) return;
 
     send.mutate({
@@ -142,8 +138,6 @@ export default function ContactScreen() {
             hint={`${message.length} / ${MAX_MESSAGE} characters`}
             maxLength={MAX_MESSAGE}
           />
-
-          {formError ? <Notice tone="error" message={formError} /> : null}
 
           <Button
             title={send.isPending ? "Sending…" : "Send message"}

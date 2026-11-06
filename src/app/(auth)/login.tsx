@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { login, requestOtp, verifyOtp } from "@/api/auth";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
@@ -24,9 +25,9 @@ type Mode = "email" | "phone";
 export default function LoginScreen() {
   const { applySession, restoreError } = useAuth();
   const { colors } = useTheme();
+  const { showToast } = useToast();
 
   const [mode, setMode] = useState<Mode>("email");
-  const [message, setMessage] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,30 +42,33 @@ export default function LoginScreen() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [phoneLoading, setPhoneLoading] = useState(false);
 
-  const switchMode = (next: Mode) => {
-    setMode(next);
-    setMessage("");
-  };
+  useEffect(() => {
+    if (!restoreError) return;
+    showToast(`We could not check your session. ${restoreError}`, "warning");
+  }, [restoreError, showToast]);
+
+  const switchMode = (next: Mode) => setMode(next);
+
+  const fail = (message: string) => showToast(message, "error");
 
   const errorText = (error: unknown, fallback: string) =>
     error instanceof ApiError ? error.message : fallback;
 
   const handleEmailSignIn = async () => {
     if (loading) return;
-    setMessage("");
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail) {
-      setMessage("Enter your email address.");
+      fail("Enter your email address.");
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setMessage("Enter a valid email address.");
+      fail("Enter a valid email address.");
       return;
     }
     if (!trimmedPassword) {
-      setMessage("Enter your password.");
+      fail("Enter your password.");
       return;
     }
 
@@ -72,13 +76,13 @@ export default function LoginScreen() {
     try {
       const user = await login(trimmedEmail, trimmedPassword);
       if (!user.isActive) {
-        setMessage("This account is deactivated. Contact the academy.");
+        fail("This account is deactivated. Contact the academy.");
         return;
       }
       applySession(user);
       router.replace("/");
     } catch (error) {
-      setMessage(errorText(error, "Unable to sign in. Please try again."));
+      fail(errorText(error, "Unable to sign in. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -86,10 +90,9 @@ export default function LoginScreen() {
 
   const handleSendCode = async () => {
     if (phoneLoading) return;
-    setMessage("");
     const normalized = normalizePhone(phone);
     if (!isValidPhone(normalized)) {
-      setMessage(
+      fail(
         "Enter your full number with country code, for example +962 7 9000 0000."
       );
       return;
@@ -102,7 +105,7 @@ export default function LoginScreen() {
       setNeedsName(false);
       setDevCode(result.devCode ?? null);
     } catch (error) {
-      setMessage(errorText(error, "Unable to send the code. Please try again."));
+      fail(errorText(error, "Unable to send the code. Please try again."));
     } finally {
       setPhoneLoading(false);
     }
@@ -110,17 +113,16 @@ export default function LoginScreen() {
 
   const handleVerifyCode = async () => {
     if (phoneLoading) return;
-    setMessage("");
     if (!isNumericCode(code.trim())) {
-      setMessage("Enter the numeric code you received.");
+      fail("Enter the numeric code you received.");
       return;
     }
     if (needsName && fullName.trim().length < 2) {
-      setMessage("Enter your full name to finish creating your account.");
+      fail("Enter your full name to finish creating your account.");
       return;
     }
     if (!sentTo) {
-      setMessage("Request a new code to continue.");
+      fail("Request a new code to continue.");
       return;
     }
     setPhoneLoading(true);
@@ -132,21 +134,20 @@ export default function LoginScreen() {
       );
       if (result.requiresProfile) {
         setNeedsName(true);
-        setMessage("");
         return;
       }
       if (!result.user) {
-        setMessage("We could not sign you in. Please try again.");
+        fail("We could not sign you in. Please try again.");
         return;
       }
       if (!result.user.isActive) {
-        setMessage("This account is deactivated. Contact the academy.");
+        fail("This account is deactivated. Contact the academy.");
         return;
       }
       applySession(result.user);
       router.replace("/");
     } catch (error) {
-      setMessage(errorText(error, "Unable to verify the code. Please try again."));
+      fail(errorText(error, "Unable to verify the code. Please try again."));
     } finally {
       setPhoneLoading(false);
     }
@@ -159,7 +160,6 @@ export default function LoginScreen() {
     setFullName("");
     setDevCode(null);
     setSentTo("");
-    setMessage("");
   };
 
   return (
@@ -167,14 +167,6 @@ export default function LoginScreen() {
       title="Welcome back"
       subtitle="Sign in with email or your mobile number to reach your lessons."
     >
-      {restoreError ? (
-        <Notice
-          tone="warning"
-          title="We could not check your session"
-          message={restoreError}
-        />
-      ) : null}
-
       <Segmented
         label="Sign-in method"
         value={mode}
@@ -310,8 +302,6 @@ export default function LoginScreen() {
           />
         </View>
       )}
-
-      {message ? <Notice tone="error" message={message} /> : null}
 
       <View style={styles.footer}>
         <AppText variant="small" color="muted">

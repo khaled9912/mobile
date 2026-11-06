@@ -247,6 +247,13 @@ function PayoutForm({ billing }: { billing: TeacherBilling }) {
       showToast("Payout details saved. The academy will use them for your transfers.");
       await queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
+    onError: (error) =>
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Unable to save your payout details.",
+        "error"
+      ),
   });
 
   return (
@@ -281,16 +288,6 @@ function PayoutForm({ billing }: { billing: TeacherBilling }) {
         <AppText variant="caption" color="muted">
           Add at least one method before saving.
         </AppText>
-      ) : null}
-      {saveMutation.isError ? (
-        <Notice
-          tone="error"
-          message={
-            saveMutation.error instanceof Error
-              ? saveMutation.error.message
-              : "Unable to save your payout details."
-          }
-        />
       ) : null}
     </Card>
   );

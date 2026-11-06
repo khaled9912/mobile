@@ -226,8 +226,8 @@ const NoteField = ({
 
 function ExcuseQueueCard({ item }: { item: ExcuseRequest }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "excuses"] });
   };
@@ -235,13 +235,16 @@ function ExcuseQueueCard({ item }: { item: ExcuseRequest }) {
     mutationFn: () => approveExcuseRequest(item.id, note),
     onSuccess: refresh,
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to approve the excuse.")),
+      showToast(
+        errorMessage(failure, "Unable to approve the excuse."),
+        "error"
+      ),
   });
   const reject = useMutation({
     mutationFn: () => rejectExcuseRequest(item.id, note),
     onSuccess: refresh,
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to reject the excuse.")),
+      showToast(errorMessage(failure, "Unable to reject the excuse."), "error"),
   });
   const busy = approve.isPending || reject.isPending;
 
@@ -258,21 +261,13 @@ function ExcuseQueueCard({ item }: { item: ExcuseRequest }) {
       </AppText>
       <AppText variant="small">{item.explanation}</AppText>
       <NoteField value={note} onChange={setNote} />
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <View style={styles.actions}>
         <Button
           title="Approve"
           size="sm"
           loading={approve.isPending}
           disabled={busy}
-          onPress={() => {
-            setError("");
-            approve.mutate();
-          }}
+          onPress={() => approve.mutate()}
         />
         <Button
           title="Reject"
@@ -280,10 +275,7 @@ function ExcuseQueueCard({ item }: { item: ExcuseRequest }) {
           variant="danger"
           loading={reject.isPending}
           disabled={busy}
-          onPress={() => {
-            setError("");
-            reject.mutate();
-          }}
+          onPress={() => reject.mutate()}
         />
       </View>
     </Card>
@@ -299,12 +291,12 @@ const incidentActions = [
 
 function IncidentQueueCard({ item }: { item: LessonIncident }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [action, setAction] = useState<
     "student_no_show" | "teacher_no_show" | "both_absent" | "dismissed"
   >("dismissed");
   const [minutes, setMinutes] = useState("");
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
   const resolve = useMutation({
     mutationFn: () =>
       resolveLessonIncident(item.id, {
@@ -317,7 +309,10 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
       void queryClient.invalidateQueries({ queryKey: ["admin", "day"] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to resolve the incident.")),
+      showToast(
+        errorMessage(failure, "Unable to resolve the incident."),
+        "error"
+      ),
   });
 
   return (
@@ -361,19 +356,13 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
         placeholder="Leave empty to use the policy default"
       />
       <NoteField value={note} onChange={setNote} />
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <Button
         title="Resolve incident"
         size="sm"
         loading={resolve.isPending}
         onPress={() => {
-          setError("");
           if (minutes.trim() && !Number.isFinite(Number(minutes))) {
-            setError("Payable minutes must be a number.");
+            showToast("Payable minutes must be a number.", "error");
             return;
           }
           resolve.mutate();
@@ -385,8 +374,8 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
 
 function HoursQueueCard({ item }: { item: TeacherHours }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [minutes, setMinutes] = useState(String(item.proposedPayableMinutes));
-  const [error, setError] = useState("");
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["admin", "hours"] });
     void queryClient.invalidateQueries({ queryKey: ["admin", "day"] });
@@ -398,13 +387,19 @@ function HoursQueueCard({ item }: { item: TeacherHours }) {
       }),
     onSuccess: refresh,
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to approve these hours.")),
+      showToast(
+        errorMessage(failure, "Unable to approve these hours."),
+        "error"
+      ),
   });
   const reject = useMutation({
     mutationFn: () => rejectTeacherHours(item.id),
     onSuccess: refresh,
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to reject these hours.")),
+      showToast(
+        errorMessage(failure, "Unable to reject these hours."),
+        "error"
+      ),
   });
   const busy = approve.isPending || reject.isPending;
 
@@ -436,11 +431,6 @@ function HoursQueueCard({ item }: { item: TeacherHours }) {
         onChangeText={setMinutes}
         keyboardType="number-pad"
       />
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <View style={styles.actions}>
         <Button
           title="Approve"
@@ -448,9 +438,8 @@ function HoursQueueCard({ item }: { item: TeacherHours }) {
           loading={approve.isPending}
           disabled={busy}
           onPress={() => {
-            setError("");
             if (!Number.isFinite(Number(minutes)) || Number(minutes) < 0) {
-              setError("Enter the approved minutes as a number.");
+              showToast("Enter the approved minutes as a number.", "error");
               return;
             }
             approve.mutate();
@@ -462,10 +451,7 @@ function HoursQueueCard({ item }: { item: TeacherHours }) {
           variant="danger"
           loading={reject.isPending}
           disabled={busy}
-          onPress={() => {
-            setError("");
-            reject.mutate();
-          }}
+          onPress={() => reject.mutate()}
         />
       </View>
     </Card>
@@ -474,7 +460,7 @@ function HoursQueueCard({ item }: { item: TeacherHours }) {
 
 function PenaltyCard({ item }: { item: TeacherPenalty }) {
   const queryClient = useQueryClient();
-  const [error, setError] = useState("");
+  const { showToast } = useToast();
   const review = useMutation({
     mutationFn: (status: "approved" | "rejected") =>
       reviewTeacherPenalty(item.id, { status }),
@@ -482,7 +468,10 @@ function PenaltyCard({ item }: { item: TeacherPenalty }) {
       void queryClient.invalidateQueries({ queryKey: ["admin", "penalties"] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to review the penalty.")),
+      showToast(
+        errorMessage(failure, "Unable to review the penalty."),
+        "error"
+      ),
   });
 
   return (
@@ -499,30 +488,19 @@ function PenaltyCard({ item }: { item: TeacherPenalty }) {
       <AppText variant="caption" color="muted">
         {item.reason}
       </AppText>
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <View style={styles.actions}>
         <Button
           title="Approve"
           size="sm"
           loading={review.isPending}
-          onPress={() => {
-            setError("");
-            review.mutate("approved");
-          }}
+          onPress={() => review.mutate("approved")}
         />
         <Button
           title="Reject"
           size="sm"
           variant="danger"
           disabled={review.isPending}
-          onPress={() => {
-            setError("");
-            review.mutate("rejected");
-          }}
+          onPress={() => review.mutate("rejected")}
         />
       </View>
     </Card>
@@ -531,15 +509,18 @@ function PenaltyCard({ item }: { item: TeacherPenalty }) {
 
 function ReliabilityCard({ item }: { item: ReliabilityEvent }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
   const resolve = useMutation({
     mutationFn: () => resolveReliabilityEvent(item.id, { note }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "reliability"] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to resolve the event.")),
+      showToast(
+        errorMessage(failure, "Unable to resolve the event."),
+        "error"
+      ),
   });
 
   return (
@@ -563,11 +544,6 @@ function ReliabilityCard({ item }: { item: ReliabilityEvent }) {
           Resolution: {item.resolutionNote}
         </AppText>
       ) : null}
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       {!item.resolvedAt ? (
         <>
           <NoteField value={note} onChange={setNote} />
@@ -575,10 +551,7 @@ function ReliabilityCard({ item }: { item: ReliabilityEvent }) {
             title="Resolve"
             size="sm"
             loading={resolve.isPending}
-            onPress={() => {
-              setError("");
-              resolve.mutate();
-            }}
+            onPress={() => resolve.mutate()}
           />
         </>
       ) : null}
@@ -588,12 +561,12 @@ function ReliabilityCard({ item }: { item: ReliabilityEvent }) {
 
 function SalaryCard({ item }: { item: SalaryPeriod }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [manual, setManual] = useState(String(item.manualAdjustmentEgp));
   const [finalAmount, setFinalAmount] = useState(
     item.finalAmountEgp != null ? String(item.finalAmountEgp) : ""
   );
   const [notes, setNotes] = useState(item.notes ?? "");
-  const [error, setError] = useState("");
   const save = useMutation({
     mutationFn: (status?: "reviewed" | "paid") =>
       updateSalaryPeriod(item.id, {
@@ -606,7 +579,10 @@ function SalaryCard({ item }: { item: SalaryPeriod }) {
       void queryClient.invalidateQueries({ queryKey: ["admin", "salary"] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to update the salary period.")),
+      showToast(
+        errorMessage(failure, "Unable to update the salary period."),
+        "error"
+      ),
   });
 
   return (
@@ -667,39 +643,25 @@ function SalaryCard({ item }: { item: SalaryPeriod }) {
         maxLength={1000}
         placeholder="Internal notes for this period"
       />
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <View style={styles.actions}>
         <Button
           title="Save"
           size="sm"
           variant="secondary"
           loading={save.isPending}
-          onPress={() => {
-            setError("");
-            save.mutate(undefined);
-          }}
+          onPress={() => save.mutate(undefined)}
         />
         <Button
           title="Mark reviewed"
           size="sm"
           disabled={save.isPending}
-          onPress={() => {
-            setError("");
-            save.mutate("reviewed");
-          }}
+          onPress={() => save.mutate("reviewed")}
         />
         <Button
           title="Mark paid"
           size="sm"
           disabled={save.isPending}
-          onPress={() => {
-            setError("");
-            save.mutate("paid");
-          }}
+          onPress={() => save.mutate("paid")}
         />
       </View>
     </Card>
@@ -751,7 +713,6 @@ function PolicyForm() {
   const { showToast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
   const [payScheduled, setPayScheduled] = useState<boolean | null>(null);
-  const [error, setError] = useState("");
 
   const policy = query.data;
   const current = (key: string) =>
@@ -775,13 +736,12 @@ function PolicyForm() {
       return updateLessonPolicy(payload);
     },
     onSuccess: () => {
-      setError("");
       showToast("The academy policy was saved.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-policy"] });
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops"] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to save the policy.")),
+      showToast(errorMessage(failure, "Unable to save the policy."), "error"),
   });
 
   if (query.isLoading) return <TextCardSkeleton lines={6} />;
@@ -823,18 +783,10 @@ function PolicyForm() {
         </View>
         <Switch value={payValue} onValueChange={setPayScheduled} />
       </View>
-      {error ? (
-        <AppText variant="small" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <Button
         title="Save policy"
         loading={save.isPending}
-        onPress={() => {
-          setError("");
-          save.mutate();
-        }}
+        onPress={() => save.mutate()}
       />
       <AppText variant="caption" color="muted">
         Last updated {formatDateTime(policy.updatedAt)}
@@ -1020,8 +972,8 @@ const QueuesTab = () => {
 const SalaryTab = () => {
   const queryClient = useQueryClient();
   const { colors } = useTheme();
+  const { showToast } = useToast();
   const [month, setMonth] = useState(() => monthKey(new Date()));
-  const [error, setError] = useState("");
   const query = useQuery({
     queryKey: ["admin", "salary", month],
     queryFn: () => getSalaryPeriods(month),
@@ -1029,11 +981,13 @@ const SalaryTab = () => {
   const generate = useMutation({
     mutationFn: () => generateSalaryPeriods(month),
     onSuccess: () => {
-      setError("");
       void queryClient.invalidateQueries({ queryKey: ["admin", "salary", month] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to generate salary periods.")),
+      showToast(
+        errorMessage(failure, "Unable to generate salary periods."),
+        "error"
+      ),
   });
 
   return (
@@ -1067,16 +1021,8 @@ const SalaryTab = () => {
         title="Generate salary periods"
         variant="secondary"
         loading={generate.isPending}
-        onPress={() => {
-          setError("");
-          generate.mutate();
-        }}
+        onPress={() => generate.mutate()}
       />
-      {error ? (
-        <AppText variant="small" color="danger">
-          {error}
-        </AppText>
-      ) : null}
       <AppText variant="caption" color="muted">
         Amounts stay manual: review minutes and penalties for each teacher, then
         set the final EGP amount. Nothing is transferred automatically.

@@ -7,7 +7,6 @@ import { ApiError } from "@/api/client";
 import {
   cancelLesson,
   cancelRescheduleRequest,
-  createReplacementLesson,
   callLesson,
   createRescheduleRequest,
   getLessonOperations,
@@ -120,18 +119,6 @@ function SectionCard({
   );
 }
 
-function ErrorNotice({ children }: { children: ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.notice, { backgroundColor: colors.dangerSoft }]}>
-      <Ionicons name="alert-circle" size={16} color={colors.danger} />
-      <AppText variant="small" color="danger" style={styles.flexText}>
-        {children}
-      </AppText>
-    </View>
-  );
-}
-
 const ChoiceChips = <T extends string>({
   options,
   value,
@@ -222,7 +209,6 @@ function CancellationSection({
   const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");
-  const [error, setError] = useState("");
   const preview = operations.cancellation;
   const record = operations.cancellationRecord;
   const isAdmin = role === "admin" || role === "super_admin";
@@ -232,15 +218,15 @@ function CancellationSection({
     onSuccess: () => {
       setConfirming(false);
       setReason("");
-      setError("");
       showToast("The lesson was cancelled and both sides were notified.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["student", "credits"] });
     },
     onError: (failure) =>
-      setError(
-        errorMessage(failure, "Unable to cancel this lesson. Please try again.")
+      showToast(
+        errorMessage(failure, "Unable to cancel this lesson. Please try again."),
+        "error"
       ),
   });
 
@@ -319,7 +305,6 @@ function CancellationSection({
               : ""}
         </AppText>
       ) : null}
-      {error ? <ErrorNotice>{error}</ErrorNotice> : null}
       {!confirming ? (
         <Button
           title={isAdmin ? "Cancel lesson as academy" : "Cancel lesson"}
@@ -344,10 +329,7 @@ function CancellationSection({
             title="Confirm cancellation"
             variant="danger"
             loading={mutation.isPending}
-            onPress={() => {
-              setError("");
-              mutation.mutate();
-            }}
+            onPress={() => mutation.mutate()}
           />
           <Pressable
             accessibilityRole="button"
@@ -382,6 +364,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function RescheduleCard({
   request,
   viewerId,
+  makeup,
   canRespond,
   busy,
   onRespond,
@@ -389,6 +372,7 @@ function RescheduleCard({
 }: {
   request: RescheduleRequest;
   viewerId?: string;
+  makeup: boolean;
   canRespond: boolean;
   busy: boolean;
   onRespond: (action: "accept" | "decline", note: string) => void;
@@ -442,13 +426,13 @@ function RescheduleCard({
               editable={!busy}
             />
             <Button
-              title="Accept new time"
+              title={makeup ? "Accept make-up time" : "Accept new time"}
               size="sm"
               loading={busy}
               onPress={() => onRespond("accept", note)}
             />
             <Button
-              title="Keep current time"
+              title={makeup ? "Decline make-up" : "Keep current time"}
               variant="secondary"
               size="sm"
               disabled={busy}
@@ -475,18 +459,30 @@ function RescheduleSection({
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const now = useNow();
-  const [startsAt, setStartsAt] = useState(
-    () => new Date(new Date(lesson.startsAt).getTime() + 24 * 3600_000)
+  const [startsAt, setStartsAt] = useState(() =>
+    new Date(
+      lesson.status === "cancelled"
+        ? Date.now() + 24 * 3600_000
+        : new Date(lesson.startsAt).getTime() + 24 * 3600_000
+    )
   );
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const pending = operations.pendingReschedule;
   const isAdmin = role === "admin" || role === "super_admin";
+  // A cancelled lesson is not moved, it is rebooked: the same request/accept
+  // machinery carries the proposal and the student's reply decides the slot.
+  const isMakeup = lesson.status === "cancelled";
   const canRequest =
+    !isMakeup &&
     (role === "teacher" || role === "student" || isAdmin) &&
     lesson.status === "scheduled" &&
     new Date(lesson.endsAt).getTime() > now;
+  const canPropose =
+    isMakeup &&
+    (role === "teacher" || isAdmin) &&
+    !lesson.isMakeup &&
+    !operations.replacementLesson;
 
   const spanMs = durationMs(lesson);
   const proposedEnd = new Date(startsAt.getTime() + spanMs);
@@ -504,41 +500,53 @@ function RescheduleSection({
         note,
       }),
     onSuccess: () => {
-      setError("");
       showToast(
-        "Your reschedule request was sent. The lesson keeps its time until it is accepted."
+        isMakeup
+          ? "Your make-up proposal was sent. The slot is booked only when the student accepts."
+          : "Your reschedule request was sent. The lesson keeps its time until it is accepted."
       );
       refresh();
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to send the reschedule request.")),
+      showToast(
+        errorMessage(failure, "Unable to send the reschedule request."),
+        "error"
+      ),
   });
 
   const respondMutation = useMutation({
     mutationFn: ({ action, reply }: { action: "accept" | "decline"; reply: string }) =>
       respondToRescheduleRequest(pending!.id, action, reply),
     onSuccess: (_, variables) => {
-      setError("");
       showToast(
         variables.action === "accept"
-          ? "The lesson was moved to the new time."
-          : "The lesson stays at its current time."
+          ? isMakeup
+            ? "The make-up lesson is booked."
+            : "The lesson was moved to the new time."
+          : isMakeup
+            ? "The make-up proposal was declined. Nothing was booked."
+            : "The lesson stays at its current time."
       );
       refresh();
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to reply to the request.")),
+      showToast(
+        errorMessage(failure, "Unable to reply to the request."),
+        "error"
+      ),
   });
 
   const withdrawMutation = useMutation({
     mutationFn: () => cancelRescheduleRequest(pending!.id),
     onSuccess: () => {
-      setError("");
       showToast("Your reschedule request was withdrawn.");
       refresh();
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to withdraw the request.")),
+      showToast(
+        errorMessage(failure, "Unable to withdraw the request."),
+        "error"
+      ),
   });
 
   const busy =
@@ -550,31 +558,39 @@ function RescheduleSection({
     (item) => item.status !== "pending"
   );
 
-  if (!pending && !canRequest) return null;
+  if (!pending && !canRequest && !canPropose) return null;
 
   return (
-    <SectionCard title="Reschedule" icon="calendar-outline">
+    <SectionCard
+      title={isMakeup ? "Make-up lesson" : "Reschedule"}
+      icon="calendar-outline"
+    >
       <AppText variant="small" color="muted">
-        A reschedule is a request, not a cancellation. The lesson keeps its time
-        until the other side accepts.
+        {isMakeup
+          ? "A make-up time is a proposal. Nothing is booked until the student accepts."
+          : "A reschedule is a request, not a cancellation. The lesson keeps its time until the other side accepts."}
       </AppText>
-      {error ? <ErrorNotice>{error}</ErrorNotice> : null}
 
       {pending ? (
         <RescheduleCard
           request={pending}
           viewerId={viewerId}
-          canRespond={canRequest || isAdmin}
+          makeup={isMakeup}
+          canRespond={
+            isAdmin ||
+            ((viewerId === lesson.teacherId || viewerId === lesson.studentId) &&
+              pending.requestedById !== viewerId)
+          }
           busy={busy}
           onRespond={(action, reply) =>
             respondMutation.mutate({ action, reply })
           }
           onWithdraw={() => withdrawMutation.mutate()}
         />
-      ) : canRequest ? (
+      ) : canRequest || canPropose ? (
         <View style={styles.form}>
           <DateTimeField
-            label="New date and time"
+            label={isMakeup ? "Make-up date and time" : "New date and time"}
             value={startsAt}
             minimumDate={new Date(now + 5 * 60_000)}
             onChange={setStartsAt}
@@ -587,17 +603,20 @@ function RescheduleSection({
             value={note}
             onChangeText={setNote}
             maxLength={1000}
-            placeholder="Optional note for the other side"
+            placeholder={
+              isMakeup
+                ? "Optional note for the student"
+                : "Optional note for the other side"
+            }
             editable={!busy}
           />
           <Button
-            title="Send reschedule request"
+            title={isMakeup ? "Propose make-up time" : "Send reschedule request"}
             loading={createMutation.isPending}
             disabled={busy}
             onPress={() => {
-              setError("");
               if (startsAt.getTime() <= Date.now()) {
-                setError("Choose a future time.");
+                showToast("Choose a future time.", "error");
                 return;
               }
               createMutation.mutate();
@@ -644,48 +663,17 @@ function RescheduleSection({
   );
 }
 
+/**
+ * Bookings are made by the reschedule request above, so this section only
+ * reports where a make-up lesson came from and where a cancelled one went.
+ */
 function MakeupSection({
   lesson,
   operations,
-  role,
 }: {
   lesson: Lesson;
   operations: LessonOperations;
-  role: string | null;
 }) {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
-  const now = useNow();
-  const isAdmin = role === "admin" || role === "super_admin";
-  const canCreate =
-    lesson.status === "cancelled" &&
-    !lesson.isMakeup &&
-    !operations.replacementLesson &&
-    (role === "teacher" || isAdmin);
-  const [startsAt, setStartsAt] = useState(() => new Date(Date.now() + 3600_000));
-  const [note, setNote] = useState("");
-  const [error, setError] = useState("");
-
-  const spanMs = durationMs(lesson);
-  const proposedEnd = new Date(startsAt.getTime() + spanMs);
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      createReplacementLesson(lesson.id, {
-        startsAt: startsAt.toISOString(),
-        endsAt: proposedEnd.toISOString(),
-        note,
-      }),
-    onSuccess: () => {
-      setError("");
-      showToast("A make-up lesson was scheduled and the student was notified.");
-      void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
-      void queryClient.invalidateQueries({ queryKey: ["lessons"] });
-    },
-    onError: (failure) =>
-      setError(errorMessage(failure, "Unable to schedule the make-up lesson.")),
-  });
-
   if (lesson.isMakeup || operations.originalLesson) {
     return (
       <SectionCard title="Make-up lesson" icon="videocam-outline">
@@ -736,45 +724,7 @@ function MakeupSection({
     );
   }
 
-  if (!canCreate) return null;
-
-  return (
-    <SectionCard title="Schedule a make-up lesson" icon="calendar-outline">
-      <AppText variant="small" color="muted">
-        The make-up keeps the original {Math.round(spanMs / 60000)}-minute length
-        and adds no extra charge or credit.
-      </AppText>
-      {error ? <ErrorNotice>{error}</ErrorNotice> : null}
-      <View style={styles.form}>
-        <DateTimeField
-          label="Make-up date and time"
-          value={startsAt}
-          minimumDate={new Date(now + 5 * 60_000)}
-          onChange={setStartsAt}
-          hint={`Ends ${formatDateTime(proposedEnd.toISOString())}.`}
-        />
-        <TextField
-          label="Note (optional)"
-          value={note}
-          onChangeText={setNote}
-          placeholder="Optional note for the student"
-          editable={!mutation.isPending}
-        />
-        <Button
-          title="Schedule make-up lesson"
-          loading={mutation.isPending}
-          onPress={() => {
-            setError("");
-            if (startsAt.getTime() <= Date.now()) {
-              setError("Choose a future time.");
-              return;
-            }
-            mutation.mutate();
-          }}
-        />
-      </View>
-    </SectionCard>
-  );
+  return null;
 }
 
 /**
@@ -954,7 +904,6 @@ function ExcuseSection({
   const { showToast } = useToast();
   const [category, setCategory] = useState<string>("illness");
   const [explanation, setExplanation] = useState("");
-  const [error, setError] = useState("");
   const outcome = lesson.cancellationOutcome;
   const eligible =
     role === "student" &&
@@ -966,12 +915,14 @@ function ExcuseSection({
   const mutation = useMutation({
     mutationFn: () => requestExcuse(lesson.id, { category, explanation }),
     onSuccess: () => {
-      setError("");
       showToast("Your excuse request was sent for review.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to send the excuse request.")),
+      showToast(
+        errorMessage(failure, "Unable to send the excuse request."),
+        "error"
+      ),
   });
 
   if (!eligible && !existing) return null;
@@ -1012,7 +963,6 @@ function ExcuseSection({
             ask the academy to review it. An approved excuse restores the lesson
             credit.
           </AppText>
-          {error ? <ErrorNotice>{error}</ErrorNotice> : null}
           <ChoiceChips
             label="Excuse category"
             options={excuseCategories}
@@ -1033,9 +983,11 @@ function ExcuseSection({
             title="Send excuse request"
             loading={mutation.isPending}
             onPress={() => {
-              setError("");
               if (explanation.trim().length < 10) {
-                setError("Explain what happened in at least 10 characters.");
+                showToast(
+                  "Explain what happened in at least 10 characters.",
+                  "error"
+                );
                 return;
               }
               mutation.mutate();
@@ -1060,19 +1012,17 @@ function IncidentSection({
   const { showToast } = useToast();
   const [type, setType] = useState<string>("attendance_dispute");
   const [detail, setDetail] = useState("");
-  const [error, setError] = useState("");
   const existing = operations.incident;
   const canReport = role === "teacher" || role === "student";
 
   const mutation = useMutation({
     mutationFn: () => reportLessonIncident(lesson.id, { type, detail }),
     onSuccess: () => {
-      setError("");
       showToast("The issue was reported to the academy.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
     },
     onError: (failure) =>
-      setError(errorMessage(failure, "Unable to report the issue.")),
+      showToast(errorMessage(failure, "Unable to report the issue."), "error"),
   });
 
   if (!canReport) return null;
@@ -1102,7 +1052,6 @@ function IncidentSection({
             If the attendance record does not match what happened, report it. The
             academy reviews every report.
           </AppText>
-          {error ? <ErrorNotice>{error}</ErrorNotice> : null}
           <ChoiceChips
             label="Issue type"
             options={incidentTypes}
@@ -1124,9 +1073,11 @@ function IncidentSection({
             variant="secondary"
             loading={mutation.isPending}
             onPress={() => {
-              setError("");
               if (detail.trim().length < 5) {
-                setError("Describe the issue in at least 5 characters.");
+                showToast(
+                  "Describe the issue in at least 5 characters.",
+                  "error"
+                );
                 return;
               }
               mutation.mutate();
@@ -1201,7 +1152,7 @@ export const LessonOperationsPanel = ({
           viewerId={user?.id}
         />
       ) : null}
-      <MakeupSection lesson={lesson} operations={stable} role={role ?? null} />
+      <MakeupSection lesson={lesson} operations={stable} />
       <AttendanceSection
         lesson={lesson}
         operations={stable}
@@ -1219,13 +1170,6 @@ const styles = StyleSheet.create({
   section: { gap: 10 },
   sectionHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { flexShrink: 1 },
-  notice: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    padding: 10,
-    borderRadius: 12,
-  },
   flexText: { flex: 1 },
   rowWrap: {
     flexDirection: "row",

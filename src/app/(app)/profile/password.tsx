@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 
 type FieldErrors = {
@@ -25,7 +24,6 @@ export default function ChangePasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const { showToast } = useToast();
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
 
   const change = useMutation({
     mutationFn: () => changePassword(currentPassword, newPassword),
@@ -34,14 +32,14 @@ export default function ChangePasswordScreen() {
       setNewPassword("");
       setConfirmPassword("");
       setErrors({});
-      setFormError(null);
       showToast("Your password has been changed. Other devices were signed out.");
     },
     onError: (error) => {
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to change your password. Please try again."
+          : "Unable to change your password. Please try again.",
+        "error"
       );
     },
   });
@@ -62,7 +60,6 @@ export default function ChangePasswordScreen() {
     }
 
     setErrors(nextErrors);
-    setFormError(null);
     if (Object.keys(nextErrors).length > 0) return;
     change.mutate();
   };
@@ -108,8 +105,6 @@ export default function ChangePasswordScreen() {
             textContentType="newPassword"
             error={errors.confirm}
           />
-
-          {formError ? <Notice tone="error" message={formError} /> : null}
 
           <Button
             title={change.isPending ? "Updating…" : "Change password"}

@@ -20,7 +20,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { TimeOfDayField } from "@/components/ui/time-of-day-field";
@@ -64,7 +63,6 @@ export const WeeklyAvailabilityEditor = ({
   const [start, setStart] = useState(() => dateFromTimeOfDay("17:00"));
   const [duration, setDuration] = useState("60");
   const [timeZoneOverride, setTimeZoneOverride] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   const end = new Date(start.getTime() + Number(duration) * 60_000);
 
   const localTimeZone = useMemo(
@@ -124,7 +122,6 @@ export const WeeklyAvailabilityEditor = ({
       return publishWeeklyAvailability(input);
     },
     onSuccess: async (created) => {
-      setFormError(null);
       showToast(
         `Announced ${created.length} weekly ${
           created.length === 1 ? "time" : "times"
@@ -133,10 +130,11 @@ export const WeeklyAvailabilityEditor = ({
       await invalidate();
     },
     onError: (error) => {
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to announce these times. Please try again."
+          : "Unable to announce these times. Please try again.",
+        "error"
       );
     },
   });
@@ -149,15 +147,15 @@ export const WeeklyAvailabilityEditor = ({
       return deleteWeeklyAvailability(ruleId);
     },
     onSuccess: async () => {
-      setFormError(null);
       showToast("Weekly time removed.");
       await invalidate();
     },
     onError: (error) =>
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to remove this time. Please try again."
+          : "Unable to remove this time. Please try again.",
+        "error"
       ),
   });
 
@@ -170,13 +168,12 @@ export const WeeklyAvailabilityEditor = ({
   };
 
   const submit = () => {
-    setFormError(null);
     if (isAdmin && !teacherId) {
-      setFormError("Choose a teacher first.");
+      showToast("Choose a teacher first.", "error");
       return;
     }
     if (!days.length) {
-      setFormError("Choose at least one weekday.");
+      showToast("Choose at least one weekday.", "error");
       return;
     }
     publish.mutate();
@@ -315,8 +312,6 @@ export const WeeklyAvailabilityEditor = ({
               </AppText>
             </View>
           </View>
-
-          {formError ? <Notice tone="error" message={formError} /> : null}
 
           <Button
             title="Announce availability"

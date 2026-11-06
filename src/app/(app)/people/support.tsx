@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +13,6 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { PersonRowSkeleton } from "@/components/ui/skeleton";
 import { RoleGate } from "@/components/ui/role-gate";
@@ -23,7 +21,6 @@ export default function SupportTeamScreen() {
   const { spacing } = useTheme();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const supportQuery = useQuery({
     queryKey: ["admin", "support-users"],
@@ -34,7 +31,6 @@ export default function SupportTeamScreen() {
     mutationFn: (input: { id: string; isActive: boolean }) =>
       setUserActive(input.id, input.isActive),
     onSuccess: async (_, input) => {
-      setActionError(null);
       showToast(
         input.isActive
           ? "Reviewer reactivated. They can sign in again."
@@ -45,10 +41,11 @@ export default function SupportTeamScreen() {
       });
     },
     onError: (error) => {
-      setActionError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to update this account. Please try again."
+          : "Unable to update this account. Please try again.",
+        "error"
       );
     },
   });
@@ -99,12 +96,6 @@ export default function SupportTeamScreen() {
             />
           }
         />
-
-        {actionError ? (
-          <View style={{ marginBottom: spacing.md }}>
-            <Notice tone="error" message={actionError} />
-          </View>
-        ) : null}
 
         {supportQuery.isLoading ? (
           <View style={{ gap: spacing.md }}>

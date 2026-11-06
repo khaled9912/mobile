@@ -541,6 +541,60 @@ Production API/Jitsi values are compiled into `app.config.ts` `extra`. To point
 a build at staging, set `EXPO_PUBLIC_API_URL` and
 `EXPO_PUBLIC_JITSI_DOMAIN` for that build.
 
+### Development versus production builds
+
+`EXPO_PUBLIC_APP_ENV` (`development` | `production`) decides which academy a
+build talks to and how it labels itself. Leave it unset and the build infers it:
+any API URL that is not `https://anaquran.runasp.net` counts as development, so
+a build that only set `EXPO_PUBLIC_API_URL` still labels itself honestly instead
+of quietly pointing at production.
+
+Development builds show a `DEV · <api host>` badge on the sign-in screens and in
+the profile footer; production builds show nothing. The badge is driven by
+`APP_ENV` in `src/config/env.ts`, not by `__DEV__`, because a release-mode binary
+pointed at your laptop has `__DEV__ === false`.
+
+```bash
+# API on the host machine (Development env so the session cookie works over http)
+cd ../Ana-Quran-Academy-Backend/src/Academy.Api
+ASPNETCORE_ENVIRONMENT=Development dotnet run --no-launch-profile --urls http://0.0.0.0:5001
+
+# iOS simulator — localhost reaches the Mac
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://localhost:5001 npx expo start
+
+# Android emulator — 10.0.2.2 is the host machine
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://10.0.2.2:5001 npx expo start
+
+# Physical device — your Mac's LAN address, same Wi-Fi
+ipconfig getifaddr en0
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://192.168.1.20:5001 npx expo start
+
+# The containerized API (image `rayan-academy-api-e2e`) is already published on
+# every interface, so it works from a device with no extra dotnet flags
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://192.168.1.20:5002 npx expo start
+```
+
+Release-mode builds against the same local API work too:
+
+```bash
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://localhost:5001 \
+  npx expo run:ios --configuration Release
+EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://10.0.2.2:5001 \
+  npx expo run:android --variant release
+```
+
+Two native consequences of that mode, both dev-only:
+
+- Android release builds refuse plain http. `plugins/withDevCleartext.js` adds
+  the cleartext exception when the environment is development, so run
+  `npx expo prebuild --clean` after changing `EXPO_PUBLIC_APP_ENV`.
+- iOS needs nothing: `NSAllowsLocalNetworking` already allows loopback and
+  private LAN addresses, and `NSAllowsArbitraryLoads` stays false.
+
+The local Jitsi containers bind to `127.0.0.1` only, so a phone can never reach
+them. Keep `EXPO_PUBLIC_JITSI_DOMAIN` at the hosted `meet.<ip>.sslip.io` value
+when testing calls from a device.
+
 Use `eas update` only for JavaScript changes; any change to native modules,
 permissions, icons, or the splash screen requires a new binary build.
 

@@ -13,11 +13,9 @@ import { BrandMark } from "@/components/ui/brand";
 import { palettes } from "@/theme/tokens";
 
 const INTRO_COLORS = palettes.light;
-const PRODUCT = "Ana Quran";
 const SUBTITLE = "Quran & Arabic Academy";
 const TICK_MS = 32;
-const PRODUCT_END = PRODUCT.length * 3;
-const SUBTITLE_START = PRODUCT_END + 8;
+const SUBTITLE_START = 14;
 const SUBTITLE_END = SUBTITLE_START + Math.ceil(SUBTITLE.length * 1.4);
 const TOTAL_TICKS = SUBTITLE_END + 10;
 
@@ -82,7 +80,6 @@ export const LaunchIntro = ({ onDone }: Props) => {
     return () => clearTimeout(timeout);
   }, [finish, tick]);
 
-  const productChars = Math.min(PRODUCT.length, Math.floor(tick / 3));
   const subtitleChars = Math.min(
     SUBTITLE.length,
     Math.max(0, Math.floor((tick - SUBTITLE_START) / 1.4))
@@ -120,26 +117,7 @@ export const LaunchIntro = ({ onDone }: Props) => {
             <Animated.View
               style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}
             >
-              <BrandMark size={104} />
-            </Animated.View>
-
-            <Animated.View style={{ opacity: logoOpacity }}>
-              <View style={styles.wordBlock}>
-                <View style={styles.wordRow}>
-                  {PRODUCT.split("").map((char, index) => (
-                    <AppText
-                      key={`${char}-${index}`}
-                      weight="800"
-                      style={[
-                        styles.wordmark,
-                        { opacity: index < productChars ? 1 : 0 },
-                      ]}
-                    >
-                      {char === " " ? "\u00A0" : char}
-                    </AppText>
-                  ))}
-                </View>
-              </View>
+              <BrandMark size={124} />
             </Animated.View>
 
             <View style={styles.subtitleRow}>
@@ -188,9 +166,6 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
   },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18 },
-  wordBlock: { alignItems: "center", gap: 2 },
-  wordRow: { flexDirection: "row", alignItems: "flex-end" },
-  wordmark: { fontSize: 42, lineHeight: 50, letterSpacing: -1 },
   subtitleRow: {
     flexDirection: "row",
     alignItems: "center",

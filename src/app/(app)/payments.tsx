@@ -12,6 +12,7 @@ import {
 } from "@/api/billing";
 import { formatDateTime, formatMonthKey, formatTime } from "@/lib/format";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import { Screen } from "@/components/ui/screen";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
@@ -62,6 +63,7 @@ export default function StudentPaymentsScreen() {
 function StudentBillingView() {
   const { colors, radius } = useTheme();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [month, setMonth] = useState<string | undefined>(undefined);
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -89,6 +91,13 @@ function StudentBillingView() {
       setNote("");
       await queryClient.invalidateQueries({ queryKey: ["billing"] });
     },
+    onError: (error) =>
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Unable to mark the payment as sent.",
+        "error"
+      ),
   });
 
   const copy = (key: string, value: string) => {
@@ -341,17 +350,6 @@ function StudentBillingView() {
                 There is nothing to pay for this month.
               </AppText>
             )}
-
-            {claimMutation.isError ? (
-              <Notice
-                tone="error"
-                message={
-                  claimMutation.error instanceof Error
-                    ? claimMutation.error.message
-                    : "Unable to mark the payment as sent."
-                }
-              />
-            ) : null}
           </Card>
         </>
       ) : null}

@@ -11,6 +11,7 @@ import {
 import { openWhatsApp } from "@/lib/whatsapp";
 import { BrandLockup } from "@/components/ui/brand";
 import { AppText } from "@/components/ui/app-text";
+import { EnvBadge } from "@/components/ui/env-badge";
 import { useTheme } from "@/providers/theme-provider";
 
 type Props = {
@@ -88,6 +89,9 @@ export const AuthShell = ({
             {subtitle}
           </AppText>
         ) : null}
+        <View style={styles.envRow}>
+          <EnvBadge />
+        </View>
         <View style={styles.body}>{children}</View>
       </View>
       </Screen>
@@ -141,5 +145,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   subtitle: { marginTop: 8, lineHeight: 19 },
+  envRow: { alignItems: "center", marginTop: 12 },
   body: { marginTop: 22, gap: 16 },
 });

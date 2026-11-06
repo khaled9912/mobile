@@ -19,6 +19,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EnvBadge } from "@/components/ui/env-badge";
 import { Segmented } from "@/components/ui/segmented";
 
 const roleLabel: Record<UserRole, string> = {
@@ -314,6 +315,7 @@ export default function ProfileTab() {
         onPress={handleVersionPress}
         style={styles.version}
       >
+        <EnvBadge />
         <AppText variant="caption" color="muted" align="center">
           Ana Quran v{version}
         </AppText>

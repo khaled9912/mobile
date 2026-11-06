@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DateTimeField } from "@/components/ui/date-time-field";
 import { Segmented } from "@/components/ui/segmented";
-import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { formatDateTime, formatTime } from "@/lib/format";
@@ -41,7 +40,6 @@ export const StudentOpenOffers = () => {
   const { showToast } = useToast();
   const [startsAt, setStartsAt] = useState(defaultStart);
   const [duration, setDuration] = useState("60");
-  const [formError, setFormError] = useState<string | null>(null);
   const endsAt = new Date(startsAt.getTime() + Number(duration) * 60_000);
 
   const offersQuery = useQuery({
@@ -66,37 +64,36 @@ export const StudentOpenOffers = () => {
     mutationFn: () =>
       publishOpenOffer(startsAt.toISOString(), endsAt.toISOString()),
     onSuccess: async () => {
-      setFormError(null);
       showToast("Time offered. All teachers were notified.");
       await invalidate();
     },
     onError: (error) =>
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to offer this time. Please try again."
+          : "Unable to offer this time. Please try again.",
+        "error"
       ),
   });
 
   const withdraw = useMutation({
     mutationFn: (offerId: string) => withdrawOpenOffer(offerId),
     onSuccess: async () => {
-      setFormError(null);
       showToast("Offered time withdrawn.");
       await invalidate();
     },
     onError: (error) =>
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to withdraw this time. Please try again."
+          : "Unable to withdraw this time. Please try again.",
+        "error"
       ),
   });
 
   const submit = () => {
-    setFormError(null);
     if (startsAt.getTime() <= Date.now()) {
-      setFormError("Choose a time in the future.");
+      showToast("Choose a time in the future.", "error");
       return;
     }
     const openCount = offers.filter(
@@ -105,8 +102,9 @@ export const StudentOpenOffers = () => {
         new Date(offer.startsAt).getTime() > Date.now()
     ).length;
     if (openCount >= OPEN_OFFER_LIMIT) {
-      setFormError(
-        `You already have ${OPEN_OFFER_LIMIT} open offers. Withdraw one to add another.`
+      showToast(
+        `You already have ${OPEN_OFFER_LIMIT} open offers. Withdraw one to add another.`,
+        "error"
       );
       return;
     }
@@ -153,7 +151,6 @@ export const StudentOpenOffers = () => {
           <AppText variant="caption" color="muted">
             Ends at {formatTime(endsAt.toISOString())}
           </AppText>
-          {formError ? <Notice tone="error" message={formError} /> : null}
           <Button
             title="Offer this time"
             icon="megaphone-outline"

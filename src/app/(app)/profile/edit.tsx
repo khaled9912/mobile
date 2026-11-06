@@ -21,7 +21,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -92,19 +91,16 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
   const [phone, setPhone] = useState(profile.phoneNumber ?? "");
   const [avatarPreview, setAvatarPreview] = useState(profile.avatarUrl ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-
   const save = useMutation({
     mutationFn: updateProfile,
     onSuccess: (next) => {
       updateUser({ ...next, avatarUrl: avatarPreview || null });
-      setFormError(null);
       showToast("Your profile has been updated.");
     },
     onError: (error) => {
-      setFormError(
-        errorMessage(error, "Unable to save your profile. Please try again.")
+      showToast(
+        errorMessage(error, "Unable to save your profile. Please try again."),
+        "error"
       );
     },
   });
@@ -115,12 +111,12 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
       const preview = `${avatarUrl}?v=${Date.now()}`;
       setAvatarPreview(preview);
       updateUser({ ...profile, avatarUrl: preview });
-      setAvatarError(null);
       showToast("Your profile photo has been updated.");
     },
     onError: (error) => {
-      setAvatarError(
-        errorMessage(error, "Unable to upload the image. Please try again.")
+      showToast(
+        errorMessage(error, "Unable to upload the image. Please try again."),
+        "error"
       );
     },
   });
@@ -130,12 +126,12 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
     onSuccess: () => {
       setAvatarPreview("");
       updateUser({ ...profile, avatarUrl: null });
-      setAvatarError(null);
       showToast("Your profile photo has been removed.");
     },
     onError: (error) => {
-      setAvatarError(
-        errorMessage(error, "Unable to remove the image. Please try again.")
+      showToast(
+        errorMessage(error, "Unable to remove the image. Please try again."),
+        "error"
       );
     },
   });
@@ -143,12 +139,12 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
   const busy = save.isPending || upload.isPending || remove.isPending;
 
   const choosePhoto = async () => {
-    setAvatarError(null);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        setAvatarError(
-          "Allow photo library access to choose a profile picture."
+        showToast(
+          "Allow photo library access to choose a profile picture.",
+          "warning"
         );
         return;
       }
@@ -161,7 +157,7 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
       if (result.canceled || !result.assets[0]) return;
       upload.mutate(await prepareAvatar(result.assets[0]));
     } catch {
-      setAvatarError("Unable to open your photos. Please try again.");
+      showToast("Unable to open your photos. Please try again.", "error");
     }
   };
 
@@ -187,7 +183,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
     }
 
     setErrors(nextErrors);
-    setFormError(null);
     if (Object.keys(nextErrors).length > 0) return;
 
     const input: UpdateProfileInput = { fullName: trimmedName };
@@ -236,7 +231,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
               />
             ) : null}
           </View>
-          {avatarError ? <Notice tone="error" message={avatarError} /> : null}
         </View>
       </Card>
 
@@ -277,8 +271,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
             hint="Include the country code, for example +974 5555 1234. Used for one-time sign-in codes."
             maxLength={20}
           />
-
-          {formError ? <Notice tone="error" message={formError} /> : null}
 
           <Button
             title={save.isPending ? "Saving…" : "Save changes"}

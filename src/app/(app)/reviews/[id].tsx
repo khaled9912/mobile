@@ -20,7 +20,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import {
@@ -265,6 +264,7 @@ function ReviewForm({
 }) {
   const { spacing } = useTheme();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [scores, setScores] = useState<Record<ScoreKey, number | null>>({
     teachingClarity: review?.teachingClarity ?? null,
     studentPractice: review?.studentPractice ?? null,
@@ -279,7 +279,6 @@ function ReviewForm({
   const [studentAction, setStudentAction] = useState(
     review?.studentAction ?? ""
   );
-  const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (status: ReviewStatus) =>
@@ -292,7 +291,6 @@ function ReviewForm({
         status,
       }),
     onSuccess: async (_, status) => {
-      setError(null);
       await queryClient.invalidateQueries({
         queryKey: ["reviews", "workspace", lessonId],
       });
@@ -300,23 +298,23 @@ function ReviewForm({
       onSaved(status);
     },
     onError: (mutationError) => {
-      setError(
+      showToast(
         mutationError instanceof Error
           ? mutationError.message
-          : "The review could not be saved."
+          : "The review could not be saved.",
+        "error"
       );
     },
   });
 
   const handleSave = (status: ReviewStatus) => {
-    setError(null);
     if (status === "submitted") {
       if (Object.values(scores).some((value) => value === null)) {
-        setError("Score all four areas before submitting.");
+        showToast("Score all four areas before submitting.", "error");
         return;
       }
       if (gaps.trim().length < 3) {
-        setError("Describe at least one gap before submitting.");
+        showToast("Describe at least one gap before submitting.", "error");
         return;
       }
     }
@@ -385,8 +383,6 @@ function ReviewForm({
         maxLength={1000}
         placeholder="What the student should practise."
       />
-
-      {error ? <Notice tone="error" message={error} /> : null}
 
       <View style={{ gap: spacing.sm }}>
         <Button

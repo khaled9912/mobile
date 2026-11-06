@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { ApiError } from "@/api/client";
 import { requestPasswordReset, resetPassword } from "@/api/auth";
+import { useToast } from "@/providers/toast-provider";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
@@ -13,20 +14,21 @@ import { isNumericCode, isValidEmail, passwordProblem } from "@/lib/validation";
 type Step = "email" | "reset" | "done";
 
 export default function ForgotPasswordScreen() {
+  const { showToast } = useToast();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
+
+  const fail = (message: string) => showToast(message, "error");
 
   const handleRequest = async () => {
     if (loading) return;
-    setMessage("");
     if (!isValidEmail(email)) {
-      setMessage("Enter a valid email address.");
+      fail("Enter a valid email address.");
       return;
     }
     setLoading(true);
@@ -35,7 +37,7 @@ export default function ForgotPasswordScreen() {
       setDevCode(result.devCode ?? null);
       setStep("reset");
     } catch (error) {
-      setMessage(
+      fail(
         error instanceof ApiError
           ? error.message
           : "Unable to send the reset code. Please try again."
@@ -47,18 +49,17 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = async () => {
     if (loading) return;
-    setMessage("");
     if (!isNumericCode(code.trim())) {
-      setMessage("Enter the numeric code from the email.");
+      fail("Enter the numeric code from the email.");
       return;
     }
     const problem = passwordProblem(newPassword);
     if (problem) {
-      setMessage(problem);
+      fail(problem);
       return;
     }
     if (newPassword !== confirm) {
-      setMessage("The new passwords do not match.");
+      fail("The new passwords do not match.");
       return;
     }
     setLoading(true);
@@ -66,7 +67,7 @@ export default function ForgotPasswordScreen() {
       await resetPassword(email.trim(), code.trim(), newPassword);
       setStep("done");
     } catch (error) {
-      setMessage(
+      fail(
         error instanceof ApiError
           ? error.message
           : "Unable to reset your password. Please try again."
@@ -173,15 +174,12 @@ export default function ForgotPasswordScreen() {
             size="sm"
             onPress={() => {
               setStep("email");
-              setMessage("");
               setCode("");
               setDevCode(null);
             }}
           />
         </View>
       )}
-
-      {message ? <Notice tone="error" message={message} /> : null}
 
       <View style={styles.footer}>
         <AppText variant="small" color="muted">

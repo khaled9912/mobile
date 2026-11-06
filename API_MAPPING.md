@@ -494,7 +494,8 @@ clear the entire cache.
 | `GET/POST /api/admin/teachers/{id}/availability` (legacy one-off) | Admin weekly rules use `/availability-rules`; one-off slot management remains web-only |
 | `GET/POST/DELETE /api/teacher/availability`, `/api/teacher/student-availability` | Superseded by `/api/teacher/availability-rules` |
 | `/api/lesson-requests` (student, teacher, admin variants) | Superseded by instant `POST /api/student/bookings`; the teacher and admin approval screens were removed |
-| `PATCH /api/lessons/{id}`, `DELETE /api/lessons/{id}` (raw) | Mobile mutates through `/cancel`, `/reschedule-requests`, and `/replacement`, which apply the lesson policy; the raw status/delete routes are not called |
+| `PATCH /api/lessons/{id}`, `DELETE /api/lessons/{id}` (raw) | Mobile mutates through `/cancel` and `/reschedule-requests`, which apply the lesson policy; the raw status/delete routes are not called |
+| `POST /api/lessons/{id}/replacement` | Admin-only direct make-up booking. Mobile proposes the time through `/reschedule-requests` and the student's accept books it |
 | `GET /api/lessons/{id}/report`, `GET /api/lessons/{id}/review` | Both are embedded in `LessonDto` |
 | `PATCH /api/admin/users/{id}` with name/email/password | Mobile only toggles activation; profile editing is self-service |
 

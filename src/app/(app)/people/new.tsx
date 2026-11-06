@@ -16,7 +16,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { RoleGate } from "@/components/ui/role-gate";
@@ -58,7 +57,6 @@ export default function NewAccountScreen() {
   const [confirm, setConfirm] = useState("");
   const [grade, setGrade] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: async (): Promise<UserProfile> => {
@@ -88,10 +86,11 @@ export default function NewAccountScreen() {
       router.back();
     },
     onError: (error) => {
-      setFormError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "Unable to create this account. Please try again."
+          : "Unable to create this account. Please try again.",
+        "error"
       );
     },
   });
@@ -107,7 +106,6 @@ export default function NewAccountScreen() {
       nextErrors.grade = "Keep the grade under 20 characters.";
     }
     setErrors(nextErrors);
-    setFormError(null);
     if (Object.keys(nextErrors).length > 0) return;
     create.mutate();
   };
@@ -115,7 +113,6 @@ export default function NewAccountScreen() {
   const changeRole = (next: AccountRole) => {
     setRole(next);
     setErrors({});
-    setFormError(null);
   };
 
   return (
@@ -191,8 +188,6 @@ export default function NewAccountScreen() {
               textContentType="newPassword"
               error={errors.confirm}
             />
-
-            {formError ? <Notice tone="error" message={formError} /> : null}
 
             <Button
               title={create.isPending ? "Creating…" : "Create account"}

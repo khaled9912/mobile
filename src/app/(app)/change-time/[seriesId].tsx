@@ -16,7 +16,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import {
@@ -46,7 +45,6 @@ export default function ChangeTimeScreen() {
   const { showToast } = useToast();
   const [selected, setSelected] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [error, setError] = useState("");
 
   const seriesQuery = useQuery({
     queryKey: ["series"],
@@ -82,7 +80,6 @@ export default function ChangeTimeScreen() {
         ? requestTimeChange(series.id, ruleId, note)
         : Promise.reject(new Error("This weekly time no longer exists.")),
     onSuccess: async () => {
-      setError("");
       showToast("Your weekly time is changed. Upcoming lessons are on it now.");
       await queryClient.invalidateQueries({ queryKey: ["change-requests"] });
       await queryClient.invalidateQueries({ queryKey: ["series"] });
@@ -92,10 +89,11 @@ export default function ChangeTimeScreen() {
       setNote("");
     },
     onError: (mutationError) => {
-      setError(
+      showToast(
         mutationError instanceof ApiError
           ? mutationError.message
-          : "Unable to send the request. Please try again."
+          : "Unable to send the request. Please try again.",
+        "error"
       );
     },
   });
@@ -116,10 +114,11 @@ export default function ChangeTimeScreen() {
       router.navigate("/book");
     },
     onError: (mutationError) => {
-      setError(
+      showToast(
         mutationError instanceof ApiError
           ? mutationError.message
-          : "Unable to end the weekly time. Please try again."
+          : "Unable to end the weekly time. Please try again.",
+        "error"
       );
     },
   });
@@ -194,12 +193,6 @@ export default function ChangeTimeScreen() {
           title="Change your time"
           subtitle="Pick any open weekly time your teacher publishes. Your lessons move as soon as you choose it."
         />
-
-        {error ? (
-          <View style={styles.block}>
-            <Notice tone="error" message={error} />
-          </View>
-        ) : null}
 
         {seriesQuery.isLoading ? (
           <>
@@ -334,7 +327,6 @@ export default function ChangeTimeScreen() {
 }
 
 const styles = StyleSheet.create({
-  block: { marginBottom: 14 },
   section: { marginTop: 24, gap: 12 },
   list: { gap: 18 },
   day: { gap: 8 },

@@ -51,7 +51,6 @@ export default function TeacherProfileScreen() {
   const { colors, radius } = useTheme();
   const { showToast } = useToast();
   const [selected, setSelected] = useState<string[]>([]);
-  const [error, setError] = useState("");
 
   const teacherQuery = useQuery({
     queryKey: ["teacher-profile", teacherId],
@@ -64,7 +63,6 @@ export default function TeacherProfileScreen() {
   const book = useMutation({
     mutationFn: (ruleIds: string[]) => bookWeeklySlots(ruleIds),
     onSuccess: async (result) => {
-      setError("");
       setSelected([]);
       showToast(
         `${result.series.length} weekly ${
@@ -84,10 +82,11 @@ export default function TeacherProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
     },
     onError: (mutationError) => {
-      setError(
+      showToast(
         mutationError instanceof ApiError
           ? mutationError.message
-          : "Unable to book these times. Please try again."
+          : "Unable to book these times. Please try again.",
+        "error"
       );
     },
   });
@@ -111,7 +110,6 @@ export default function TeacherProfileScreen() {
   }, [teacher?.slots, viewerTimeZone]);
 
   const toggle = (rule: WeeklyRule) => {
-    setError("");
     if (rule.status !== "available") return;
     setSelected((current) =>
       current.includes(rule.id)
@@ -197,11 +195,6 @@ export default function TeacherProfileScreen() {
               <StarRating value={teacher.averageRating} size={18} showValue />
             ) : null}
 
-            {error ? (
-              <View style={styles.block}>
-                <Notice tone="error" message={error} />
-              </View>
-            ) : null}
             {!teacher.hasLessons ? (
               <View style={styles.block}>
                 <Notice

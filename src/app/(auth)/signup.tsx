@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { ApiError } from "@/api/client";
 import { register } from "@/api/auth";
 import { useAuth } from "@/providers/auth-provider";
+import { useToast } from "@/providers/toast-provider";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
@@ -13,32 +14,33 @@ import { isValidEmail, passwordProblem } from "@/lib/validation";
 
 export default function SignupScreen() {
   const { applySession } = useAuth();
+  const { showToast } = useToast();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+
+  const fail = (message: string) => showToast(message, "error");
 
   const handleSubmit = async () => {
     if (loading) return;
-    setMessage("");
 
     if (fullName.trim().length < 2) {
-      setMessage("Enter your full name.");
+      fail("Enter your full name.");
       return;
     }
     if (!isValidEmail(email)) {
-      setMessage("Enter a valid email address.");
+      fail("Enter a valid email address.");
       return;
     }
     const problem = passwordProblem(password);
     if (problem) {
-      setMessage(problem);
+      fail(problem);
       return;
     }
     if (password !== confirm) {
-      setMessage("The passwords do not match.");
+      fail("The passwords do not match.");
       return;
     }
 
@@ -48,7 +50,7 @@ export default function SignupScreen() {
       applySession(user);
       router.replace("/");
     } catch (error) {
-      setMessage(
+      fail(
         error instanceof ApiError
           ? error.message
           : "We could not create your account. Please try again."
@@ -117,8 +119,6 @@ export default function SignupScreen() {
           message="After registration you can choose a teacher and request your first lesson."
         />
       </View>
-
-      {message ? <Notice tone="error" message={message} /> : null}
 
       <View style={styles.footer}>
         <AppText variant="small" color="muted">

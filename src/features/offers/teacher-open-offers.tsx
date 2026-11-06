@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
@@ -10,7 +10,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { TextCardSkeleton } from "@/components/ui/skeleton";
 import { formatDateTime, formatTime } from "@/lib/format";
@@ -21,7 +20,6 @@ export const TeacherOpenOffers = () => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const now = useNow();
-  const [acceptError, setAcceptError] = useState<string | null>(null);
 
   const offersQuery = useQuery({
     queryKey: ["open-offers", "teacher"],
@@ -56,17 +54,17 @@ export const TeacherOpenOffers = () => {
   const accept = useMutation({
     mutationFn: (offerId: string) => acceptOpenOffer(offerId),
     onSuccess: async (result) => {
-      setAcceptError(null);
       showToast(
         `${result.offer?.studentName ?? "The student"} booked. The lesson is on your schedule.`
       );
       await invalidate();
     },
     onError: async (error) => {
-      setAcceptError(
+      showToast(
         error instanceof ApiError
           ? error.message
-          : "This time is no longer available."
+          : "This time is no longer available.",
+        "error"
       );
       await invalidate();
     },
@@ -82,16 +80,11 @@ export const TeacherOpenOffers = () => {
         { text: "Cancel", style: "cancel" },
         {
           text: "Accept and book",
-          onPress: () => {
-            setAcceptError(null);
-            accept.mutate(offer.id);
-          },
+          onPress: () => accept.mutate(offer.id),
         },
       ]
     );
   };
-
-  const error = acceptError || offersQuery.error;
 
   return (
     <View style={styles.section}>
@@ -103,17 +96,6 @@ export const TeacherOpenOffers = () => {
         books it instantly; everyone else sees that the student picked another
         teacher.
       </AppText>
-
-      {error ? (
-        <Notice
-          tone="error"
-          message={
-            error instanceof ApiError
-              ? error.message
-              : "Unable to load student offers."
-          }
-        />
-      ) : null}
 
       <View style={styles.list}>
         {offersQuery.isLoading ? (

@@ -18,7 +18,6 @@ import { AppText } from "@/components/ui/app-text";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { EmptyState, ErrorView } from "@/components/ui/states";
 import { PersonRowSkeleton } from "@/components/ui/skeleton";
@@ -69,7 +68,6 @@ export default function AssignTeacherScreen() {
   );
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const studentsQuery = useQuery({
     queryKey: ["admin", "students", false],
@@ -116,10 +114,11 @@ export default function AssignTeacherScreen() {
       router.back();
     },
     onError: (mutationError) =>
-      setError(
+      showToast(
         mutationError instanceof ApiError
           ? mutationError.message
-          : "Unable to create this assignment. Please try again."
+          : "Unable to create this assignment. Please try again.",
+        "error"
       ),
   });
 
@@ -127,13 +126,11 @@ export default function AssignTeacherScreen() {
     setStudentId(person.id);
     setTeacherId(null);
     setSearch("");
-    setError(null);
   };
 
   const chooseTeacher = (person: UserProfile) => {
     setTeacherId(person.id);
     setSearch("");
-    setError(null);
   };
 
   const subheading = !studentId
@@ -200,12 +197,6 @@ export default function AssignTeacherScreen() {
             </View>
           ))}
         </View>
-
-        {error ? (
-          <View style={styles.block}>
-            <Notice tone="error" message={error} />
-          </View>
-        ) : null}
 
         {studentsQuery.isLoading || teachersQuery.isLoading ? (
           <View style={styles.list}>

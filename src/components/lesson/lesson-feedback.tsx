@@ -22,7 +22,6 @@ import { Card } from "@/components/ui/card";
 import { AppText } from "@/components/ui/app-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { StarRating, StarRatingInput } from "@/components/ui/star-rating";
 
@@ -162,7 +161,6 @@ const TeacherReportSection = ({
   const [progress, setProgress] = useState<LessonProgress>(
     report?.progress ?? "good"
   );
-  const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -174,29 +172,34 @@ const TeacherReportSection = ({
     onSuccess: (saved) => {
       onSaved(saved);
       setEditing(false);
-      setFormError(null);
       showToast("Your class report has been saved.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lessons", lesson.id] });
       void queryClient.invalidateQueries({ queryKey: ["profile", "reports"] });
     },
     onError: (error) =>
-      setFormError(
+      showToast(
         errorMessage(
           error,
           "Unable to save the class report. Please try again."
-        )
+        ),
+        "error"
       ),
   });
 
   const submit = () => {
-    setFormError(null);
     if (classSummary.trim().length < MIN_LENGTH) {
-      setFormError("Summarize the class in at least 10 characters.");
+      showToast(
+        "Summarize the class in at least 10 characters.",
+        "error"
+      );
       return;
     }
     if (studentFeedback.trim().length < MIN_LENGTH) {
-      setFormError("Give feedback about the student in at least 10 characters.");
+      showToast(
+        "Give feedback about the student in at least 10 characters.",
+        "error"
+      );
       return;
     }
     mutation.mutate();
@@ -206,7 +209,6 @@ const TeacherReportSection = ({
     setClassSummary(report?.classSummary ?? "");
     setStudentFeedback(report?.studentFeedback ?? "");
     setProgress(report?.progress ?? "good");
-    setFormError(null);
     setEditing(false);
   };
 
@@ -272,8 +274,6 @@ const TeacherReportSection = ({
           />
         </View>
 
-        {formError ? <Notice tone="error" message={formError} /> : null}
-
         <View style={styles.actions}>
           <Button
             title={
@@ -314,7 +314,6 @@ const StudentReviewSection = ({
   const [editing, setEditing] = useState(!review);
   const [rating, setRating] = useState(review?.rating ?? 0);
   const [comment, setComment] = useState(review?.comment ?? "");
-  const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -327,7 +326,6 @@ const StudentReviewSection = ({
     onSuccess: (saved) => {
       onSaved(saved);
       setEditing(false);
-      setFormError(null);
       showToast("Thank you — your review has been saved.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lessons", lesson.id] });
@@ -337,15 +335,15 @@ const StudentReviewSection = ({
       });
     },
     onError: (error) =>
-      setFormError(
-        errorMessage(error, "Unable to save your review. Please try again.")
+      showToast(
+        errorMessage(error, "Unable to save your review. Please try again."),
+        "error"
       ),
   });
 
   const submit = () => {
-    setFormError(null);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      setFormError("Choose a rating from 1 to 5 stars.");
+      showToast("Choose a rating from 1 to 5 stars.", "error");
       return;
     }
     mutation.mutate();
@@ -354,7 +352,6 @@ const StudentReviewSection = ({
   const cancelEdit = () => {
     setRating(review?.rating ?? 0);
     setComment(review?.comment ?? "");
-    setFormError(null);
     setEditing(false);
   };
 
@@ -404,8 +401,6 @@ const StudentReviewSection = ({
           placeholder="What went well? What could be better?"
           hint={`${comment.trim().length} / ${MAX_LENGTH} characters`}
         />
-
-        {formError ? <Notice tone="error" message={formError} /> : null}
 
         <View style={styles.actions}>
           <Button

@@ -44,7 +44,7 @@ export default function LessonRoomScreen() {
   const { colors } = useTheme();
   const isSupport = role === "admin" || role === "super_admin";
   const trackAttendance = role === "teacher" || role === "student";
-  const displayName = user?.fullName ?? "Guest";
+  const displayName = user?.fullName?.trim() || "Guest";
   const roomDisplayName = isSupport
     ? `${displayName} (Academy support)`
     : displayName;

@@ -70,7 +70,9 @@ export const AdminHome = () => {
       ) : (
         <PageHeader
           eyebrow="Academy administration"
-          title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
+          title={`Assalamu alaikum${
+            user?.fullName ? `, ${firstName(user.fullName)}` : ""
+          }`}
           subtitle="See the weekly times students moved, monitor the schedule, and keep the academy running."
         />
       )}

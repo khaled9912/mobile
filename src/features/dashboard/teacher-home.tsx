@@ -58,7 +58,9 @@ export const TeacherHome = () => {
       ) : (
         <PageHeader
           eyebrow="Teacher portal"
-          title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
+          title={`Assalamu alaikum${
+            user?.fullName ? `, ${firstName(user.fullName)}` : ""
+          }`}
           subtitle="Your teaching week, weekly availability, and lesson reports."
         />
       )}

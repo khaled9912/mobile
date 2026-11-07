@@ -85,7 +85,9 @@ export const StudentHome = () => {
       ) : (
         <PageHeader
           eyebrow="Student portal"
-          title={`Assalamu alaikum${user ? `, ${firstName(user.fullName)}` : ""}`}
+          title={`Assalamu alaikum${
+            user?.fullName ? `, ${firstName(user.fullName)}` : ""
+          }`}
           subtitle="Your weekly lessons, teacher, and time changes in one place."
         />
       )}

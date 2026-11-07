@@ -154,6 +154,29 @@ export default function TeacherProfileScreen() {
         edges={["left", "right"]}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        footer={
+          teacher?.slots.some((rule) => rule.status === "available") ? (
+            <View style={styles.bookBar}>
+              <Button
+                title={
+                  book.isPending
+                    ? "Booking…"
+                    : selected.length
+                      ? `Book ${selected.length} weekly ${
+                          selected.length === 1 ? "time" : "times"
+                        }`
+                      : "Select weekly times"
+                }
+                loading={book.isPending}
+                disabled={!selected.length || book.isPending}
+                onPress={confirmBook}
+              />
+              <AppText variant="caption" color="muted" style={styles.bookHint}>
+                Your selection locks instantly and repeats every week.
+              </AppText>
+            </View>
+          ) : null
+        }
       >
         {teacherQuery.isLoading ? (
           <>
@@ -361,28 +384,6 @@ export default function TeacherProfileScreen() {
               )}
             </View>
 
-            {teacher.slots.some((rule) => rule.status === "available") ? (
-              <View style={styles.bookBar}>
-                <Button
-                  title={
-                    book.isPending
-                      ? "Booking…"
-                      : selected.length
-                        ? `Book ${selected.length} weekly ${
-                            selected.length === 1 ? "time" : "times"
-                          }`
-                        : "Select weekly times"
-                  }
-                  loading={book.isPending}
-                  disabled={!selected.length || book.isPending}
-                  onPress={confirmBook}
-                />
-                <AppText variant="caption" color="muted" style={styles.bookHint}>
-                  Your selection locks instantly and repeats every week.
-                </AppText>
-              </View>
-            ) : null}
-
             <View style={styles.reviews}>
               <SectionHeader title="Student reviews" />
               {teacher.reviews?.length ? (
@@ -451,7 +452,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   ruleCopy: { flex: 1, gap: 2 },
-  bookBar: { marginTop: 22, gap: 8 },
+  bookBar: { gap: 8 },
   bookHint: { textAlign: "center" },
   reviews: { marginTop: 28, gap: 12 },
   reviewHead: {

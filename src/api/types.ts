@@ -42,7 +42,8 @@ export interface UserDto {
 
 export const normalizeUser = (user: UserDto): UserProfile => ({
   id: user.id,
-  fullName: user.fullName ?? user.full_name ?? user.name ?? user.email ?? "",
+  // An empty name stays empty; an email address is never someone's name.
+  fullName: user.fullName ?? user.full_name ?? user.name ?? "",
   email: user.email ?? "",
   role: isUserRole(user.role) ? user.role : "student",
   isActive: user.isActive ?? user.is_active ?? true,

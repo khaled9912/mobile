@@ -79,6 +79,24 @@ export const Screen = ({
     <View style={[styles.flex, styles.content, contentStyle]}>{children}</View>
   );
 
+  // The sticky action area sits outside the scroll view, so it stays reachable
+  // while the list above it is long. It lives inside the keyboard avoider, so a
+  // focused field on iOS lifts it instead of hiding it behind the keyboard.
+  const footerNode = footer ? (
+    <View
+      style={[
+        styles.footer,
+        {
+          borderTopColor: colors.border,
+          backgroundColor: colors.background,
+          paddingBottom: 12,
+        },
+      ]}
+    >
+      {footer}
+    </View>
+  ) : null;
+
   return (
     <SafeAreaView
       edges={resolvedEdges}
@@ -94,24 +112,14 @@ export const Screen = ({
           keyboardVerticalOffset={0}
         >
           {body}
+          {footerNode}
         </KeyboardAvoidingView>
       ) : (
-        body
+        <>
+          {body}
+          {footerNode}
+        </>
       )}
-      {footer ? (
-        <View
-          style={[
-            styles.footer,
-            {
-              borderTopColor: colors.border,
-              backgroundColor: colors.background,
-              paddingBottom: 12,
-            },
-          ]}
-        >
-          {footer}
-        </View>
-      ) : null}
     </SafeAreaView>
   );
 };

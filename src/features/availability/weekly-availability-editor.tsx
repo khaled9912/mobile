@@ -212,6 +212,14 @@ export const WeeklyAvailabilityEditor = ({
       edges={["left", "right"]}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      footer={
+        <Button
+          title="Announce availability"
+          onPress={submit}
+          loading={publish.isPending}
+          icon="add-circle-outline"
+        />
+      }
     >
       <PageHeader
         eyebrow={isAdmin ? "Academy administration" : "Teacher portal"}
@@ -312,13 +320,6 @@ export const WeeklyAvailabilityEditor = ({
               </AppText>
             </View>
           </View>
-
-          <Button
-            title="Announce availability"
-            onPress={submit}
-            loading={publish.isPending}
-            icon="add-circle-outline"
-          />
         </View>
       </Card>
 

@@ -187,7 +187,24 @@ export default function ChangeTimeScreen() {
 
   return (
     <RoleGate roles={["student"]}>
-      <Screen>
+      <Screen
+        footer={
+          series && available.length ? (
+            <View style={styles.actionBar}>
+              <Button
+                title={submit.isPending ? "Moving…" : "Move to this time"}
+                loading={submit.isPending}
+                disabled={!selected || submit.isPending}
+                onPress={() => selected && submit.mutate(selected)}
+              />
+              <AppText variant="caption" color="muted" style={styles.hint}>
+                Your lessons move to the new time right away. Your teacher and
+                the academy are told about it.
+              </AppText>
+            </View>
+          ) : null
+        }
+      >
         <PageHeader
           eyebrow="Weekly lessons"
           title="Change your time"
@@ -307,16 +324,6 @@ export default function ChangeTimeScreen() {
                   placeholder="Anything they should know about the new time?"
                   multiline
                 />
-                <Button
-                  title={submit.isPending ? "Moving…" : "Move to this time"}
-                  loading={submit.isPending}
-                  disabled={!selected || submit.isPending}
-                  onPress={() => selected && submit.mutate(selected)}
-                />
-                <AppText variant="caption" color="muted">
-                  Your lessons move to the new time right away. Your teacher and
-                  the academy are told about it.
-                </AppText>
               </View>
             ) : null}
           </>
@@ -328,6 +335,8 @@ export default function ChangeTimeScreen() {
 
 const styles = StyleSheet.create({
   section: { marginTop: 24, gap: 12 },
+  actionBar: { gap: 10 },
+  hint: { textAlign: "center" },
   list: { gap: 18 },
   day: { gap: 8 },
   note: { marginTop: 10 },

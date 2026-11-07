@@ -144,7 +144,28 @@ export default function AssignTeacherScreen() {
 
   return (
     <RoleGate roles={["admin", "super_admin"]}>
-      <Screen edges={["left", "right"]} keyboard>
+      <Screen
+        edges={["left", "right"]}
+        keyboard
+        footer={
+          studentId && teacherId ? (
+            <View style={styles.actions}>
+              <Button
+                title="Assign teacher"
+                onPress={() => assign.mutate()}
+                loading={assign.isPending}
+                icon="checkmark-circle-outline"
+              />
+              <Button
+                title="Change teacher"
+                variant="secondary"
+                disabled={assign.isPending}
+                onPress={() => setTeacherId(null)}
+              />
+            </View>
+          ) : null
+        }
+      >
         <PageHeader
           eyebrow="Academy administration"
           title="Assign a teacher"
@@ -354,21 +375,6 @@ export default function AssignTeacherScreen() {
                 The student will see this teacher and their open lesson times.
                 Any previous active assignment is ended automatically.
               </AppText>
-
-              <View style={styles.actions}>
-                <Button
-                  title="Assign teacher"
-                  onPress={() => assign.mutate()}
-                  loading={assign.isPending}
-                  icon="checkmark-circle-outline"
-                />
-                <Button
-                  title="Change teacher"
-                  variant="secondary"
-                  disabled={assign.isPending}
-                  onPress={() => setTeacherId(null)}
-                />
-              </View>
             </Card>
           </>
         )}
@@ -404,5 +410,5 @@ const styles = StyleSheet.create({
   confirmRow: { gap: 12 },
   confirmPerson: { flexDirection: "row", alignItems: "center", gap: 12 },
   confirmNote: { marginTop: 16, lineHeight: 19 },
-  actions: { marginTop: 18, flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
 });

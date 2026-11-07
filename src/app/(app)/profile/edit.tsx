@@ -192,7 +192,18 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
   };
 
   return (
-    <Screen edges={["left", "right"]} keyboard>
+    <Screen
+      edges={["left", "right"]}
+      keyboard
+      footer={
+        <Button
+          title={save.isPending ? "Saving…" : "Save changes"}
+          onPress={submit}
+          loading={save.isPending}
+          disabled={busy}
+        />
+      }
+    >
       <PageHeader
         eyebrow="Your account"
         title="Edit profile"
@@ -270,13 +281,6 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
             error={errors.phoneNumber}
             hint="Include the country code, for example +974 5555 1234. Used for one-time sign-in codes."
             maxLength={20}
-          />
-
-          <Button
-            title={save.isPending ? "Saving…" : "Save changes"}
-            onPress={submit}
-            loading={save.isPending}
-            disabled={busy}
           />
         </View>
       </Card>

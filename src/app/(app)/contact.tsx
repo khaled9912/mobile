@@ -24,10 +24,7 @@ const MAX_MESSAGE = 3000;
 export default function ContactScreen() {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [name, setName] = useState(
-    // accounts created before the name rule still hold an email here
-    user?.fullName?.includes("@") ? "" : (user?.fullName ?? "")
-  );
+  const [name, setName] = useState(user?.fullName ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});

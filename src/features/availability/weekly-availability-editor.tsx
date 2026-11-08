@@ -28,6 +28,7 @@ import { TextCardSkeleton } from "@/components/ui/skeleton";
 import {
   WEEKDAY_SHORT,
   dateFromTimeOfDay,
+  formatTimeOfDay,
   formatWeeklyTimeRange,
   timeOfDayFromDate,
   weekdayLabel,
@@ -197,12 +198,15 @@ export const WeeklyAvailabilityEditor = ({
     );
   };
 
+  const startLabel = formatTimeOfDay(timeOfDayFromDate(start));
+  const endLabel = formatTimeOfDay(timeOfDayFromDate(end));
+
   const summary = days.length
     ? `${days
         .slice()
         .sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b))
         .map((day) => WEEKDAY_SHORT[day])
-        .join(", ")} · ${timeOfDayFromDate(start)} – ${timeOfDayFromDate(end)}`
+        .join(", ")} · ${startLabel} – ${endLabel}`
     : isAdmin
       ? "Choose the days this teacher teaches."
       : "Choose the days you teach.";
@@ -293,9 +297,6 @@ export const WeeklyAvailabilityEditor = ({
             value={duration}
             onChange={setDuration}
           />
-          <AppText variant="caption" color="muted">
-            Ends at {timeOfDayFromDate(end)}
-          </AppText>
 
           {isAdmin ? (
             <TextField

@@ -60,7 +60,10 @@ export default function ChangePasswordScreen() {
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      showToast(Object.values(nextErrors)[0], "error");
+      return;
+    }
     change.mutate();
   };
 

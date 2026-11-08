@@ -65,6 +65,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       await resetPassword(email.trim(), code.trim(), newPassword);
+      showToast("Your password has been reset. Sign in with your new password.");
       setStep("done");
     } catch (error) {
       fail(
@@ -80,10 +81,6 @@ export default function ForgotPasswordScreen() {
   if (step === "done") {
     return (
       <AuthShell title="Password updated">
-        <Notice
-          tone="success"
-          message="Your password has been reset. Sign in with your new password."
-        />
         <Button
           title="Back to sign in"
           onPress={() => router.replace("/login")}

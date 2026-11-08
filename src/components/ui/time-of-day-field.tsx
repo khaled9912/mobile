@@ -78,11 +78,7 @@ export const TimeOfDayField = ({
         </AppText>
         <Ionicons name="chevron-down" size={17} color={colors.muted} />
       </Pressable>
-      {error ? (
-        <AppText variant="caption" color="danger">
-          {error}
-        </AppText>
-      ) : hint ? (
+      {hint ? (
         <AppText variant="caption" color="muted">
           {hint}
         </AppText>

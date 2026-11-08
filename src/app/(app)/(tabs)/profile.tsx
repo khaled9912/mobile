@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth, isAdminRole } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
+import { useToast } from "@/providers/toast-provider";
 import {
   isApiDebugEnabled,
   setApiDebugEnabled,
@@ -82,6 +83,7 @@ const LinkRow = ({
 export default function ProfileTab() {
   const { user, signOut } = useAuth();
   const { colors, preference, setPreference } = useTheme();
+  const { showToast } = useToast();
   const [signingOut, setSigningOut] = useState(false);
   const debugEnabled = useApiDebugEnabled();
   const versionTaps = useRef(0);
@@ -101,11 +103,11 @@ export default function ProfileTab() {
 
     const next = !isApiDebugEnabled();
     void setApiDebugEnabled(next);
-    Alert.alert(
-      "API debugger",
+    showToast(
       next
         ? "Enabled. A floating API button now shows every request and response."
-        : "Disabled. The logged requests were cleared."
+        : "Disabled. The logged requests were cleared.",
+      "info"
     );
   };
 

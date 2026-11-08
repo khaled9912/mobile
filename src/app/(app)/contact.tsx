@@ -53,6 +53,7 @@ export default function ContactScreen() {
         }
         if (Object.keys(mapped).length > 0) {
           setErrors(mapped);
+          showToast(Object.values(mapped)[0], "error");
           return;
         }
       }
@@ -88,7 +89,10 @@ export default function ContactScreen() {
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      showToast(Object.values(nextErrors)[0], "error");
+      return;
+    }
 
     send.mutate({
       name: trimmedName,

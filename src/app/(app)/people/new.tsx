@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
@@ -19,6 +25,10 @@ import { Card } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { TextField } from "@/components/ui/text-field";
 import { RoleGate } from "@/components/ui/role-gate";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/providers/theme-provider";
+import { GRADE_OPTIONS } from "@/lib/grades";
 
 type AccountRole = "student" | "teacher" | "admin" | "support";
 
@@ -27,7 +37,6 @@ type FieldErrors = {
   email?: string;
   password?: string;
   confirm?: string;
-  grade?: string;
 };
 
 const roleOptions: { value: AccountRole; label: string }[] = [
@@ -42,6 +51,128 @@ const isAccountRole = (value: unknown): value is AccountRole =>
   value === "teacher" ||
   value === "admin" ||
   value === "support";
+
+const GradePicker = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) => {
+  const { colors, radius } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+  const selected = GRADE_OPTIONS.find((option) => option.value === value);
+  const rows = [
+    { value: "", short: "No grade", explain: "Leave the grade empty." },
+    ...GRADE_OPTIONS,
+  ];
+
+  return (
+    <View style={styles.pickerWrapper}>
+      <AppText variant="label">Grade (optional)</AppText>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Grade: ${selected?.short ?? "No grade"}`}
+        accessibilityHint="Opens the grade picker"
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [
+          styles.pickerField,
+          {
+            borderRadius: radius.md,
+            borderColor: colors.border,
+            backgroundColor: colors.input,
+            opacity: pressed ? 0.85 : 1,
+          },
+        ]}
+      >
+        <AppText variant="body" style={styles.pickerValue}>
+          {selected?.short ?? "No grade"}
+        </AppText>
+        <Ionicons name="chevron-down" size={17} color={colors.muted} />
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close grade picker"
+            onPress={() => setOpen(false)}
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors.overlay },
+            ]}
+          />
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+            ]}
+          >
+            <View style={styles.sheetHead}>
+              <AppText variant="h3">Grade</AppText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close grade picker"
+                hitSlop={10}
+                onPress={() => setOpen(false)}
+              >
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.pickerList}>
+              {rows.map((row) => {
+                const isSelected = row.value === value;
+                return (
+                  <Pressable
+                    key={row.value || "none"}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      onChange(row.value);
+                      setOpen(false);
+                    }}
+                    style={[
+                      styles.pickerOption,
+                      {
+                        borderRadius: radius.md,
+                        backgroundColor: isSelected
+                          ? colors.brandSoft
+                          : "transparent",
+                      },
+                    ]}
+                  >
+                    <View style={styles.pickerOptionText}>
+                      <AppText variant="body">{row.short}</AppText>
+                      <AppText variant="caption" color="muted">
+                        {row.explain}
+                      </AppText>
+                    </View>
+                    {isSelected ? (
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color={colors.brand}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 export default function NewAccountScreen() {
   const params = useLocalSearchParams<{ role?: string | string[] }>();
@@ -65,7 +196,7 @@ export default function NewAccountScreen() {
           fullName: fullName.trim(),
           email: email.trim(),
           password,
-          ...(grade.trim() ? { grade: grade.trim() } : {}),
+          ...(grade ? { grade } : {}),
         });
       }
       return createManagedUser({
@@ -102,11 +233,11 @@ export default function NewAccountScreen() {
     const passwordIssue = passwordProblem(password);
     if (passwordIssue) nextErrors.password = passwordIssue;
     if (confirm !== password) nextErrors.confirm = "Passwords do not match.";
-    if (grade.trim().length > 20) {
-      nextErrors.grade = "Keep the grade under 20 characters.";
-    }
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      showToast(Object.values(nextErrors)[0], "error");
+      return;
+    }
     create.mutate();
   };
 
@@ -158,14 +289,7 @@ export default function NewAccountScreen() {
               error={errors.email}
             />
             {role === "student" ? (
-              <TextField
-                label="Grade (optional)"
-                value={grade}
-                onChangeText={setGrade}
-                placeholder="For example, Grade 7"
-                error={errors.grade}
-                maxLength={20}
-              />
+              <GradePicker value={grade} onChange={setGrade} />
             ) : null}
             <TextField
               label="Temporary password"
@@ -205,4 +329,38 @@ export default function NewAccountScreen() {
 const styles = StyleSheet.create({
   form: { gap: 16 },
   roleBlock: { gap: 8 },
+  pickerWrapper: { gap: 6 },
+  pickerField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  pickerValue: { flex: 1 },
+  modalRoot: { flex: 1, justifyContent: "flex-end" },
+  sheet: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 8,
+  },
+  sheetHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  pickerList: { maxHeight: 400 },
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickerOptionText: { flex: 1, gap: 2 },
 });

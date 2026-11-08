@@ -782,9 +782,9 @@ excuse/incident), attendance summaries inside the lesson panel with the call
 button, the incoming-call banner and its own Android channel, support review
 queue and weekly digest, in-app notifications, and Expo push registration.
 
-The optional "Grade" field when an admin creates a student is accepted by the
-API contract but not persisted or returned by the backend, so it is
-informational only.
+The optional "Grade" field when an admin creates a student is a fixed
+dropdown (Kindergarten, Grade 1 to Grade 12). The API persists it and returns
+it on the student's `UserDto`.
 
 ---
 

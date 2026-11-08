@@ -1,0 +1,7 @@
+#!/bin/sh
+# Install once per clone:  git config core.hooksPath .githooks
+# Typecheck and unit tests are the fast local version of what CI enforces.
+set -e
+
+npm run typecheck
+npm test

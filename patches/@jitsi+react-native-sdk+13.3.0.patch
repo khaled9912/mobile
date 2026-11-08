@@ -72,6 +72,19 @@ index 0000000..bef209c
 +}
 +
 +export const JitsiMeeting: ComponentType<JitsiMeetingProps>;
+diff --git a/node_modules/@jitsi/react-native-sdk/package.json b/node_modules/@jitsi/react-native-sdk/package.json
+index 230268a..7eba412 100644
+--- a/node_modules/@jitsi/react-native-sdk/package.json
++++ b/node_modules/@jitsi/react-native-sdk/package.json
+@@ -101,5 +101,6 @@
+     ],
+     "overrides": {
+         "hermes-compiler": "0.16.0"
+-    }
++    },
++    "types": "index.d.ts"
+ }
+\ No newline at end of file
 diff --git a/node_modules/@jitsi/react-native-sdk/react/features/base/lib-jitsi-meet/functions.native.ts b/node_modules/@jitsi/react-native-sdk/react/features/base/lib-jitsi-meet/functions.native.ts
 index b01630d..7ae5ac7 100644
 --- a/node_modules/@jitsi/react-native-sdk/react/features/base/lib-jitsi-meet/functions.native.ts

@@ -416,8 +416,9 @@ Rules:
 - Assigning a student to a new teacher ends any other active assignment. The
   API always keeps a single active teacher per student.
 - `role` on `POST /api/admin/users` accepts `teacher` or `admin` only.
-- `grade` is accepted by the create-student contract but the API does not
-  persist or return it; the field is informational and is not shown later.
+- `grade` on `POST /api/students` is optional and must be one of the fixed
+  dropdown values (Kindergarten, Grade 1 to Grade 12). The API persists it and
+  returns it on `UserDto`.
 
 ---
 

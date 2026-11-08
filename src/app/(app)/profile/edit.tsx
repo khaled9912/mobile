@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { useMutation } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
+import { requestOtp } from "@/api/auth";
 import {
   deleteAvatar,
   updateProfile,
@@ -36,6 +37,7 @@ type FieldErrors = {
   fullName?: string;
   email?: string;
   phoneNumber?: string;
+  stepUp?: string;
 };
 
 const extensionOf = (asset: ImagePicker.ImagePickerAsset) => {
@@ -91,6 +93,20 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
   const [phone, setPhone] = useState(profile.phoneNumber ?? "");
   const [avatarPreview, setAvatarPreview] = useState(profile.avatarUrl ?? "");
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [stepUpPassword, setStepUpPassword] = useState("");
+  const [stepUpCode, setStepUpCode] = useState("");
+  const [codeSentTo, setCodeSentTo] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+
+  // Rebinding a sign-in identifier needs step-up proof, so the API demands a
+  // current password or a code to the number already on the account.
+  const emailChanged =
+    email.trim().toLowerCase() !== (profile.email ?? "").trim().toLowerCase();
+  const phoneChanged =
+    normalizePhone(phone) !== normalizePhone(profile.phoneNumber ?? "");
+  const needsStepUp =
+    (email.trim().length > 0 && emailChanged) ||
+    (phone.trim().length > 0 && phoneChanged);
   const save = useMutation({
     mutationFn: updateProfile,
     onSuccess: (next) => {
@@ -183,12 +199,42 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
     }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      showToast(Object.values(nextErrors)[0], "error");
+      return;
+    }
 
     const input: UpdateProfileInput = { fullName: trimmedName };
     if (trimmedEmail) input.email = trimmedEmail;
     if (trimmedPhone) input.phoneNumber = normalizePhone(trimmedPhone);
+
+    if (needsStepUp) {
+      if (!stepUpPassword.trim() && !stepUpCode.trim()) {
+        const message =
+          "Confirm your identity with your current password or a code sent to your mobile.";
+        setErrors({ stepUp: message });
+        showToast(message, "error");
+        return;
+      }
+      if (stepUpPassword.trim()) input.currentPassword = stepUpPassword;
+      if (stepUpCode.trim()) input.phoneCode = stepUpCode.trim();
+    }
+
     save.mutate(input);
+  };
+
+  const sendStepUpCode = async () => {
+    if (!profile.phoneNumber || sendingCode) return;
+    setSendingCode(true);
+    try {
+      await requestOtp(profile.phoneNumber);
+      setCodeSentTo(profile.phoneNumber);
+      setErrors({});
+    } catch {
+      showToast("Unable to send the code. Please try again.", "error");
+    } finally {
+      setSendingCode(false);
+    }
   };
 
   return (
@@ -284,6 +330,54 @@ function EditProfileForm({ profile }: { profile: UserProfile }) {
           />
         </View>
       </Card>
+
+      {needsStepUp ? (
+        <Card style={styles.detailsCard}>
+          <AppText variant="h3">Confirm it's you</AppText>
+          <AppText variant="small" color="muted">
+            You changed how you sign in. Verify with your current password, or
+            a code sent to the number already on your account.
+          </AppText>
+          <View style={styles.form}>
+            <TextField
+              label="Current password"
+              value={stepUpPassword}
+              onChangeText={setStepUpPassword}
+              secure
+              autoComplete="password"
+              textContentType="password"
+              error={errors.stepUp}
+              maxLength={256}
+            />
+            {profile.phoneNumber ? (
+              <>
+                <Button
+                  title={
+                    sendingCode ? "Sending…" : `Send code to ${profile.phoneNumber}`
+                  }
+                  variant="secondary"
+                  size="sm"
+                  icon="chatbox-ellipses-outline"
+                  onPress={() => void sendStepUpCode()}
+                  loading={sendingCode}
+                  disabled={busy}
+                />
+                {codeSentTo ? (
+                  <TextField
+                    label={`Code sent to ${codeSentTo}`}
+                    value={stepUpCode}
+                    onChangeText={setStepUpCode}
+                    keyboardType="number-pad"
+                    autoComplete="one-time-code"
+                    textContentType="oneTimeCode"
+                    maxLength={8}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
     </Screen>
   );
 }

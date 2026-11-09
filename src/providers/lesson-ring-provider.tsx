@@ -11,6 +11,7 @@ import {
   startCallHaptics,
   startCallRinger,
 } from "@/lib/lesson-call-notifications";
+import { socketAwareInterval } from "@/lib/realtime-liveness";
 import { useAuth } from "@/providers/auth-provider";
 import { useLessonCall } from "@/providers/lesson-call-provider";
 import { IncomingCallBanner } from "@/components/lesson/incoming-call-banner";
@@ -18,9 +19,11 @@ import { IncomingCallBanner } from "@/components/lesson/incoming-call-banner";
 /**
  * Rings for calls addressed to the signed-in user. The list query is the only
  * trigger: realtime invalidates it instantly, push invalidates the notification
- * list, and its own interval plus refetch-on-focus cover a socket that died
- * while the app was suspended.
+ * list, and returning to the foreground sweeps everything the app missed while
+ * suspended. The interval is the fallback for a socket that never connected.
  */
+const RING_POLL_MS = 20_000;
+
 export const LessonRingProvider = ({ children }: { children: ReactNode }) => {
   const { status, user } = useAuth();
   const { call } = useLessonCall();
@@ -32,7 +35,7 @@ export const LessonRingProvider = ({ children }: { children: ReactNode }) => {
     queryKey: ["lesson-calls"],
     queryFn: getRecentCalls,
     enabled: authenticated,
-    refetchInterval: 20_000,
+    refetchInterval: socketAwareInterval(RING_POLL_MS),
   });
 
   useEffect(() => {

@@ -20,7 +20,11 @@ import {
   TextCardSkeleton,
 } from "@/components/ui/skeleton";
 import { LessonCard } from "@/components/lesson/lesson-card";
-import { firstName, todayLessons } from "@/lib/lesson-selectors";
+import {
+  firstName,
+  laterLessons,
+  todayLessons,
+} from "@/lib/lesson-selectors";
 import { formatWeeklySlot } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { isReportDue } from "@/lib/status";
@@ -42,6 +46,7 @@ export const TeacherHome = () => {
   const lessons = lessonsQuery.data ?? [];
   const rules = rulesQuery.data ?? [];
   const today = todayLessons(lessons);
+  const nextUp = laterLessons(lessons);
   const booked = rules.filter((rule) => rule.status === "booked").length;
   const reportsDue = lessons
     .filter(isReportDue)
@@ -154,6 +159,21 @@ export const TeacherHome = () => {
               />
             )}
           </View>
+
+          {nextUp.length ? (
+            <View style={styles.section}>
+              <SectionHeader title="Next up" />
+              <View style={styles.list}>
+                {nextUp.map((lesson) => (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    perspective="teacher"
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {reportsDue.length ? (
             <View style={styles.section}>

@@ -165,6 +165,18 @@ export const deleteTeacherAvailabilityAsAdmin = (
     { method: "DELETE" }
   );
 
+/** Ends every student's repeating series on this time so it can be removed. */
+export const releaseTeacherAvailabilityAsAdmin = (
+  teacherId: string,
+  ruleId: string
+) =>
+  apiFetch<{ released: number; lessonsCancelled: number }>(
+    `/api/admin/teachers/${encodeURIComponent(
+      teacherId
+    )}/availability-rules/${encodeURIComponent(ruleId)}/release`,
+    { method: "POST" }
+  );
+
 // Read-only history of weekly times students moved themselves.
 export const getAdminChangeRequests = (status?: ChangeRequestStatus) =>
   apiFetch<LessonChangeRequest[]>(

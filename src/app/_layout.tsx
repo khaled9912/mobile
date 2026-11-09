@@ -18,6 +18,7 @@ import { RealtimeProvider } from "@/providers/realtime-provider";
 import { LessonReminderProvider } from "@/providers/lesson-reminder-provider";
 import { PushTokenProvider } from "@/providers/push-token-provider";
 import { NotificationBadgeProvider } from "@/providers/notification-badge-provider";
+import { NotificationTrayProvider } from "@/providers/notification-tray-provider";
 import { LessonCallProvider } from "@/providers/lesson-call-provider";
 import { LessonRingProvider } from "@/providers/lesson-ring-provider";
 import { ApiDebugOverlay } from "@/components/dev/api-debug-overlay";
@@ -124,14 +125,16 @@ const RootLayout = () => (
               <RealtimeProvider>
                 <PushTokenProvider>
                   <NotificationBadgeProvider>
-                    <LessonReminderProvider>
-                      <LessonCallProvider>
-                        <LessonRingProvider>
-                          <RootNavigator />
-                        </LessonRingProvider>
-                      </LessonCallProvider>
-                      <ApiDebugOverlay />
-                    </LessonReminderProvider>
+                    <NotificationTrayProvider>
+                      <LessonReminderProvider>
+                        <LessonCallProvider>
+                          <LessonRingProvider>
+                            <RootNavigator />
+                          </LessonRingProvider>
+                        </LessonCallProvider>
+                        <ApiDebugOverlay />
+                      </LessonReminderProvider>
+                    </NotificationTrayProvider>
                   </NotificationBadgeProvider>
                 </PushTokenProvider>
               </RealtimeProvider>

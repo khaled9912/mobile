@@ -323,6 +323,19 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
         </AppText>
         <Badge label={item.type.replaceAll("_", " ")} tone="danger" />
       </View>
+      <Pressable
+        accessibilityRole="link"
+        onPress={() =>
+          router.push({
+            pathname: "/lesson/[id]",
+            params: { id: item.lessonId },
+          })
+        }
+      >
+        <AppText variant="caption" color="link" weight="700">
+          Open lesson
+        </AppText>
+      </Pressable>
       <AppText variant="caption" color="muted">
         Lesson {formatDateTime(item.startsAt)} · reported {formatDateTime(item.createdAt)}
       </AppText>

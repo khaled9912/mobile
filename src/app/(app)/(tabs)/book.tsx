@@ -49,6 +49,11 @@ export default function BookScreen() {
   const assigned = assignedQuery.data;
   const assignedTeacher = assigned?.teacher ?? null;
   const series = assigned?.series ?? [];
+  const otherTeachers = assignedTeacher
+    ? teachers.filter((entry) => entry.teacher.id !== assignedTeacher.id)
+    : teachers;
+  const showDirectory = !assignedTeacher || otherTeachers.length > 0;
+  const directoryBusy = directoryQuery.isLoading || assignedQuery.isLoading;
   const { refreshing, onRefresh } = usePullRefresh(() =>
     Promise.all([directoryQuery.refetch(), assignedQuery.refetch()])
   );
@@ -179,10 +184,14 @@ export default function BookScreen() {
         ) : null}
 
         <View style={styles.directory}>
-          <SectionHeader
-            title={assignedTeacher ? "Other teachers" : "Choose your teacher"}
-          />
-          {directoryQuery.isLoading || assignedQuery.isLoading ? (
+          {showDirectory ? (
+            <SectionHeader
+              title={
+                assignedTeacher ? "Other teachers" : "Choose your teacher"
+              }
+            />
+          ) : null}
+          {!showDirectory ? null : directoryBusy ? (
             <View style={styles.list}>
               {[0, 1, 2].map((key) => (
                 <PersonRowSkeleton key={key} />
@@ -193,9 +202,9 @@ export default function BookScreen() {
               error={directoryQuery.error}
               onRetry={() => void directoryQuery.refetch()}
             />
-          ) : teachers.length ? (
+          ) : otherTeachers.length ? (
             <View style={styles.list}>
-              {teachers.map((entry) => {
+              {otherTeachers.map((entry) => {
                 const open = entry.slots.filter(
                   (slot) => slot.status === "available"
                 );
@@ -217,9 +226,6 @@ export default function BookScreen() {
                           <AppText variant="h3">
                             {entry.teacher.fullName}
                           </AppText>
-                          {entry.teacher.id === assignedTeacher?.id ? (
-                            <Badge label="Your teacher" tone="success" />
-                          ) : null}
                         </View>
                         <View style={styles.ratingRow}>
                           {entry.reviewCount > 0 &&

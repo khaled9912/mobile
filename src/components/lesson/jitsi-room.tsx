@@ -11,12 +11,20 @@ import { Camera } from "expo-camera";
 import { requestRecordingPermissionsAsync } from "expo-audio";
 import { JitsiMeeting } from "@jitsi/react-native-sdk";
 import { JITSI_DOMAIN } from "@/config/env";
+import { useRealtimeConnection } from "@/providers/realtime-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { AppText } from "@/components/ui/app-text";
 
 type JoinMode = "audio-video" | "audio-only" | "view-only";
 
+/** The lesson's one-share lock, as the hub reports it. */
+type ShareState = { on?: boolean; holder?: string | null };
+type ShareClaim = { accepted?: boolean; holder?: string | null };
+
+const UNKNOWN_HOLDER = "Another participant";
+
 type Props = {
+  lessonId: string;
   room: string;
   displayName: string;
   onJoined?: () => void;
@@ -67,6 +75,7 @@ const FLAGS = {
 };
 
 export const JitsiRoom = ({
+  lessonId,
   room,
   displayName,
   onJoined,
@@ -108,13 +117,78 @@ export const JitsiRoom = ({
     onLeftRef.current?.();
   }, []);
 
+  const { connection, revision } = useRealtimeConnection();
+  const [shareHolder, setShareHolder] = useState<string | null>(null);
+  // The SDK registers its listeners once on mount, so the share handler reads
+  // the live socket and lesson through refs.
+  const connectionRef = useRef(connection);
+  const lessonIdRef = useRef(lessonId);
+  useEffect(() => {
+    connectionRef.current = connection;
+    lessonIdRef.current = lessonId;
+  }, [connection, lessonId]);
+
+  const handleShareToggled = useCallback(({ sharing }: { sharing: boolean }) => {
+    const current = connectionRef.current;
+    const id = lessonIdRef.current;
+    // With no live socket the lock cannot be consulted, so sharing still works.
+    if (!current) return;
+
+    if (!sharing) {
+      void current.invoke("ReleaseLessonShare", id).catch(() => {});
+      return;
+    }
+
+    void current
+      .invoke<ShareClaim>("ClaimLessonShare", id)
+      .then((claim) => {
+        if (claim?.accepted) {
+          setShareHolder(null);
+          return;
+        }
+        // A native share cannot be stopped from here, so it has to be said.
+        setShareHolder(claim?.holder ?? UNKNOWN_HOLDER);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Follow the lock for as long as this call is up, and hand it back on the way
+  // out so hanging up mid-share never leaves the other person blocked.
+  useEffect(() => {
+    if (!mode || !connection) return;
+    let disposed = false;
+
+    const onChanged = (state: ShareState) =>
+      setShareHolder(state?.on ? (state.holder ?? UNKNOWN_HOLDER) : null);
+
+    connection.on("LessonShareChanged", onChanged);
+    // The snapshot answers both ways: it clears a stale holder from a
+    // reconnect and reports one that started before this client joined.
+    void connection
+      .invoke<ShareState>("JoinLessonShare", lessonId)
+      .then((state) => {
+        if (!disposed) {
+          setShareHolder(state?.on ? (state.holder ?? UNKNOWN_HOLDER) : null);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      connection.off("LessonShareChanged", onChanged);
+      void connection.invoke("ReleaseLessonShare", lessonId).catch(() => {});
+      void connection.invoke("LeaveLessonShare", lessonId).catch(() => {});
+    };
+  }, [connection, revision, mode, lessonId]);
+
   const eventListeners = useMemo(
     () => ({
       onConferenceJoined: handleJoined,
       onConferenceLeft: handleLeft,
       onReadyToClose: close,
+      onScreenShareToggled: handleShareToggled,
     }),
-    [close, handleJoined, handleLeft]
+    [close, handleJoined, handleLeft, handleShareToggled]
   );
 
   const config = useMemo(
@@ -332,6 +406,14 @@ export const JitsiRoom = ({
         eventListeners={eventListeners}
         style={styles.meeting}
       />
+      {shareHolder ? (
+        <View pointerEvents="none" style={styles.shareLock}>
+          <AppText variant="caption" color="#ffffff" align="center">
+            {shareHolder} is sharing their screen. Only one screen share at a
+            time — please stop yours.
+          </AppText>
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -383,6 +465,18 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   shareHintText: { flexShrink: 1 },
+  // Sits above the Jitsi toolbar so it never covers a control.
+  shareLock: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 96,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    backgroundColor: "rgba(10,14,16,0.88)",
+  },
   errorBox: {
     width: "100%",
     maxWidth: 360,

@@ -436,6 +436,7 @@ const LessonCallHost = ({
       >
         <JitsiRoom
           key={call.room}
+          lessonId={call.lessonId}
           room={call.room}
           displayName={call.displayName}
           onJoined={onJoined}

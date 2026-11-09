@@ -10,6 +10,7 @@ import {
   getTeacherAvailabilityAsAdmin,
   publishTeacherAvailabilityAsAdmin,
   publishWeeklyAvailability,
+  releaseTeacherAvailabilityAsAdmin,
 } from "@/api/scheduling";
 import type { WeeklyRule } from "@/api/types";
 import { useTheme } from "@/providers/theme-provider";
@@ -141,14 +142,22 @@ export const WeeklyAvailabilityEditor = ({
   });
 
   const remove = useMutation({
-    mutationFn: (ruleId: string) => {
+    mutationFn: async (rule: WeeklyRule) => {
       if (isAdmin && teacherId) {
-        return deleteTeacherAvailabilityAsAdmin(teacherId, ruleId);
+        // A booked time carries students' repeating series. Those must end
+        // before the slot itself can go, otherwise the API refuses to delete it.
+        if (rule.status !== "available")
+          await releaseTeacherAvailabilityAsAdmin(teacherId, rule.id);
+        return deleteTeacherAvailabilityAsAdmin(teacherId, rule.id);
       }
-      return deleteWeeklyAvailability(ruleId);
+      return deleteWeeklyAvailability(rule.id);
     },
-    onSuccess: async () => {
-      showToast("Weekly time removed.");
+    onSuccess: async (_result, rule) => {
+      showToast(
+        isAdmin && rule.status !== "available"
+          ? "Weekly time ended. The students booked on it and the teacher were notified."
+          : "Weekly time removed."
+      );
       await invalidate();
     },
     onError: (error) =>
@@ -181,18 +190,22 @@ export const WeeklyAvailabilityEditor = ({
   };
 
   const confirmRemove = (rule: WeeklyRule) => {
+    const endsSeries = isAdmin && rule.status !== "available";
+    const label = `${weekdayLabel(rule.dayOfWeek)} · ${formatWeeklyTimeRange(
+      rule.startsAtTime,
+      rule.endsAtTime
+    )}`;
     Alert.alert(
-      "Remove this weekly time?",
-      `${weekdayLabel(rule.dayOfWeek)} · ${formatWeeklyTimeRange(
-        rule.startsAtTime,
-        rule.endsAtTime
-      )} will no longer be offered.`,
+      endsSeries ? "End this booked weekly time?" : "Remove this weekly time?",
+      endsSeries
+        ? `${label} will be removed. The weekly lessons of every student booked on it end too, including all their future lessons. The students and the teacher are notified.`
+        : `${label} will no longer be offered.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Remove",
+          text: endsSeries ? "End and remove" : "Remove",
           style: "destructive",
-          onPress: () => remove.mutate(rule.id),
+          onPress: () => remove.mutate(rule),
         },
       ]
     );
@@ -349,8 +362,9 @@ export const WeeklyAvailabilityEditor = ({
                   </AppText>
                   {dayRules.map((rule) => {
                     const booked = rule.status !== "available";
+                    const endsSeries = isAdmin && booked;
                     const removing =
-                      remove.isPending && remove.variables === rule.id;
+                      remove.isPending && remove.variables?.id === rule.id;
                     return (
                       <Card key={rule.id}>
                         <View style={styles.ruleRow}>
@@ -372,10 +386,16 @@ export const WeeklyAvailabilityEditor = ({
                             tone={booked ? "info" : "success"}
                           />
                         </View>
-                        {booked ? null : (
+                        {booked && !isAdmin ? null : (
                           <View style={styles.ruleActions}>
                             <Button
-                              title={removing ? "Removing…" : "Remove"}
+                              title={
+                                removing
+                                  ? "Removing…"
+                                  : endsSeries
+                                    ? "End & remove"
+                                    : "Remove"
+                              }
                               variant="danger"
                               size="sm"
                               icon="trash-outline"

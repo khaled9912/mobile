@@ -1,8 +1,10 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLessons } from "@/api/lessons";
+import { markNotificationRead } from "@/api/notifications";
+import { NOTIFICATIONS_QUERY_KEY } from "@/hooks/use-notifications";
 import { useAuth } from "@/providers/auth-provider";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { buildLessonReminders } from "@/lib/lesson-reminders";
@@ -35,6 +37,14 @@ const linkFrom = (response: Notifications.NotificationResponse | null) => {
     : null;
 };
 
+/** A feed alert knows its own row, so tapping it clears the unread count. */
+const notificationIdFrom = (
+  response: Notifications.NotificationResponse | null
+) => {
+  const id = response?.notification.request.content.data?.notificationId;
+  return typeof id === "string" && id ? id : null;
+};
+
 const openLesson = (lessonId: string) => {
   router.push({ pathname: "/lesson/[id]", params: { id: lessonId } });
 };
@@ -46,6 +56,7 @@ const openLesson = (lessonId: string) => {
  */
 export const LessonReminderProvider = ({ children }: { children: ReactNode }) => {
   const { user, status } = useAuth();
+  const queryClient = useQueryClient();
   const authenticated = status === "authenticated" && Boolean(user);
   const role = user?.role ?? "student";
   // Support reviewers have no lessons of their own; the lessons endpoint would
@@ -88,6 +99,14 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
       const identifier = response?.notification.request.identifier;
       if (!identifier || handled.current.has(identifier)) return;
       handled.current.add(identifier);
+      const notificationId = notificationIdFrom(response);
+      if (notificationId) {
+        void markNotificationRead(notificationId)
+          .then(() =>
+            queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY })
+          )
+          .catch(() => {});
+      }
       const link = linkFrom(response);
       if (link) {
         router.push(link);
@@ -107,7 +126,7 @@ export const LessonReminderProvider = ({ children }: { children: ReactNode }) =>
     const subscription =
       Notifications.addNotificationResponseReceivedListener(handle);
     return () => subscription.remove();
-  }, [authenticated]);
+  }, [authenticated, queryClient]);
 
   return <>{children}</>;
 };

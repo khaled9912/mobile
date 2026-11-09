@@ -17,6 +17,7 @@ import {
 } from "@microsoft/signalr";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/api/client";
+import { setRealtimeLive } from "@/lib/realtime-liveness";
 import { useAuth } from "@/providers/auth-provider";
 
 /**
@@ -196,6 +197,11 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
         next.onclose(() => {
           connection = null;
           setLiveConnection(null);
+          // Polling is suspended while the socket is live, so this sweep is
+          // also what re-arms every interval now that it is not. While the app
+          // is backgrounded there is nothing to re-arm: focusManager pauses.
+          setRealtimeLive(false);
+          if (!paused) void queryClient.invalidateQueries();
           scheduleRetry();
         });
         await next.start();
@@ -205,6 +211,7 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
         }
         connection = next;
         retryAttempts = 0;
+        setRealtimeLive(true);
         setLiveConnection(next);
         setRevision((value) => value + 1);
       } catch {
@@ -221,6 +228,7 @@ export const RealtimeProvider = ({ children }: { children: ReactNode }) => {
       }
       const current = connection;
       connection = null;
+      setRealtimeLive(false);
       setLiveConnection(null);
       if (current) {
         try {

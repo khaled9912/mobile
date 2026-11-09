@@ -564,8 +564,9 @@ scheduler), which the current API does not provide.
 ### Lesson calls
 
 `LessonRingProvider` owns the incoming-call layer and reads `GET
-/api/calls/recent` (query key `["lesson-calls"]`) on launch, every 20 seconds,
-whenever the `calls` realtime scope arrives, and whenever any push is received.
+/api/calls/recent` (query key `["lesson-calls"]`) on launch, every 20 seconds
+while the SignalR socket is down, whenever the `calls` realtime scope arrives,
+and whenever any push is received.
 The newest unseen call younger than 90 seconds renders `IncomingCallBanner`
 over every screen, loops `assets/sounds/lesson_call.wav` through `expo-audio`,
 starts repeating haptics, and stops 45 seconds after it rings or as soon as the
@@ -583,7 +584,7 @@ build.
 | Push payload | The API sends the call with `channelId: lesson-calls-2`, `sound: lesson_call.wav`, `priority: high`, `interruptionLevel: time-sensitive`, `tag: lesson-call`, `ttl: 60`, `badge: 1` |
 | Sound asset | `assets/sounds/lesson_call.wav`, used twice: `require`d by `expo-audio` for the in-app ring, and registered through the `expo-notifications` config plugin so prebuild copies it to the iOS bundle and to `android/app/src/main/res/raw` for the notification. Until the app is rebuilt, Android falls back to the system notification sound instead of silence |
 | Badge | `shouldSetBadge` is true only for a notification whose sound is `lesson_call.wav`, so lesson reminders never badge |
-| iOS | A time-sensitive notification still follows the Silent switch and Focus, so an iPhone on silent rings visually only. There is no Critical Alerts entitlement yet. |
+| iOS | The build declares the Time Sensitive Notifications entitlement, so a call is presented through Focus and out of the summary rather than waiting there; the Silent switch still wins, because breaking it needs Apple's Critical Alerts entitlement, which is not held. Both capabilities must be ticked on the App ID before a profile will accept the entitlement |
 | App closed | Only the push can wake the app (push must be enabled — see the README). Reopening inside the 90-second window still rings; after that the call exists only as a notification-feed entry and a row on the lesson. |
 
 Push needs the one-time enablement described in the README (`eas init`, the

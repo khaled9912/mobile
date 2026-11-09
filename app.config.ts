@@ -49,6 +49,16 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.anaquran.academy",
+    // Without this capability Apple downgrades the call payload's
+    // `interruptionLevel: time-sensitive` to a plain alert, so a lesson ring
+    // sitting in Focus or a notification summary never surfaces. The App ID in
+    // Apple Developer must have "Time Sensitive Notifications" ticked before
+    // this builds, or provisioning rejects the entitlement.
+    // Critical Alerts is deliberately absent: Apple grants it case by case, and
+    // until then an iPhone on the silent switch gets the banner without sound.
+    entitlements: {
+      "com.apple.developer.usernotifications.time-sensitive": true,
+    },
     infoPlist: {
       NSCameraUsageDescription:
         "Ana Quran uses your camera so you can join live lessons with your teacher.",

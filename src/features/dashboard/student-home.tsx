@@ -28,6 +28,7 @@ import { AppText } from "@/components/ui/app-text";
 import { Card } from "@/components/ui/card";
 import {
   firstName,
+  laterLessons,
   todayLessons,
   upcomingLessons,
 } from "@/lib/lesson-selectors";
@@ -59,6 +60,7 @@ export const StudentHome = () => {
   const lessons = lessonsQuery.data ?? [];
   const today = todayLessons(lessons);
   const next = today[0];
+  const nextUp = laterLessons(lessons);
   const hasLaterLessons = upcomingLessons(lessons).length > 0;
   const changes = [...(changesQuery.data ?? [])].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
@@ -159,7 +161,7 @@ export const StudentHome = () => {
               <EmptyState
                 icon="calendar-outline"
                 title="No lessons today"
-                body="Your next lesson shows here on the day. Open the schedule to see the week ahead."
+                body="Your next lesson shows here on the day. What is coming up is listed below."
                 action={
                   <Button
                     title="Open schedule"
@@ -183,6 +185,21 @@ export const StudentHome = () => {
               />
             )}
           </View>
+
+          {nextUp.length ? (
+            <View style={styles.section}>
+              <SectionHeader title="Next up" />
+              <View style={styles.list}>
+                {nextUp.map((lesson) => (
+                  <LessonCard
+                    key={lesson.id}
+                    lesson={lesson}
+                    perspective="student"
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {changes.length ? (
             <View style={styles.section}>

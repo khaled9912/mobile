@@ -361,8 +361,9 @@ from the lesson-operations panel. Both use
   run alongside it and both stop 45 seconds after the ring starts, so an
   ignored call cannot keep vibrating the phone.
 - `src/providers/lesson-ring-provider.tsx` owns the ring. It polls
-  `GET /api/calls/recent` every 20 seconds, and the SignalR `calls` scope plus
-  any incoming push make it refetch immediately. Each call id rings once per
+  `GET /api/calls/recent` every 20 seconds only while the SignalR socket is
+  down, and the `calls` scope plus any incoming push make it refetch
+  immediately. Each call id rings once per
   session and only while it is younger than 90 seconds, so a call that happened
   an hour ago does not wake the phone.
 - The audible part is `expo-audio`: `startCallRinger()` loops the bundled
@@ -380,7 +381,10 @@ from the lesson-operations panel. Both use
   sound is a native change: it needs a new build, not just an OTA update, and a
   binary built before the plugin entry simply has no `res/raw` file — Android
   then falls back to the system sound and the in-app player still works.
-- On iOS the notification still obeys the Silent switch and Focus modes. Without
+- On iOS the notification still obeys the Silent switch. The build now carries
+  the **Time Sensitive Notifications** entitlement, so a lesson call is
+  presented through Focus modes and out of the notification summary instead of
+  waiting there — the user can still switch it off per app in Settings. Without
   Apple's Critical Alerts entitlement an iPhone on silent gets the banner and
   the badge but no audio, so the unread badge plus the "Call from your
   teacher/student" entry in the notification feed are the fallback.
@@ -565,13 +569,11 @@ EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://localhost:5001 npx ex
 # Android emulator — 10.0.2.2 is the host machine
 EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://10.0.2.2:5001 npx expo start
 
-# Physical device — your Mac's LAN address, same Wi-Fi
+# Physical device — your Mac's LAN address, same Wi-Fi. The Compose API
+# (`ana-quran-academy-api`, started with the backend's `./dev up`) publishes
+# :5001 on every interface, so a device reaches it with no extra flags.
 ipconfig getifaddr en0
 EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://192.168.1.20:5001 npx expo start
-
-# The containerized API (image `rayan-academy-api-e2e`) is already published on
-# every interface, so it works from a device with no extra dotnet flags
-EXPO_PUBLIC_APP_ENV=development EXPO_PUBLIC_API_URL=http://192.168.1.20:5002 npx expo start
 ```
 
 Release-mode builds against the same local API work too:
@@ -635,10 +637,24 @@ reminders keep working.
    - Rebuild the binary: `googleServicesFile` is native, so an OTA update will
      not pick it up.
 
-3. **iOS — APNs key.** In Apple Developer, create a key under *Apple Push
+3. **iOS — APNs key and the Time Sensitive capability.** In Apple Developer, create a key under *Apple Push
    Notification service* (APNs) and note the Key ID and your Team ID. Then
    `npx eas-cli@latest credentials` → iOS → upload the `.p8` for the
    distribution profile you already build with. Expo uses it automatically.
+
+   Still in Apple Developer, open *Certificates, Identifiers & Profiles →
+   Identifiers → com.anaquran.academy* and tick **Time Sensitive Notifications**
+   under Capabilities. `app.config.ts` asks for that entitlement, so a profile
+   generated before the tick makes the build fail with a
+   "profile doesn't include the entitlement" error rather than dropping the
+   ring quietly — regenerate the provisioning profile in EAS after ticking.
+   Without it Apple treats a lesson call as an ordinary alert and buries it in
+   Focus and in the notification summary.
+
+   `eas.json` carries the three profiles (`development`, `preview`,
+   `production`); all of them need `EAS_PROJECT_ID` and
+   `EXPO_GOOGLE_SERVICES_FILE` in the build environment to ship a binary that
+   can actually be rung.
 
 4. **Check it works.** On two physical dev builds, signed in as teacher and
    student:

@@ -34,6 +34,29 @@ export const todayLessons = (lessons: Lesson[], now = Date.now()) => {
   });
 };
 
+/** How many later lessons the dashboards preview before the full schedule. */
+export const NEXT_UP_LIMIT = 3;
+
+/** Local midnight at the start of the day the value falls on. */
+const dayStartMs = (ms: number) => {
+  const day = new Date(ms);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime();
+};
+
+/**
+ * Upcoming lessons starting after the viewer's current calendar day, capped
+ * for a preview. The dashboards lead with today, so this is the "next up".
+ */
+export const laterLessons = (
+  lessons: Lesson[],
+  now = Date.now(),
+  limit = NEXT_UP_LIMIT
+): Lesson[] =>
+  upcomingLessons(lessons, now)
+    .filter((lesson) => dayStartMs(startsAtMs(lesson)) > dayStartMs(now))
+    .slice(0, Math.max(0, limit));
+
 export type LessonDay = {
   /** Local midnight at the start of the day. */
   dayStart: number;

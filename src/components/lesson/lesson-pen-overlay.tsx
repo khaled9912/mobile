@@ -18,7 +18,7 @@ type SnapshotStroke = {
   width: number;
   points: number[];
 };
-type Snapshot = { strokes: SnapshotStroke[] };
+type Snapshot = { strokes: SnapshotStroke[]; frame: number };
 type StrokeStart = {
   id: string;
   color: string;
@@ -27,6 +27,7 @@ type StrokeStart = {
   y: number;
 };
 type StrokeAppend = { id: string; points: number[] };
+type FrameChanged = { frame: number };
 type Drawing = {
   id: string;
   x: number;
@@ -37,30 +38,55 @@ type Drawing = {
 
 const INK_COLORS = ["#ff5252", "#ffd166", "#6ee7b7", "#60a5fa"];
 const INK_WIDTH = 0.004;
+const DEFAULT_ASPECT = 16 / 9;
 // One batch per frame-ish keeps a fast scribble from flooding the socket.
 const APPEND_INTERVAL_MS = 60;
+// The grip is dragged continuously; the room only needs the settled ratio.
+const FRAME_INTERVAL_MS = 90;
+// The same limits the hub enforces, so a drag never lands on a rejected value.
+const MIN_ASPECT = 0.3;
+const MAX_ASPECT = 4;
 
 const clampUnit = (value: number) => Math.min(1, Math.max(0, value));
+const clampAspect = (value: number) =>
+  Math.min(MAX_ASPECT, Math.max(MIN_ASPECT, value));
 const roundPoints = (points: number[]) =>
   points.map((value) => Math.round(value * 10_000) / 10_000);
+
+type Box = { x: number; y: number; width: number; height: number };
+
+/** The largest centered box of the shared picture's ratio inside the stage. */
+const frameBox = (width: number, height: number, aspect: number): Box => {
+  const boxWidth = Math.min(width, height * aspect);
+  const boxHeight = boxWidth / aspect;
+  return {
+    x: (width - boxWidth) / 2,
+    y: (height - boxHeight) / 2,
+    width: boxWidth,
+    height: boxHeight,
+  };
+};
 
 const newStrokeId = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-const pathFor = (stroke: Stroke, width: number, height: number) => {
+const pathFor = (stroke: Stroke, box: Box) => {
   const { points } = stroke;
   if (points.length < 2) return "";
-  let path = `M${(points[0] * width).toFixed(2)} ${(points[1] * height).toFixed(2)}`;
+  let path = `M${(box.x + points[0] * box.width).toFixed(2)} ${(box.y + points[1] * box.height).toFixed(2)}`;
   for (let index = 2; index + 1 < points.length; index += 2) {
-    path += `L${(points[index] * width).toFixed(2)} ${(points[index + 1] * height).toFixed(2)}`;
+    path += `L${(box.x + points[index] * box.width).toFixed(2)} ${(box.y + points[index + 1] * box.height).toFixed(2)}`;
   }
   return path;
 };
 
 /**
- * A synced ink layer above the Jitsi view. Points are normalized to the shared
- * view, so marks track the share only as closely as the two layouts match —
- * letterboxing and portrait phones can drift.
+ * A synced ink layer above the Jitsi view. Marks are normalized inside a
+ * centered box fitted to the shared picture's ratio, so both screens write on
+ * the same part of the page instead of on their own viewport. That box tracks
+ * Jitsi's own letterboxing only approximately, because the filmstrip and
+ * controls shift the picture differently on every screen: the corner grip is
+ * how whoever marks corrects it, and only the ratio travels to the others.
  */
 export const LessonPenOverlay = ({
   lessonId,
@@ -77,12 +103,25 @@ export const LessonPenOverlay = ({
   const insets = useSafeAreaInsets();
   const [color, setColor] = useState(INK_COLORS[0]);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [aspect, setAspect] = useState(DEFAULT_ASPECT);
+  const [fitting, setFitting] = useState(false);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const strokesRef = useRef<Map<string, Stroke>>(new Map());
   const drawingRef = useRef<Drawing | null>(null);
   const frameRef = useRef<number | null>(null);
+  const lastFrameSent = useRef(0);
+  const frameDirty = useRef(false);
+  // Where the grip and the touch started, so only the drag delta is needed.
+  const fitFrom = useRef<{
+    x: number;
+    y: number;
+    pageX: number;
+    pageY: number;
+  } | null>(null);
   // The server only accepts strokes after JoinLessonPen registers the drawer.
   const readyRef = useRef(false);
+
+  const box = frameBox(size.width, size.height, aspect);
 
   const publish = useCallback(() => {
     setStrokes(
@@ -149,6 +188,11 @@ export const LessonPenOverlay = ({
       requestRender();
     };
 
+    const onFrame = (state: FrameChanged) => {
+      const next = Number(state?.frame);
+      if (Number.isFinite(next)) setAspect(clampAspect(next));
+    };
+
     const join = async () => {
       try {
         const snapshot = await connection.invoke<Snapshot>(
@@ -166,6 +210,8 @@ export const LessonPenOverlay = ({
           });
         }
         strokesRef.current = next;
+        const frame = Number(snapshot?.frame);
+        setAspect(Number.isFinite(frame) ? clampAspect(frame) : DEFAULT_ASPECT);
         readyRef.current = true;
         requestRender();
       } catch {
@@ -176,6 +222,7 @@ export const LessonPenOverlay = ({
     connection.on("PenStrokeStarted", onStarted);
     connection.on("PenStrokeAppended", onAppended);
     connection.on("PenCleared", onCleared);
+    connection.on("PenFrameChanged", onFrame);
     void join();
 
     return () => {
@@ -184,6 +231,7 @@ export const LessonPenOverlay = ({
       connection.off("PenStrokeStarted", onStarted);
       connection.off("PenStrokeAppended", onAppended);
       connection.off("PenCleared", onCleared);
+      connection.off("PenFrameChanged", onFrame);
       void connection.invoke("LeaveLessonPen", lessonId).catch(() => {});
     };
   }, [connection, lessonId, revision, requestRender]);
@@ -203,12 +251,78 @@ export const LessonPenOverlay = ({
     invoke("EndPenStroke", lessonId, current.id);
   }, [invoke, lessonId]);
 
-  const handleStart = (event: GestureResponderEvent) => {
-    if (!active || !canDraw || !readyRef.current || !size.width || !size.height) {
+  /** A stage position as a point inside the fitted box. */
+  const pointOf = (locationX: number, locationY: number) => {
+    if (box.width < 1 || box.height < 1) return null;
+    return {
+      x: clampUnit((locationX - box.x) / box.width),
+      y: clampUnit((locationY - box.y) / box.height),
+    };
+  };
+
+  const publishFrame = (next: number, force: boolean) => {
+    const now = Date.now();
+    if (!force && now - lastFrameSent.current < FRAME_INTERVAL_MS) {
+      frameDirty.current = true;
       return;
     }
-    const x = clampUnit(event.nativeEvent.locationX / size.width);
-    const y = clampUnit(event.nativeEvent.locationY / size.height);
+    lastFrameSent.current = now;
+    frameDirty.current = false;
+    void connection
+      ?.invoke("SetPenFrame", lessonId, Number(next.toFixed(4)))
+      .catch(() => {});
+  };
+
+  const fitGrant = (event: GestureResponderEvent) => {
+    fitFrom.current = {
+      x: box.x + box.width,
+      y: box.y + box.height,
+      pageX: event.nativeEvent.pageX,
+      pageY: event.nativeEvent.pageY,
+    };
+    setFitting(true);
+  };
+
+  const fitMove = (event: GestureResponderEvent) => {
+    const from = fitFrom.current;
+    if (!from) return;
+    const touch = event.nativeEvent;
+    const cornerX = from.x + (touch.pageX - from.pageX);
+    const cornerY = from.y + (touch.pageY - from.pageY);
+    // The corner is half a width and half a height from the centre, so its new
+    // distance from the centre is the picture's ratio directly.
+    const dx = Math.abs(cornerX - size.width / 2);
+    const dy = Math.abs(cornerY - size.height / 2);
+    if (dx < 8 || dy < 8) return;
+    const next = clampAspect(dx / dy);
+    if (Math.abs(next - aspect) < 0.002) return;
+    setAspect(next);
+    publishFrame(next, false);
+  };
+
+  const fitRelease = () => {
+    fitFrom.current = null;
+    setFitting(false);
+    if (frameDirty.current) publishFrame(aspect, true);
+  };
+
+  const handleStart = (event: GestureResponderEvent) => {
+    if (
+      !active ||
+      !canDraw ||
+      fitting ||
+      !readyRef.current ||
+      !size.width ||
+      !size.height
+    ) {
+      return;
+    }
+    const point = pointOf(
+      event.nativeEvent.locationX,
+      event.nativeEvent.locationY
+    );
+    if (!point) return;
+    const { x, y } = point;
     const id = newStrokeId();
     strokesRef.current.set(id, {
       id,
@@ -223,9 +337,13 @@ export const LessonPenOverlay = ({
 
   const handleMove = (event: GestureResponderEvent) => {
     const current = drawingRef.current;
-    if (!current || !size.width || !size.height) return;
-    const x = clampUnit(event.nativeEvent.locationX / size.width);
-    const y = clampUnit(event.nativeEvent.locationY / size.height);
+    if (!current || fitting) return;
+    const point = pointOf(
+      event.nativeEvent.locationX,
+      event.nativeEvent.locationY
+    );
+    if (!point) return;
+    const { x, y } = point;
     if (Math.abs(x - current.x) + Math.abs(y - current.y) < 0.0015) return;
 
     current.x = x;
@@ -279,15 +397,55 @@ export const LessonPenOverlay = ({
           {strokes.map((stroke) => (
             <Path
               key={stroke.id}
-              d={pathFor(stroke, size.width, size.height)}
+              d={pathFor(stroke, box)}
               stroke={stroke.color}
-              strokeWidth={Math.max(1, stroke.width * size.height)}
+              strokeWidth={Math.max(1, stroke.width * box.height)}
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"
             />
           ))}
         </Svg>
+      ) : null}
+
+      {drawing && box.width > 1 ? (
+        <>
+          {fitting ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.frame,
+                {
+                  left: box.x,
+                  top: box.y,
+                  width: box.width,
+                  height: box.height,
+                },
+              ]}
+            />
+          ) : null}
+          <View
+            accessibilityRole="adjustable"
+            accessibilityLabel="Drag to fit the marks to the shared screen"
+            accessibilityValue={{
+              min: MIN_ASPECT * 100,
+              max: MAX_ASPECT * 100,
+              now: Math.round(aspect * 100),
+            }}
+            hitSlop={10}
+            style={[
+              styles.grip,
+              { left: box.x + box.width, top: box.y + box.height },
+            ]}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderTerminationRequest={() => false}
+            onResponderGrant={fitGrant}
+            onResponderMove={fitMove}
+            onResponderRelease={fitRelease}
+            onResponderTerminate={fitRelease}
+          />
+        </>
       ) : null}
 
       {drawing ? (
@@ -338,6 +496,23 @@ export const LessonPenOverlay = ({
 
 const styles = StyleSheet.create({
   layer: { zIndex: 5 },
+  frame: {
+    position: "absolute",
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,209,102,0.85)",
+  },
+  grip: {
+    position: "absolute",
+    width: 26,
+    height: 26,
+    marginLeft: -13,
+    marginTop: -13,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: "#ffd166",
+    backgroundColor: "rgba(11,15,18,0.8)",
+  },
   bar: {
     position: "absolute",
     left: "50%",

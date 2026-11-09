@@ -5,6 +5,7 @@ import {
   COMPLETED_PAGE_SIZE,
   countCompletedLessons,
   firstName,
+  laterLessons,
   pastLessons,
   todayLessons,
   upcomingDayPage,
@@ -137,6 +138,37 @@ describe("lesson selectors", () => {
 
     expect(page.lessons.map((l) => l.id)).toEqual(["tomorrow"]);
     expect(page.hasMore).toBe(false);
+  });
+
+  it("previews the upcoming lessons after today, nearest first", () => {
+    const base = new Date(2026, 0, 5, 20, 0, 0);
+    const atLocal = (dayOffset: number, localHour: number) => {
+      const date = new Date(base);
+      date.setDate(date.getDate() + dayOffset);
+      date.setHours(localHour, 0, 0, 0);
+      return date.toISOString();
+    };
+    const span = (dayOffset: number) => ({
+      startsAt: atLocal(dayOffset, 10),
+      endsAt: atLocal(dayOffset, 11),
+    });
+
+    const lessons = [
+      lesson({ id: "today", startsAt: atLocal(0, 21), endsAt: atLocal(0, 22) }),
+      lesson({ id: "day4", ...span(4) }),
+      lesson({ id: "tomorrow", ...span(1) }),
+      lesson({ id: "cancelled", ...span(2), status: "cancelled" }),
+      lesson({ id: "day3", ...span(3) }),
+    ];
+
+    expect(laterLessons(lessons, base.getTime()).map((l) => l.id)).toEqual([
+      "tomorrow",
+      "day3",
+      "day4",
+    ]);
+    expect(
+      laterLessons(lessons, base.getTime(), 1).map((l) => l.id)
+    ).toEqual(["tomorrow"]);
   });
 
   it("keeps ended lessons from the last week but not older ones", () => {

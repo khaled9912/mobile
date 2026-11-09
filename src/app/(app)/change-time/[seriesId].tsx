@@ -295,19 +295,12 @@ export default function ChangeTimeScreen() {
                 <EmptyState
                   icon="time-outline"
                   title="No other times available"
-                  body={`${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time.`}
+                  body={`${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time below.`}
                   action={
                     <View style={styles.actions}>
                       <Button
                         title="Browse other teachers"
                         onPress={() => router.navigate("/book")}
-                      />
-                      <Button
-                        title="End weekly lessons"
-                        variant="danger"
-                        loading={endSeries.isPending}
-                        disabled={endSeries.isPending}
-                        onPress={confirmEndSeries}
                       />
                     </View>
                   }
@@ -326,6 +319,28 @@ export default function ChangeTimeScreen() {
                 />
               </View>
             ) : null}
+
+            <View style={styles.section}>
+              <SectionHeader title="Stop these weekly lessons" />
+              <Card>
+                <AppText variant="small" color="muted">
+                  Ending this weekly time cancels every future lesson with{" "}
+                  {series.teacherName}, not just the next one. Your teacher is
+                  told and the time opens up for other students. Lessons you
+                  have already taken, and your credits, are unaffected.
+                </AppText>
+                <View style={styles.stopAction}>
+                  <Button
+                    title={endSeries.isPending ? "Ending…" : "End weekly lessons"}
+                    variant="danger"
+                    icon="stop-circle-outline"
+                    loading={endSeries.isPending}
+                    disabled={endSeries.isPending}
+                    onPress={confirmEndSeries}
+                  />
+                </View>
+              </Card>
+            </View>
           </>
         )}
       </Screen>
@@ -340,6 +355,7 @@ const styles = StyleSheet.create({
   list: { gap: 18 },
   day: { gap: 8 },
   note: { marginTop: 10 },
+  stopAction: { marginTop: 14 },
   actions: { gap: 10, alignSelf: "stretch" },
   ruleRow: {
     flexDirection: "row",

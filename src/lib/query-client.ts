@@ -2,6 +2,7 @@ import NetInfo from "@react-native-community/netinfo";
 import { QueryClient, focusManager, onlineManager } from "@tanstack/react-query";
 import { AppState } from "react-native";
 import { ApiError } from "@/api/client";
+import { socketAwareInterval } from "@/lib/realtime-liveness";
 
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => {
@@ -23,7 +24,7 @@ focusManager.setEventListener((handleFocus) => {
  * demand. This slow cadence only repairs a missed event while the socket is
  * down; reconnect triggers a full invalidation.
  */
-export const LIVE_SYNC_INTERVAL = 120_000;
+export const LIVE_SYNC_INTERVAL = socketAwareInterval(120_000);
 
 const shouldRetry = (failureCount: number, error: unknown) => {
   if (error instanceof ApiError) {

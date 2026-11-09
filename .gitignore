@@ -17,6 +17,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Firebase hands this out per app and it carries the project's API key.
+google-services.json
 
 # Metro
 .metro-health-check*

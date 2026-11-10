@@ -1,11 +1,13 @@
 import { Alert, Linking } from "react-native";
 
-// The academy's WhatsApp account. Keep digits only; wa.me rejects "+" and
-// spaces. EXPO_PUBLIC_ACADEMY_WHATSAPP lets staging point elsewhere without
+// The academy's WhatsApp username. A handle resolves to the same chat as a
+// phone number but keeps the digits out of the app bundle and out of the
+// handoff screen, which prints whatever identifier the link carries.
+// EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME lets staging point elsewhere without
 // editing code.
-const ACADEMY_WHATSAPP = (
-  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP?.trim() || "201501223115"
-).replace(/\D/g, "");
+const ACADEMY_WHATSAPP_USERNAME = (
+  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME?.trim() || "anaquran"
+).replace(/^@/, "");
 const DEFAULT_MESSAGE =
   "Assalamu alaikum, I'd like to know more about Ana Quran lessons.";
 
@@ -29,27 +31,35 @@ export const openWhatsApp = (text?: string) => {
   // Pressables call onPress with an event, so only a real string may switch
   // this into share mode; anything else means "chat with the academy".
   const message = typeof text === "string" && text.trim() ? text.trim() : null;
-  const urls = message
-    ? [
-        `whatsapp://send?text=${encodeURIComponent(message)}`,
-        `https://wa.me/?text=${encodeURIComponent(message)}`,
-      ]
-    : [
-        `whatsapp://send?phone=${ACADEMY_WHATSAPP}&text=${encodeURIComponent(
-          DEFAULT_MESSAGE
-        )}`,
-        `https://wa.me/${ACADEMY_WHATSAPP}?text=${encodeURIComponent(
-          DEFAULT_MESSAGE
-        )}`,
-      ];
 
-  void openFirstAvailable(urls).then((opened) => {
-    if (opened) return;
+  if (message) {
+    // The share sheet is the only thing the private scheme can do without a
+    // phone number, so it stays first and wa.me backs it up.
+    void openFirstAvailable([
+      `whatsapp://send?text=${encodeURIComponent(message)}`,
+      `https://wa.me/?text=${encodeURIComponent(message)}`,
+    ]).then((opened) => {
+      if (!opened) {
+        Alert.alert(
+          "WhatsApp not available",
+          "Install WhatsApp to share the lesson link."
+        );
+      }
+    });
+    return;
+  }
+
+  // wa.me has no username form of the private scheme, so this relies on the
+  // universal link: the OS hands it to WhatsApp when installed, and otherwise
+  // lands on the page offering to install it.
+  void Linking.openURL(
+    `https://wa.me/@${ACADEMY_WHATSAPP_USERNAME}?text=${encodeURIComponent(
+      DEFAULT_MESSAGE
+    )}`
+  ).catch(() => {
     Alert.alert(
       "WhatsApp not available",
-      message
-        ? "Install WhatsApp to share the lesson link."
-        : "Install WhatsApp to chat with the academy."
+      "Install WhatsApp to chat with the academy."
     );
   });
 };

@@ -339,7 +339,8 @@ for whichever account is signed in on the device:
   Sign-out cancels every pending lesson reminder.
 - Delivery is per device and needs that account to have opened the app at least
   once since the lesson was booked. These two local alarms are separate from the
-  server notices (`Lesson tomorrow`, `Lesson in 1 hour`, `Lesson starting now`)
+  server notices (`Lesson tomorrow`, `Lesson in about 3 hours`,
+  `Lesson in 20 minutes`, `Lesson starting now`)
   and the call ring, which arrive as push once it is enabled.
 
 ---

@@ -11,21 +11,29 @@ const FLAGS_OFF: LessonRoomFlags = {
   chat: false,
   cameraBackground: false,
   pen: false,
+  transcription: false,
+  reportConcern: false,
 };
 
-/**
- * Read once at startup and kept for the session: Jitsi fixes its toolbar when
- * the conference is created, so a mid-call revalidation could only mislead.
- */
+/** Live app controls refresh; JitsiRoom separately snapshots its native config. */
 export const useLessonRoomFlags = () => {
-  const { data, isPending } = useQuery({
+  const { data, isFetched, isError } = useQuery({
     queryKey: LESSON_ROOM_FLAGS_KEY,
     queryFn: getLessonRoomFlags,
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    retry: false,
   });
 
-  return { flags: data ?? FLAGS_OFF, flagsLoaded: !isPending };
+  const flags = data ?? FLAGS_OFF;
+  return {
+    // React Query retains old data after a failed poll. Never keep these two
+    // features enabled from that stale response. Do not unmount a live room.
+    flags: isError
+      ? { ...flags, transcription: false, reportConcern: false }
+      : flags,
+    // isPending becomes true again when retrying an initial failure with no
+    // cached data. isFetched stays true, keeping an already-open room mounted.
+    flagsLoaded: isFetched,
+  };
 };

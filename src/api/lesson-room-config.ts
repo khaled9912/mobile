@@ -10,6 +10,8 @@ export interface LessonRoomFlags {
   chat: boolean;
   cameraBackground: boolean;
   pen: boolean;
+  transcription: boolean;
+  reportConcern: boolean;
 }
 
 export const LESSON_ROOM_FLAGS_KEY = ["config", "lesson-room"] as const;
@@ -23,5 +25,7 @@ export const getLessonRoomFlags = async (): Promise<LessonRoomFlags> => {
     chat: Boolean(raw?.chat),
     cameraBackground: Boolean(raw?.cameraBackground),
     pen: Boolean(raw?.pen),
+    transcription: raw?.transcription === true,
+    reportConcern: raw?.reportConcern === true,
   };
 };

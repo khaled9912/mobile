@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   getReviewQueue,
+  isCoverageReason,
   type ReviewFilter,
   type ReviewFlag,
   type ReviewQueueItem,
@@ -33,12 +34,20 @@ const filterOptions: { value: ReviewFilter; label: string }[] = [
 const flagLabel: Record<ReviewFlag, string> = {
   phone: "Phone number",
   email: "Email address",
-  platform: "Chat app",
+  platform: "External platform",
   offplatform: "Off-platform",
+  payment: "Payment discussion",
+  secrecy: "Secrecy language",
+  no_transcript: "No transcript captured",
+  unsupported_device: "Unsupported device",
 };
 
 const QueueCard = ({ lesson }: { lesson: ReviewQueueItem }) => {
   const { colors, spacing } = useTheme();
+  const speechReasons = lesson.flagReasons.filter(
+    (reason) => !isCoverageReason(reason)
+  );
+  const coverageReasons = lesson.flagReasons.filter(isCoverageReason);
   const statusBadge =
     lesson.reviewStatus === "submitted"
       ? { label: "Submitted", tone: "success" as const }
@@ -72,12 +81,17 @@ const QueueCard = ({ lesson }: { lesson: ReviewQueueItem }) => {
         ) : null}
         <Badge label={`${lesson.segments} segments`} />
       </View>
-      {lesson.flagReasons.length > 0 ? (
+      {speechReasons.length > 0 ? (
         <AppText
           variant="caption"
           style={{ color: colors.warning, marginTop: spacing.sm }}
         >
-          {lesson.flagReasons.map((flag) => flagLabel[flag] ?? flag).join(", ")}
+          {speechReasons.map((flag) => flagLabel[flag] ?? flag).join(", ")}
+        </AppText>
+      ) : null}
+      {coverageReasons.length > 0 ? (
+        <AppText variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
+          Coverage (informational): {coverageReasons.map((reason) => flagLabel[reason]).join(", ")}
         </AppText>
       ) : null}
       {lesson.reviewerName ? (
@@ -121,6 +135,11 @@ export default function ReviewsTab() {
             />
           }
         />
+        <AppText variant="small" color="muted" style={{ marginBottom: spacing.md }}>
+          Client text and keyword flags are unverified review signals. Coverage
+          gaps are informational, not misconduct. Transcript text is retained for
+          30 days.
+        </AppText>
         <Segmented
           label="Review queue filter"
           options={filterOptions}
@@ -148,7 +167,7 @@ export default function ReviewsTab() {
                 ? "Nothing waiting for review"
                 : "No lessons match this filter"
             }
-            body="Lessons appear here once their transcript has been captured."
+            body="No lessons are waiting in this view. Missing text is a coverage gap, not misconduct."
           />
         ) : (
           <View style={{ gap: spacing.md }}>

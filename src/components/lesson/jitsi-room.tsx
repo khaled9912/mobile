@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -63,6 +64,10 @@ const buildConfig = (mode: JoinMode, flags: LessonRoomFlags) => ({
   toolbarButtons: roomToolbarButtons(flags),
   disableReactions: true,
   disablePolls: true,
+  // Native v1 is unsupported for capture, regardless of the live app flag.
+  transcription: { enabled: false, autoTranscribeOnRecord: false },
+  recordingService: { enabled: false },
+  localRecording: { disable: true, disableSelfRecording: true },
   // The web room applies the academy backdrop by itself; the native SDK
   // exposes no such command, so the flag only opens the picker and the student
   // chooses the academy picture from it.
@@ -78,6 +83,8 @@ const FLAGS = {
   "android.screensharing.enabled": true,
   "pip.enabled": true,
   "prejoinpage.enabled": false,
+  "recording.enabled": false,
+  "ios.recording.enabled": false,
 };
 
 export const JitsiRoom = ({
@@ -255,7 +262,7 @@ export const JitsiRoom = ({
 
     return (
       <View style={styles.stage}>
-        <View style={styles.gate}>
+        <ScrollView contentContainerStyle={styles.gate}>
           <View style={styles.gateIcon}>
             <Ionicons name="videocam-outline" size={30} color="#ffffff" />
           </View>
@@ -272,6 +279,19 @@ export const JitsiRoom = ({
             This is a private, unlisted lesson room — share the link only with
             someone you trust.
           </AppText>
+
+          {flags.transcription ? (
+            <AppText
+              variant="small"
+              color="rgba(255,255,255,0.82)"
+              align="center"
+              style={styles.gateCopy}
+            >
+              This app cannot transcribe your own microphone. A participant who
+              consents on a supported web browser may contribute text from their
+              own microphone. Text is retained for 30 days.
+            </AppText>
+          ) : null}
 
           <View style={styles.gateButtons}>
             <Pressable
@@ -400,7 +420,7 @@ export const JitsiRoom = ({
               </View>
             </View>
           ) : null}
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -433,7 +453,7 @@ const styles = StyleSheet.create({
   stage: { flex: 1, backgroundColor: STAGE_BG },
   meeting: { flex: 1, backgroundColor: STAGE_BG },
   gate: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,

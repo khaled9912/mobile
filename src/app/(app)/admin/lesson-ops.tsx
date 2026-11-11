@@ -289,12 +289,18 @@ const incidentActions = [
   { value: "dismissed", label: "Dismiss" },
 ] as const;
 
+const conductActions = [
+  { value: "resolved", label: "Resolved after review" },
+  { value: "dismissed", label: "Dismiss concern" },
+] as const;
+
 function IncidentQueueCard({ item }: { item: LessonIncident }) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const conduct = item.type === "conduct_concern";
   const [action, setAction] = useState<
-    "student_no_show" | "teacher_no_show" | "both_absent" | "dismissed"
-  >("dismissed");
+    "student_no_show" | "teacher_no_show" | "both_absent" | "dismissed" | "resolved"
+  >(conduct ? "resolved" : "dismissed");
   const [minutes, setMinutes] = useState("");
   const [note, setNote] = useState("");
   const resolve = useMutation({
@@ -302,7 +308,8 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
       resolveLessonIncident(item.id, {
         action,
         note,
-        teacherPayableMinutes: minutes.trim() ? Number(minutes) : undefined,
+        teacherPayableMinutes:
+          !conduct && minutes.trim() ? Number(minutes) : undefined,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin", "incidents"] });
@@ -341,7 +348,7 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
       </AppText>
       <AppText variant="small">{item.detail}</AppText>
       <View style={styles.chips}>
-        {incidentActions.map((option) => {
+        {(conduct ? conductActions : incidentActions).map((option) => {
           const selected = action === option.value;
           return (
             <Pressable
@@ -361,13 +368,15 @@ function IncidentQueueCard({ item }: { item: LessonIncident }) {
           );
         })}
       </View>
-      <TextField
-        label="Teacher payable minutes (optional)"
-        value={minutes}
-        onChangeText={setMinutes}
-        keyboardType="number-pad"
-        placeholder="Leave empty to use the policy default"
-      />
+      {conduct ? null : (
+        <TextField
+          label="Teacher payable minutes (optional)"
+          value={minutes}
+          onChangeText={setMinutes}
+          keyboardType="number-pad"
+          placeholder="Leave empty to use the policy default"
+        />
+      )}
       <NoteField value={note} onChange={setNote} />
       <Button
         title="Resolve incident"

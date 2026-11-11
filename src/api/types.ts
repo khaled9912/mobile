@@ -98,7 +98,8 @@ export type CancellationOutcome =
   | "student_no_show"
   | "teacher_no_show"
   | "both_absent"
-  | "series_ended";
+  | "series_ended"
+  | "series_rescheduled";
 
 export interface Lesson {
   id: string;
@@ -250,6 +251,12 @@ export interface ExcuseRequest {
   reviewedAt?: string | null;
 }
 
+export type LessonIncidentType =
+  | "attendance_dispute"
+  | "potential_student_no_show"
+  | "potential_teacher_no_show"
+  | "conduct_concern";
+
 export interface LessonIncident {
   id: string;
   lessonId: string;
@@ -258,12 +265,14 @@ export interface LessonIncident {
   teacherName: string;
   studentId: string;
   studentName: string;
-  type: string;
+  type: LessonIncidentType;
   status: string;
   detail: string;
   createdAt: string;
   resolvedAt?: string | null;
   resolutionNote?: string | null;
+  /** Null when the lesson-ops monitor filed the row from room presence. */
+  reportedBy?: string | null;
 }
 
 /** One in-app ring between the two participants, or from staff to one side. */
@@ -311,7 +320,7 @@ export interface LessonOperations {
   attendance: AttendanceSummary;
   hours?: TeacherHours | null;
   excuse?: ExcuseRequest | null;
-  incident?: LessonIncident | null;
+  incidents: LessonIncident[];
   replacementLesson?: Lesson | null;
   originalLesson?: Lesson | null;
   calls: LessonCall[];

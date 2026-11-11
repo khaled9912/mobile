@@ -466,6 +466,8 @@ export interface WeeklyRule {
   endsAtTime: string;
   timeZoneId: string;
   status: WeeklyRuleStatus;
+  /** When this recurring time happens next, or null if the teacher is away. */
+  nextStartsAt?: string | null;
 }
 
 /** A teacher in the student-facing directory, with their weekly times. */
@@ -527,6 +529,8 @@ export interface WeeklyAvailability {
   reviewCount: number;
   reviews: TeacherReview[] | null;
   hasLessons: boolean;
+  /** Academy-wide notice a weekly-time move must leave the teacher, in minutes. */
+  timeChangeLeadMinutes?: number;
 }
 
 export type OpenOfferStatus = "open" | "claimed" | "withdrawn";

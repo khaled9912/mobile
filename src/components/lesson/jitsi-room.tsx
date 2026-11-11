@@ -11,6 +11,7 @@ import { Camera } from "expo-camera";
 import { requestRecordingPermissionsAsync } from "expo-audio";
 import { JitsiMeeting } from "@jitsi/react-native-sdk";
 import { JITSI_DOMAIN } from "@/config/env";
+import type { LessonRoomFlags } from "@/api/lesson-room-config";
 import { useRealtimeConnection } from "@/providers/realtime-provider";
 import { useTheme } from "@/providers/theme-provider";
 import { AppText } from "@/components/ui/app-text";
@@ -27,6 +28,7 @@ type Props = {
   lessonId: string;
   room: string;
   displayName: string;
+  flags: LessonRoomFlags;
   onJoined?: () => void;
   onLeft?: () => void;
   onClose: () => void;
@@ -37,16 +39,17 @@ const SERVER_URL = `https://${JITSI_DOMAIN}/`;
 
 // Mirrors the web room's toolbar so both clients offer the same controls,
 // including the screen share button (native ReplayKit / MediaProjection).
-const TOOLBAR_BUTTONS = [
+// Leaving is deliberately absent: the room overlay owns it, so every exit can
+// ask for confirmation first — the SDK hangs up the moment it is pressed.
+const roomToolbarButtons = (flags: LessonRoomFlags) => [
   "microphone",
   "camera",
   "desktop",
-  "whiteboard",
-  "chat",
-  "hangup",
+  ...(flags.whiteboard ? ["whiteboard"] : []),
+  ...(flags.chat ? ["chat"] : []),
 ];
 
-const buildConfig = (mode: JoinMode) => ({
+const buildConfig = (mode: JoinMode, flags: LessonRoomFlags) => ({
   prejoinPageEnabled: false,
   prejoinConfig: { enabled: false, hideDisplayName: true },
   requireDisplayName: false,
@@ -57,10 +60,13 @@ const buildConfig = (mode: JoinMode) => ({
   startWithAudioMuted: mode === "view-only",
   startWithVideoMuted: mode !== "audio-video",
   enableInsecureRoomNameWarning: false,
-  toolbarButtons: TOOLBAR_BUTTONS,
+  toolbarButtons: roomToolbarButtons(flags),
   disableReactions: true,
   disablePolls: true,
-  disableVirtualBackground: true,
+  // The web room applies the academy backdrop by itself; the native SDK
+  // exposes no such command, so the flag only opens the picker and the student
+  // chooses the academy picture from it.
+  disableVirtualBackground: !flags.cameraBackground,
   hideConferenceSubject: true,
   hideConferenceTimer: true,
 });
@@ -78,6 +84,7 @@ export const JitsiRoom = ({
   lessonId,
   room,
   displayName,
+  flags,
   onJoined,
   onLeft,
   onClose,
@@ -191,9 +198,13 @@ export const JitsiRoom = ({
     [close, handleJoined, handleLeft, handleShareToggled]
   );
 
+  // Captured at mount on purpose: Jitsi fixes its toolbar and background
+  // switches when the conference is created, so later flag changes are ignored.
+  const [roomFlags] = useState(flags);
+
   const config = useMemo(
-    () => (mode ? buildConfig(mode) : undefined),
-    [mode]
+    () => (mode ? buildConfig(mode, roomFlags) : undefined),
+    [mode, roomFlags]
   );
 
   const userInfo = useMemo(

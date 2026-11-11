@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Alert,
   Pressable,
   StyleSheet,
   View,
@@ -21,6 +22,8 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/auth-provider";
 import { sendAttendanceEvent } from "@/api/lesson-operations";
+import { useLessonRoomFlags } from "@/hooks/use-lesson-room-flags";
+import type { LessonRoomFlags } from "@/api/lesson-room-config";
 import { getDeviceId } from "@/lib/device-id";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
 import { LessonPenOverlay } from "@/components/lesson/lesson-pen-overlay";
@@ -163,6 +166,10 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
     return () => clearTimeout(timer);
   }, [endCall, status]);
 
+  // Loaded with the app so a room opened later never has to wait on it: the
+  // flags decide the Jitsi toolbar, which is fixed once the conference exists.
+  const { flags, flagsLoaded } = useLessonRoomFlags();
+
   const value = useMemo(
     () => ({
       call,
@@ -179,9 +186,10 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
   return (
     <LessonCallContext.Provider value={value}>
       {children}
-      {call ? (
+      {call && flagsLoaded ? (
         <LessonCallHost
           call={call}
+          flags={flags}
           joined={joined}
           minimized={minimized}
           onJoined={handleJoined}
@@ -196,6 +204,7 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
 
 const LessonCallHost = ({
   call,
+  flags,
   joined,
   minimized,
   onJoined,
@@ -204,6 +213,7 @@ const LessonCallHost = ({
   onEnd,
 }: {
   call: ActiveLessonCall;
+  flags: LessonRoomFlags;
   joined: boolean;
   minimized: boolean;
   onJoined: () => void;
@@ -252,14 +262,38 @@ const LessonCallHost = ({
   const [penActive, setPenActive] = useState(false);
   const { role } = useAuth();
   // The server enforces the same rule; this only decides who sees the button.
+  // Marking is also a switch: no flag, no pen and no ink layer.
   const canMark =
-    role === "teacher" || role === "admin" || role === "super_admin";
+    flags.pen &&
+    (role === "teacher" || role === "admin" || role === "super_admin");
 
   // Marking takes over touches, so shrinking the room must drop it.
   const minimize = useCallback(() => {
     setPenActive(false);
     onMinimized(true);
   }, [onMinimized]);
+
+  // The leave controls sit next to the ones used mid-lesson, so an accidental
+  // press must not drop the call. A room that was never joined has nothing to
+  // drop, so it closes straight away.
+  const requestLeave = useCallback(() => {
+    if (!joined) {
+      endAndReturn();
+      return;
+    }
+    Alert.alert(
+      "Leave the lesson?",
+      "You will stop seeing and hearing the room. The lesson itself keeps running.",
+      [
+        { text: "Stay in the lesson", style: "cancel" },
+        {
+          text: "Leave the lesson",
+          style: "destructive",
+          onPress: endAndReturn,
+        },
+      ]
+    );
+  }, [endAndReturn, joined]);
 
   const containerStyle: StyleProp<ViewStyle> = expanded
     ? styles.expandedHost
@@ -348,23 +382,6 @@ const LessonCallHost = ({
           >
             <Ionicons name="share-outline" size={19} color="#ffffff" />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Leave lesson"
-            hitSlop={10}
-            onPress={endAndReturn}
-            style={({ pressed }) => [
-              styles.hangupButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name="call"
-              size={16}
-              color="#ffffff"
-              style={styles.hangupIcon}
-            />
-          </Pressable>
         </View>
       ) : null}
 
@@ -411,7 +428,7 @@ const LessonCallHost = ({
             accessibilityRole="button"
             accessibilityLabel="Leave lesson"
             hitSlop={8}
-            onPress={endAndReturn}
+            onPress={requestLeave}
             style={({ pressed }) => [
               styles.miniHangup,
               pressed && styles.pressed,
@@ -439,6 +456,7 @@ const LessonCallHost = ({
           lessonId={call.lessonId}
           room={call.room}
           displayName={call.displayName}
+          flags={flags}
           onJoined={onJoined}
           onLeft={onLeft}
           onClose={endAndReturn}
@@ -450,6 +468,28 @@ const LessonCallHost = ({
             canDraw={canMark}
             onDone={() => setPenActive(false)}
           />
+        ) : null}
+        {expanded && joined && !penActive ? (
+          // The room's own leave control. It sits above the toolbar row the
+          // SDK draws, so it never covers the microphone or chat buttons.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Leave lesson"
+            hitSlop={10}
+            onPress={requestLeave}
+            style={({ pressed }) => [
+              styles.leaveButton,
+              { bottom: insets.bottom + 92 },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons
+              name="call"
+              size={20}
+              color="#ffffff"
+              style={styles.hangupIcon}
+            />
+          </Pressable>
         ) : null}
         <View
           pointerEvents="none"
@@ -538,13 +578,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.09)",
   },
-  hangupButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  leaveButton: {
+    position: "absolute",
+    right: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#d94a3f",
+    zIndex: 4,
+    elevation: 4,
   },
   penActiveButton: { backgroundColor: "#ffd166" },
   hangupIcon: { transform: [{ rotate: "135deg" }] },

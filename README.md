@@ -164,7 +164,7 @@ Navigation rules:
 | In-app notifications | notifications surface from Home/Profile |
 | Teacher weekly availability | `(app)/availability` |
 | Student weekly time change | `(app)/change-time/[seriesId]` (from Home or Requests) |
-| Admin time-change queue | `(app)/(tabs)/requests` |
+| Admin time-change history (read-only) | `(app)/(tabs)/requests` |
 | Admin dashboard | `(app)/(tabs)/index` (admin variant) |
 | Admin students/teachers/assignments | `(app)/(tabs)/people`, `people/new`, `people/assign` |
 | Admin: manage a teacher's weekly rules | `(app)/people/availability/[teacherId]` (from People → Teachers) |
@@ -178,7 +178,7 @@ Navigation rules:
 | --- | --- | --- | --- |
 | Home | ✓ | ✓ | ✓ |
 | Book | ✓ | — | — |
-| Requests | ✓ (mine) | — | ✓ (queue) |
+| Requests | ✓ (mine) | — | ✓ (history) |
 | Schedule | ✓ | ✓ | ✓ |
 | Reviews | — | — | ✓ |
 | People | — | — | ✓ |
@@ -403,7 +403,7 @@ forms) instead of only on the tab roots. The Expo Router tab bar is hidden;
 the stack keeps its native headers and swipe-back gestures.
 
 - Tabs are role-filtered: Home, Book (`student`), Requests (students see their
-own time changes, admins see the queue), Schedule, Reviews
+own time changes, admins see the read-only history), Schedule, Reviews
 (`admin`/`super_admin`/`support`), People (`admin`), Profile.
   Teachers have no request screen at all.
 - Screens inside a section keep their tab highlighted via `sectionTab()`
@@ -419,7 +419,7 @@ foreground as a fallback. `LIVE_SYNC_INTERVAL` in `src/lib/query-client.ts`
 
 - `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
   reminders all update together) and `["lessons", id]` in the lesson room.
-- `["change-requests", …]` for the student's own requests and the admin queue.
+- `["change-requests", …]` for the student's own changes and the admin history.
 - `["teacher-directory"]`, `["assigned-teacher"]`, `["series"]` and
   `["availability-rules","teacher"]` so a booking, a published rule, or an
   admin change appears for the other role without a refresh.
@@ -734,13 +734,17 @@ Manual device QA still matters because unit tests do not exercise native UI:
    landing page every time, both actions work, and signing out returns here.
 2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
-3. Student: browse teachers, book one or more weekly times, move one to another
-   open slot, join the room at the start time, submit a review after the lesson.
+3. Student: browse teachers, book two weekly times (e.g. Monday and Thursday),
+   change Monday's weekly time to another open slot and confirm Thursday is
+   unchanged and Monday's old lessons show "Weekly time changed"; propose a
+   one-lesson move, accept it as the teacher, and confirm the weekly booking
+   stays; join the room at the start time, submit a review after the lesson.
 4. Teacher: announce weekly rules, start the room, submit a report after the end
    time.
 5. Admin: open the time-change history and confirm the move is recorded and
-   notified, create/deactivate/reactivate an account, assign a teacher, manage a
-   teacher's weekly rules from People, read contact messages.
+   notified (student, teacher, admins), create/deactivate/reactivate an account,
+   assign a teacher, manage a teacher's weekly rules from People, read contact
+   messages.
 6. Time zones: set the device to a US or UK zone while the teacher is in another
    zone and confirm the Book, teacher profile, Home, and change-time screens show
    converted times and the "Times shown in your time zone" note; teacher and

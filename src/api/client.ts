@@ -113,6 +113,8 @@ export type ApiRequestOptions = {
   headers?: Record<string, string>;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** Best-effort call metadata must not sign out or interrupt a live meeting. */
+  suppressUnauthorized?: boolean;
 };
 
 /**
@@ -164,6 +166,7 @@ export async function apiFetch<T>(
   options.signal?.addEventListener("abort", relayAbort);
 
   let response: Response;
+  let payload: unknown;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? "GET",
@@ -172,6 +175,14 @@ export async function apiFetch<T>(
       credentials: "include",
       signal: controller.signal,
     });
+    // Keep the timeout alive while reading the body too.
+    const contentType = response.headers.get("content-type") ?? "";
+    payload = response.status !== 204 && contentType.includes("json")
+      ? await response.json().catch((error: unknown) => {
+          if (controller.signal.aborted) throw error;
+          return null;
+        })
+      : null;
   } catch (error) {
     if (options.signal?.aborted) throw error;
     if (timedOut) {
@@ -197,16 +208,12 @@ export async function apiFetch<T>(
     return null as T;
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("json")
-    ? await response.json().catch(() => null)
-    : null;
-
   debug?.succeed(response.status, payload);
 
   if (!response.ok) {
     if (
       response.status === 401 &&
+      !options.suppressUnauthorized &&
       !SILENT_401_PREFIXES.some((prefix) => path.startsWith(prefix))
     ) {
       notifyUnauthorized();

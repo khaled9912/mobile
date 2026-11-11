@@ -4,8 +4,10 @@ import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getReviewWorkspace,
+  isCoverageReason,
   saveQualityReview,
   type LessonQualityReview,
+  type ReviewCapture,
   type ReviewFlag,
   type ReviewMetrics,
   type ReviewSegment,
@@ -33,8 +35,12 @@ import { formatDateTime } from "@/lib/format";
 const flagLabel: Record<ReviewFlag, string> = {
   phone: "Phone number",
   email: "Email address",
-  platform: "Chat app",
+  platform: "External platform",
   offplatform: "Off-platform",
+  payment: "Payment discussion",
+  secrecy: "Secrecy language",
+  no_transcript: "No transcript captured",
+  unsupported_device: "Unsupported device",
 };
 
 const offset = (seconds: number | null) => {
@@ -135,16 +141,66 @@ const MetricCell = ({ label, value }: { label: string; value: string }) => (
   </View>
 );
 
+const CaptureCoverage = ({
+  captures,
+  reasons,
+}: {
+  captures: ReviewCapture[];
+  reasons: string[];
+}) => {
+  const { spacing } = useTheme();
+  return (
+    <Card>
+      <AppText variant="h3">Transcript coverage</AppText>
+      <AppText variant="small" color="muted" style={{ marginTop: spacing.sm }}>
+        Client text and keyword flags are unverified review signals. Missing text
+        is not misconduct and must not be used to infer a score. Transcript text
+        is retained for 30 days.
+      </AppText>
+      {reasons.length > 0 ? (
+        <AppText variant="caption" color="muted" style={{ marginTop: spacing.sm }}>
+          Coverage (informational): {reasons.map((reason) => flagLabel[reason as ReviewFlag] ?? reason).join(", ")}
+        </AppText>
+      ) : null}
+      {captures.length === 0 ? (
+        <AppText variant="small" color="muted" style={{ marginTop: spacing.sm }}>
+          No capture status reported.
+        </AppText>
+      ) : captures.map((capture, index) => (
+        <View key={`${capture.role}:${index}`} style={{ marginTop: spacing.md, gap: 4 }}>
+          <AppText variant="label">
+            {capture.role} · {capture.lastStatus === "unsupported"
+              ? "Unsupported device"
+              : capture.lastStatus?.replaceAll("_", " ") || "No status reported"}
+          </AppText>
+          <AppText variant="caption" color="muted">
+            Reported status, not verified capture · {capture.segmentCount} text segments
+            {capture.expected ? " · Coverage expected" : " · Coverage not expected"}
+          </AppText>
+          <AppText variant="caption" color="muted">
+            First seen: {capture.firstSeenAt ? formatDateTime(capture.firstSeenAt) : "Not reported"}
+            {"\n"}Last seen: {capture.lastSeenAt ? formatDateTime(capture.lastSeenAt) : "Not reported"}
+            {"\n"}Last text: {capture.lastSegmentAt ? formatDateTime(capture.lastSegmentAt) : "None reported"}
+          </AppText>
+        </View>
+      ))}
+    </Card>
+  );
+};
+
 const MetricsCard = ({ metrics }: { metrics: ReviewMetrics }) => {
   const { colors, radius, spacing } = useTheme();
   const teacher = metrics.teacherTalkPercent;
   const student = metrics.studentTalkPercent;
+  const speechReasons = metrics.flagReasons.filter(
+    (reason) => !isCoverageReason(reason)
+  );
   return (
     <Card>
       <View style={styles.metricGrid}>
         <MetricCell label="Segments" value={String(metrics.segments)} />
         <MetricCell
-          label="Recorded"
+          label="Transcript span"
           value={duration(metrics.recordedSeconds)}
         />
         <MetricCell label="Flagged" value={String(metrics.flaggedSegments)} />
@@ -159,7 +215,7 @@ const MetricsCard = ({ metrics }: { metrics: ReviewMetrics }) => {
         </AppText>
         {teacher === null || student === null ? (
           <AppText variant="small" color="muted" style={{ marginTop: 4 }}>
-            Speaker labels were not recognised.
+            Not enough attributed text to estimate talk balance.
           </AppText>
         ) : (
           <>
@@ -198,9 +254,9 @@ const MetricsCard = ({ metrics }: { metrics: ReviewMetrics }) => {
           </>
         )}
       </View>
-      {metrics.flagReasons.length > 0 ? (
+      {speechReasons.length > 0 ? (
         <View style={[styles.badges, { marginTop: spacing.sm }]}>
-          {metrics.flagReasons.map((flag) => (
+          {speechReasons.map((flag) => (
             <Badge
               key={flag}
               label={flagLabel[flag] ?? flag}
@@ -215,7 +271,8 @@ const MetricsCard = ({ metrics }: { metrics: ReviewMetrics }) => {
 
 const SegmentRow = ({ segment }: { segment: ReviewSegment }) => {
   const { colors, radius, spacing } = useTheme();
-  const flagged = segment.flags.length > 0;
+  const speechFlags = segment.flags.filter((flag) => !isCoverageReason(flag));
+  const flagged = speechFlags.length > 0;
   const time = offset(segment.atSeconds);
   return (
     <View
@@ -238,7 +295,13 @@ const SegmentRow = ({ segment }: { segment: ReviewSegment }) => {
             {time}
           </AppText>
         ) : null}
-        {segment.flags.map((flag) => (
+        <Badge
+          label={segment.source === "client"
+            ? "Client text · unverified"
+            : segment.source === "server" ? "Server text" : "Source not reported"}
+          tone="neutral"
+        />
+        {speechFlags.map((flag) => (
           <Badge
             key={flag}
             label={flagLabel[flag] ?? flag}
@@ -256,10 +319,12 @@ const SegmentRow = ({ segment }: { segment: ReviewSegment }) => {
 function ReviewForm({
   lessonId,
   review,
+  hasTranscript,
   onSaved,
 }: {
   lessonId: string;
   review: LessonQualityReview | null;
+  hasTranscript: boolean;
   onSaved: (status: ReviewStatus) => void;
 }) {
   const { spacing } = useTheme();
@@ -297,13 +362,8 @@ function ReviewForm({
       await queryClient.invalidateQueries({ queryKey: ["reviews", "queue"] });
       onSaved(status);
     },
-    onError: (mutationError) => {
-      showToast(
-        mutationError instanceof Error
-          ? mutationError.message
-          : "The review could not be saved.",
-        "error"
-      );
+    onError: () => {
+      showToast("The review could not be saved.", "error");
     },
   });
 
@@ -335,6 +395,17 @@ function ReviewForm({
         }
       />
 
+      {hasTranscript ? null : (
+        <AppText variant="small" color="muted">
+          No transcript text is retained for this lesson. Save follow-up notes as
+          a draft; do not score missing capture as poor teaching.
+        </AppText>
+      )}
+      <AppText variant="caption" color="muted">
+        Save summaries and follow-up actions, not copied transcript quotes.
+      </AppText>
+
+      {hasTranscript ? (
       <Card>
         <View style={{ gap: spacing.lg }}>
           {scoreFields.map((field) => (
@@ -350,6 +421,7 @@ function ReviewForm({
           ))}
         </View>
       </Card>
+      ) : null}
 
       <TextField
         label="What went well"
@@ -389,6 +461,7 @@ function ReviewForm({
           title="Submit review"
           icon="send-outline"
           loading={mutation.isPending}
+          disabled={!hasTranscript}
           onPress={() => handleSave("submitted")}
           fullWidth
         />
@@ -452,6 +525,14 @@ export default function LessonReviewScreen() {
               subtitle={`${formatDateTime(workspace.lesson.startsAt)} · ${workspace.lesson.status}`}
             />
 
+            <CaptureCoverage
+              captures={workspace.captures ?? []}
+              reasons={[...new Set([
+                ...(workspace.coverageReasons ?? []),
+                ...workspace.metrics.flagReasons.filter(isCoverageReason),
+              ])]}
+            />
+            <View style={{ height: spacing.md }} />
             <MetricsCard metrics={workspace.metrics} />
 
             <View style={{ height: spacing.xl }} />
@@ -459,6 +540,7 @@ export default function LessonReviewScreen() {
               key={`${lessonId}:${workspace.review?.updatedAt ?? "new"}`}
               lessonId={lessonId}
               review={workspace.review}
+              hasTranscript={workspace.segments.length > 0}
               onSaved={(status) =>
                 showToast(status === "submitted" ? "Review submitted." : "Draft saved.")
               }
@@ -469,8 +551,8 @@ export default function LessonReviewScreen() {
             {workspace.segments.length === 0 ? (
               <EmptyState
                 icon="document-text-outline"
-                title="No transcript yet"
-                body="This lesson has not been transcribed, so it cannot be reviewed."
+                title="No transcript captured"
+                body="Text may be unavailable, unsupported, or past the 30-day retention period. Missing text is not misconduct; do not infer a score from its absence."
               />
             ) : (
               <View style={{ gap: spacing.sm }}>

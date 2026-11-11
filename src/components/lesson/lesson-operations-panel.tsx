@@ -30,6 +30,7 @@ import type {
   AttendanceParticipant,
   CancellationPreview,
   Lesson,
+  LessonIncident,
   LessonOperations,
   RescheduleRequest,
 } from "@/api/types";
@@ -45,6 +46,7 @@ const outcomeLabels: Record<string, string> = {
   teacher_no_show: "Teacher no-show",
   both_absent: "Both participants absent",
   series_ended: "Weekly lessons ended",
+  series_rescheduled: "Weekly time changed",
 };
 
 const rescheduleStatusLabels: Record<string, string> = {
@@ -66,7 +68,31 @@ const incidentTypes = [
   { value: "attendance_dispute", label: "Attendance dispute" },
   { value: "potential_student_no_show", label: "Student did not attend" },
   { value: "potential_teacher_no_show", label: "Teacher did not attend" },
-];
+] as const;
+
+/**
+ * The no-show rows name who missed the lesson, so each side is only ever
+ * offered the row about the other person. Reporting your own absence is not a
+ * thing a participant should be invited to do; the admin queue still accepts
+ * every type, because that is where the academy records what it confirmed.
+ */
+const incidentTypesFor = (role: string | null) =>
+  incidentTypes.filter(
+    (option) =>
+      option.value === "attendance_dispute" ||
+      (role === "teacher" && option.value === "potential_student_no_show") ||
+      (role === "student" && option.value === "potential_teacher_no_show")
+  );
+
+/** A monitor noticing a no-show is not the other side complaining about you. */
+const reportSource = (report: LessonIncident, role: string | null) => {
+  if (!report.reportedBy) return "Recorded automatically";
+  if (report.reportedBy === report.teacherId)
+    return role === "teacher" ? "Your report" : `Filed by ${report.teacherName}`;
+  if (report.reportedBy === report.studentId)
+    return role === "student" ? "Your report" : `Filed by ${report.studentName}`;
+  return "Filed by the academy";
+};
 
 /** Mirrors the backend guard so the button explains itself instead of failing. */
 const CALL_COOLDOWN_MS = 30_000;
@@ -477,12 +503,15 @@ function RescheduleSection({
     !isMakeup &&
     (role === "teacher" || role === "student" || isAdmin) &&
     lesson.status === "scheduled" &&
-    new Date(lesson.endsAt).getTime() > now;
-  const canPropose =
+    new Date(lesson.startsAt).getTime() > now;
+  const makeupEligible =
     isMakeup &&
-    (role === "teacher" || isAdmin) &&
+    lesson.cancellationOutcome !== "series_ended" &&
+    lesson.cancellationOutcome !== "series_rescheduled" &&
     !lesson.isMakeup &&
     !operations.replacementLesson;
+  const canPropose = makeupEligible && (role === "teacher" || isAdmin);
+  const showMakeupStatus = makeupEligible && role === "student" && !pending;
 
   const spanMs = durationMs(lesson);
   const proposedEnd = new Date(startsAt.getTime() + spanMs);
@@ -503,7 +532,9 @@ function RescheduleSection({
       showToast(
         isMakeup
           ? "Your make-up proposal was sent. The slot is booked only when the student accepts."
-          : "Your reschedule request was sent. The lesson keeps its time until it is accepted."
+          : lesson.seriesId
+            ? "Your reschedule request for only this lesson was sent. It keeps its time until the request is accepted."
+            : "Your reschedule request was sent. The lesson keeps its time until it is accepted."
       );
       refresh();
     },
@@ -522,7 +553,9 @@ function RescheduleSection({
         variables.action === "accept"
           ? isMakeup
             ? "The make-up lesson is booked."
-            : "The lesson was moved to the new time."
+            : lesson.seriesId
+              ? "Only this lesson was moved to the new time."
+              : "The lesson was moved to the new time."
           : isMakeup
             ? "The make-up proposal was declined. Nothing was booked."
             : "The lesson stays at its current time."
@@ -554,22 +587,68 @@ function RescheduleSection({
     respondMutation.isPending ||
     withdrawMutation.isPending;
 
-  const history = operations.rescheduleHistory.filter(
-    (item) => item.status !== "pending"
-  );
+  const history = operations.rescheduleHistory
+    .filter((item) => item.status !== "pending")
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const canRetry =
+    !pending &&
+    (canRequest || canPropose) &&
+    (history[0]?.status === "declined" || history[0]?.status === "expired");
 
-  if (!pending && !canRequest && !canPropose) return null;
+  if (
+    !pending &&
+    !canRequest &&
+    !canPropose &&
+    !showMakeupStatus &&
+    history.length === 0
+  ) return null;
 
   return (
     <SectionCard
-      title={isMakeup ? "Make-up lesson" : "Reschedule"}
+      title={isMakeup ? "Make-up lesson" : "Reschedule this lesson"}
       icon="calendar-outline"
     >
-      <AppText variant="small" color="muted">
-        {isMakeup
-          ? "A make-up time is a proposal. Nothing is booked until the student accepts."
-          : "A reschedule is a request, not a cancellation. The lesson keeps its time until the other side accepts."}
-      </AppText>
+      {pending || canRequest || canPropose || showMakeupStatus ? (
+        <AppText variant="small" color="muted">
+          {showMakeupStatus
+            ? "The teacher or academy can propose a make-up for this cancelled lesson. It is booked only if you accept."
+            : isMakeup
+              ? "A make-up time is a proposal. Nothing is booked until the student accepts."
+              : "A reschedule is a request, not a cancellation. The lesson keeps its time until the other side accepts."}
+        </AppText>
+      ) : null}
+
+      {!isMakeup && lesson.seriesId ? (
+        <AppText variant="caption" color="muted">
+          Other lessons in this weekly booking keep their usual time.
+        </AppText>
+      ) : null}
+
+      {role === "student" && lesson.seriesId && canRequest ? (
+        <View style={styles.form}>
+          <Button
+            title="Change weekly time instead"
+            variant="secondary"
+            size="sm"
+            onPress={() =>
+              router.push({
+                pathname: "/change-time/[seriesId]",
+                params: { seriesId: lesson.seriesId! },
+              })
+            }
+          />
+          <AppText variant="caption" color="muted">
+            Switching to another teacher-published weekly slot is instant. Your
+            teacher is notified; no approval is needed.
+          </AppText>
+        </View>
+      ) : null}
+
+      {canRetry ? (
+        <AppText variant="small" color="muted">
+          No time was changed. You can propose another time below.
+        </AppText>
+      ) : null}
 
       {pending ? (
         <RescheduleCard
@@ -578,8 +657,10 @@ function RescheduleSection({
           makeup={isMakeup}
           canRespond={
             isAdmin ||
-            ((viewerId === lesson.teacherId || viewerId === lesson.studentId) &&
-              pending.requestedById !== viewerId)
+            (pending.requestedById !== viewerId &&
+              (isMakeup || pending.requestedById === lesson.teacherId
+                ? viewerId === lesson.studentId
+                : viewerId === lesson.teacherId))
           }
           busy={busy}
           onRespond={(action, reply) =>
@@ -1010,9 +1091,21 @@ function IncidentSection({
 }) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [type, setType] = useState<string>("attendance_dispute");
+  const [picked, setPicked] = useState<string | null>(null);
   const [detail, setDetail] = useState("");
-  const existing = operations.incident;
+  // Conduct reports are confidential: never expose them in the teacher UI,
+  // even if a stale operations response still contains one.
+  const reports = (operations.incidents ?? []).filter(
+    (report) => report.type !== "conduct_concern" || role === "student"
+  );
+  // The server refuses a second report of the same type, so anything already
+  // on the lesson leaves the picker instead of failing once it is submitted.
+  const options = incidentTypesFor(role).filter(
+    (option) => !reports.some((report) => report.type === option.value)
+  );
+  const type =
+    options.find((option) => option.value === picked)?.value ??
+    options[0]?.value ?? "attendance_dispute";
   const canReport = role === "teacher" || role === "student";
 
   const mutation = useMutation({
@@ -1028,25 +1121,42 @@ function IncidentSection({
   if (!canReport) return null;
 
   return (
-    <SectionCard title="Attendance issue" icon="warning-outline">
-      {existing ? (
-        <View style={styles.form}>
-          <AppText variant="small">
-            <AppText variant="small" weight="700" style={styles.capitalize}>
-              {existing.type.replaceAll("_", " ")}
-            </AppText>{" "}
-            · <AppText variant="small" style={styles.capitalize}>{existing.status}</AppText>
-          </AppText>
-          <AppText variant="small" color="muted">
-            {existing.detail}
-          </AppText>
-          {existing.resolutionNote ? (
-            <AppText variant="small" color="muted">
-              Academy note: {existing.resolutionNote}
-            </AppText>
-          ) : null}
+    <SectionCard
+      title={reports.some((report) => report.type === "conduct_concern") ? "Lesson reports" : "Attendance issue"}
+      icon="warning-outline"
+    >
+      {reports.length ? (
+        <View style={styles.historyList}>
+          {reports.map((report) => (
+            <View key={report.id} style={styles.historyRow}>
+              <AppText variant="caption" color="muted" weight="700">
+                {reportSource(report, role)}
+              </AppText>
+              <AppText variant="small">
+                <AppText variant="small" weight="700" style={styles.capitalize}>
+                  {report.type === "conduct_concern"
+                    ? "Conduct concern (confidential)"
+                    : report.type.replaceAll("_", " ")}
+                </AppText>{" "}
+                ·{" "}
+                <AppText variant="small" style={styles.capitalize}>
+                  {report.status}
+                </AppText>
+              </AppText>
+              <AppText variant="small" color="muted">
+                {report.detail}
+              </AppText>
+              {report.resolutionNote ? (
+                <AppText variant="small" color="muted">
+                  Academy note: {report.resolutionNote}
+                </AppText>
+              ) : null}
+            </View>
+          ))}
         </View>
-      ) : (
+      ) : null}
+
+      {options.length ? (
         <View style={styles.form}>
           <AppText variant="small" color="muted">
             If the attendance record does not match what happened, report it. The
@@ -1054,9 +1164,9 @@ function IncidentSection({
           </AppText>
           <ChoiceChips
             label="Issue type"
-            options={incidentTypes}
+            options={options}
             value={type}
-            onChange={setType}
+            onChange={setPicked}
             disabled={mutation.isPending}
           />
           <TextField
@@ -1084,7 +1194,7 @@ function IncidentSection({
             }}
           />
         </View>
-      )}
+      ) : null}
     </SectionCard>
   );
 }
@@ -1144,14 +1254,12 @@ export const LessonOperationsPanel = ({
         </AppText>
       </View>
       <CancellationSection lesson={lesson} operations={stable} role={role ?? null} />
-      {lesson.status !== "cancelled" ? (
-        <RescheduleSection
-          lesson={lesson}
-          operations={stable}
-          role={role ?? null}
-          viewerId={user?.id}
-        />
-      ) : null}
+      <RescheduleSection
+        lesson={lesson}
+        operations={stable}
+        role={role ?? null}
+        viewerId={user?.id}
+      />
       <MakeupSection lesson={lesson} operations={stable} />
       <AttendanceSection
         lesson={lesson}

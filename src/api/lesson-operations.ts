@@ -10,6 +10,7 @@ import type {
   Lesson,
   LessonCreditTransaction,
   LessonIncident,
+  LessonIncidentType,
   LessonOperations,
   LessonCall,
   ReliabilityEvent,
@@ -99,6 +100,15 @@ export const sendAttendanceEvent = (
     json: input,
   });
 
+/** Native v1 cannot capture text. Cookie-authenticated, bounded, no retries. */
+export const reportUnsupportedTranscript = (id: string) =>
+  apiFetch<unknown>(`${lessonPath(id)}/transcript/self`, {
+    method: "POST",
+    json: { segments: [], status: "unsupported" },
+    timeoutMs: 5_000,
+    suppressUnauthorized: true,
+  });
+
 export const getLessonExcuse = (id: string) =>
   apiFetch<ExcuseRequest>(`${lessonPath(id)}/excuse`);
 export const requestExcuse = (
@@ -112,11 +122,13 @@ export const requestExcuse = (
 
 export const reportLessonIncident = (
   id: string,
-  input: { type: string; detail: string }
+  input: { type: LessonIncidentType; detail: string }
 ) =>
   apiFetch<LessonIncident>(`${lessonPath(id)}/incident`, {
     method: "POST",
     json: input,
+    // Reporting a concern must not dismiss the persistent room on a 401.
+    suppressUnauthorized: input.type === "conduct_concern",
   });
 
 export const getStudentCredits = () =>
@@ -170,7 +182,12 @@ export const getLessonIncidents = (status = "open") =>
 export const resolveLessonIncident = (
   id: string,
   input: {
-    action: "student_no_show" | "teacher_no_show" | "both_absent" | "dismissed";
+    action:
+      | "student_no_show"
+      | "teacher_no_show"
+      | "both_absent"
+      | "dismissed"
+      | "resolved";
     note?: string;
     teacherPayableMinutes?: number;
   }

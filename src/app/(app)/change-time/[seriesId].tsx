@@ -64,8 +64,22 @@ export default function ChangeTimeScreen() {
     enabled: Boolean(teacherId),
     refetchInterval: LIVE_SYNC_INTERVAL,
   });
-  const available = (teacherQuery.data?.slots ?? [])
-    .filter((rule) => rule.status === "available")
+  const leadMinutes = teacherQuery.data?.timeChangeLeadMinutes ?? 0;
+  // Measured from the moment the server answered, which is the instant it
+  // worked out each nextStartsAt, so the client clock never enters in.
+  const noticeAfter =
+    (teacherQuery.dataUpdatedAt ?? 0) + leadMinutes * 60_000;
+  const openRules = (teacherQuery.data?.slots ?? []).filter(
+    (rule) => rule.status === "available"
+  );
+  const available = openRules
+    // A class already inside the academy's notice window would leave the
+    // teacher no time to prepare, so that time is not offered at all.
+    .filter(
+      (rule) =>
+        !rule.nextStartsAt ||
+        new Date(rule.nextStartsAt).getTime() >= noticeAfter
+    )
     .map((rule) => ({ rule, local: toViewerWeeklyTime(rule, viewerTimeZone) }))
     .sort(
       (a, b) =>
@@ -73,6 +87,7 @@ export default function ChangeTimeScreen() {
           DAY_ORDER.indexOf(b.local.dayOfWeek) ||
         a.local.startsAtTime.localeCompare(b.local.startsAtTime)
     );
+  const hiddenByNotice = openRules.length - available.length;
 
   const submit = useMutation({
     mutationFn: (ruleId: string) =>
@@ -278,6 +293,13 @@ export default function ChangeTimeScreen() {
                       available[0]?.rule.timeZoneId ?? series.timeZoneId
                     }
                   />
+                  {leadMinutes > 0 && (
+                    <AppText variant="caption" color="muted" style={styles.hint}>
+                      Times whose next class starts within {leadMinutes} minutes
+                      are not listed, so your teacher always gets that much
+                      notice.
+                    </AppText>
+                  )}
                   <View style={styles.list}>
                     {DAY_ORDER.filter((day) => grouped[day]?.length).map(
                       (day) => (
@@ -295,7 +317,11 @@ export default function ChangeTimeScreen() {
                 <EmptyState
                   icon="time-outline"
                   title="No other times available"
-                  body={`${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time below.`}
+                  body={
+                    hiddenByNotice > 0
+                      ? `The times your teacher has open all repeat within the next ${leadMinutes} minutes, so moving onto one would leave them no notice. Try again later, or look for another teacher below.`
+                      : `${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time below.`
+                  }
                   action={
                     <View style={styles.actions}>
                       <Button

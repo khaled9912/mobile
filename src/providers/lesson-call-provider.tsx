@@ -9,7 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
@@ -20,7 +25,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/providers/auth-provider";
-import { sendAttendanceEvent } from "@/api/lesson-operations";
+import {
+  reportLessonIncident,
+  reportUnsupportedTranscript,
+  sendAttendanceEvent,
+} from "@/api/lesson-operations";
+import { useToast } from "@/providers/toast-provider";
+import { useTheme } from "@/providers/theme-provider";
+import { Button } from "@/components/ui/button";
+import { TextField } from "@/components/ui/text-field";
+import { useLessonRoomFlags } from "@/hooks/use-lesson-room-flags";
+import type { LessonRoomFlags } from "@/api/lesson-room-config";
 import { getDeviceId } from "@/lib/device-id";
 import { JitsiRoom } from "@/components/lesson/jitsi-room";
 import { LessonPenOverlay } from "@/components/lesson/lesson-pen-overlay";
@@ -85,6 +100,8 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const joinedCallRef = useRef<ActiveLessonCall | null>(null);
+  const unsupportedReportedRef = useRef(false);
   const cycleRef = useRef<{
     lessonId: string;
     room: string;
@@ -106,6 +123,9 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const leaveCycle = useCallback(() => {
+    joinedCallRef.current = null;
+    unsupportedReportedRef.current = false;
+    setJoined(false);
     const cycle = cycleRef.current;
     if (!cycle) return;
     cycleRef.current = null;
@@ -113,21 +133,25 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
   }, [sendBeat]);
 
   const handleJoined = useCallback(() => {
+    const current = callRef.current;
+    if (!current || joinedCallRef.current?.room === current.room) return;
+    joinedCallRef.current = current;
+    unsupportedReportedRef.current = false;
     setJoined(true);
-    if (!call?.trackAttendance) return;
+    if (!current.trackAttendance) return;
     void getDeviceId()
       .then((deviceId) => {
-        // The room may have changed while the device id was loading.
-        if (callRef.current?.room !== call.room) return;
+        // Ignore a completed lookup from a previous join or departed room.
+        if (joinedCallRef.current !== current) return;
         cycleRef.current = {
-          lessonId: call.lessonId,
-          room: call.room,
+          lessonId: current.lessonId,
+          room: current.room,
           deviceId,
         };
-        sendBeat(call.lessonId, "join", deviceId);
+        sendBeat(current.lessonId, "join", deviceId);
       })
       .catch(() => {});
-  }, [call, sendBeat]);
+  }, [sendBeat]);
 
   const endCall = useCallback(() => {
     leaveCycle();
@@ -163,6 +187,27 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
     return () => clearTimeout(timer);
   }, [endCall, status]);
 
+  // App-owned features refresh without rebuilding the native conference.
+  const { flags, flagsLoaded } = useLessonRoomFlags();
+
+  useEffect(() => {
+    if (!flags.transcription) {
+      unsupportedReportedRef.current = false;
+      return;
+    }
+    const participant = joinedCallRef.current;
+    if (
+      !joined ||
+      !call?.trackAttendance ||
+      participant?.room !== call.room ||
+      unsupportedReportedRef.current
+    ) return;
+    // Mark before sending: errors (including 404 disabled / 409 outside the
+    // lesson window) never retry, toast, or change the meeting. No text/audio.
+    unsupportedReportedRef.current = true;
+    void reportUnsupportedTranscript(call.lessonId).catch(() => {});
+  }, [call, flags.transcription, joined]);
+
   const value = useMemo(
     () => ({
       call,
@@ -179,9 +224,10 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
   return (
     <LessonCallContext.Provider value={value}>
       {children}
-      {call ? (
+      {call && flagsLoaded ? (
         <LessonCallHost
           call={call}
+          flags={flags}
           joined={joined}
           minimized={minimized}
           onJoined={handleJoined}
@@ -196,6 +242,7 @@ export const LessonCallProvider = ({ children }: { children: ReactNode }) => {
 
 const LessonCallHost = ({
   call,
+  flags,
   joined,
   minimized,
   onJoined,
@@ -204,6 +251,7 @@ const LessonCallHost = ({
   onEnd,
 }: {
   call: ActiveLessonCall;
+  flags: LessonRoomFlags;
   joined: boolean;
   minimized: boolean;
   onJoined: () => void;
@@ -252,14 +300,38 @@ const LessonCallHost = ({
   const [penActive, setPenActive] = useState(false);
   const { role } = useAuth();
   // The server enforces the same rule; this only decides who sees the button.
+  // Marking is also a switch: no flag, no pen and no ink layer.
   const canMark =
-    role === "teacher" || role === "admin" || role === "super_admin";
+    flags.pen &&
+    (role === "teacher" || role === "admin" || role === "super_admin");
 
   // Marking takes over touches, so shrinking the room must drop it.
   const minimize = useCallback(() => {
     setPenActive(false);
     onMinimized(true);
   }, [onMinimized]);
+
+  // The leave controls sit next to the ones used mid-lesson, so an accidental
+  // press must not drop the call. A room that was never joined has nothing to
+  // drop, so it closes straight away.
+  const requestLeave = useCallback(() => {
+    if (!joined) {
+      endAndReturn();
+      return;
+    }
+    Alert.alert(
+      "Leave the lesson?",
+      "You will stop seeing and hearing the room. The lesson itself keeps running.",
+      [
+        { text: "Stay in the lesson", style: "cancel" },
+        {
+          text: "Leave the lesson",
+          style: "destructive",
+          onPress: endAndReturn,
+        },
+      ]
+    );
+  }, [endAndReturn, joined]);
 
   const containerStyle: StyleProp<ViewStyle> = expanded
     ? styles.expandedHost
@@ -348,23 +420,6 @@ const LessonCallHost = ({
           >
             <Ionicons name="share-outline" size={19} color="#ffffff" />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Leave lesson"
-            hitSlop={10}
-            onPress={endAndReturn}
-            style={({ pressed }) => [
-              styles.hangupButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons
-              name="call"
-              size={16}
-              color="#ffffff"
-              style={styles.hangupIcon}
-            />
-          </Pressable>
         </View>
       ) : null}
 
@@ -411,7 +466,7 @@ const LessonCallHost = ({
             accessibilityRole="button"
             accessibilityLabel="Leave lesson"
             hitSlop={8}
-            onPress={endAndReturn}
+            onPress={requestLeave}
             style={({ pressed }) => [
               styles.miniHangup,
               pressed && styles.pressed,
@@ -427,6 +482,20 @@ const LessonCallHost = ({
         </View>
       ) : null}
 
+      {joined && flags.transcription && (expanded || showMini) ? (
+        <View key="transcription-notice" style={styles.transcriptionNotice}>
+          <AppText variant="caption" color="rgba(255,255,255,0.82)">
+            This app cannot transcribe your mic. Consenting participants on
+            supported web browsers may contribute their own mic text, retained
+            for 30 days.
+          </AppText>
+        </View>
+      ) : null}
+      {expanded && joined && flags.reportConcern &&
+      role === "student" && call.trackAttendance ? (
+        <ReportConcernControl key={call.lessonId} lessonId={call.lessonId} />
+      ) : null}
+
       <View
         key="stage"
         style={
@@ -439,6 +508,7 @@ const LessonCallHost = ({
           lessonId={call.lessonId}
           room={call.room}
           displayName={call.displayName}
+          flags={flags}
           onJoined={onJoined}
           onLeft={onLeft}
           onClose={endAndReturn}
@@ -450,6 +520,28 @@ const LessonCallHost = ({
             canDraw={canMark}
             onDone={() => setPenActive(false)}
           />
+        ) : null}
+        {expanded && joined && !penActive ? (
+          // The room's own leave control. It sits above the toolbar row the
+          // SDK draws, so it never covers the microphone or chat buttons.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Leave lesson"
+            hitSlop={10}
+            onPress={requestLeave}
+            style={({ pressed }) => [
+              styles.leaveButton,
+              { bottom: insets.bottom + 92 },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons
+              name="call"
+              size={20}
+              color="#ffffff"
+              style={styles.hangupIcon}
+            />
+          </Pressable>
         ) : null}
         <View
           pointerEvents="none"
@@ -486,7 +578,136 @@ const LessonCallHost = ({
   );
 };
 
+/** A self-contained sheet: never routes, hangs up, or replaces the meeting. */
+const ReportConcernControl = ({ lessonId }: { lessonId: string }) => {
+  const { colors, radius } = useTheme();
+  const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const length = detail.trim().length;
+  const valid = length >= 5 && length <= 1000;
+
+  const submit = async () => {
+    if (!valid || inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      await reportLessonIncident(lessonId, {
+        type: "conduct_concern",
+        detail: detail.trim(),
+      });
+      setDetail("");
+      setOpen(false);
+      showToast("Your concern was sent confidentially to the academy.");
+    } catch {
+      // Close the native modal so the existing top toast is visible. Keep the
+      // draft for a manual retry; never display server details or retry for them.
+      setOpen(false);
+      showToast("Unable to report the concern. Please try again.", "error");
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Report a concern"
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [styles.reportButton, pressed && styles.pressed]}
+      >
+        <Ionicons name="flag-outline" size={16} color="#ffffff" />
+        <AppText variant="small" color="#ffffff">Report a concern</AppText>
+      </Pressable>
+      <Modal
+        visible={open}
+        transparent
+        animationType="none"
+        onRequestClose={() => setOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.reportBackdrop}
+        >
+          <View
+            accessibilityViewIsModal
+            style={[
+              styles.reportSheet,
+              {
+                backgroundColor: colors.card,
+                borderRadius: radius.xl,
+                paddingBottom: insets.bottom + 16,
+              },
+            ]}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.reportForm}
+            >
+              <AppText variant="h3" accessibilityRole="header">
+                Report a concern
+              </AppText>
+              <AppText variant="small" color="muted">
+                Your report is confidential to the academy and is not shown to
+                your teacher. Describe what happened; sending this will not end
+                your lesson.
+              </AppText>
+              <TextField
+                label="Concern details"
+                hint="Use 5–1000 characters. Do not include passwords or payment details."
+                value={detail}
+                onChangeText={setDetail}
+                multiline
+                maxLength={1000}
+                editable={!busy}
+              />
+              <Button
+                title="Send concern"
+                disabled={!valid}
+                loading={busy}
+                onPress={() => void submit()}
+              />
+              <Button
+                title="Close"
+                variant="secondary"
+                onPress={() => setOpen(false)}
+              />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </>
+  );
+};
+
 const styles = StyleSheet.create({
+  transcriptionNotice: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#141a1f",
+  },
+  reportButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#141a1f",
+  },
+  reportBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 12,
+  },
+  reportSheet: { maxHeight: "90%", padding: 18 },
+  reportForm: { gap: 14 },
   expandedHost: {
     position: "absolute",
     top: 0,
@@ -494,7 +715,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 1000,
-    elevation: 1000,
+    // Below the existing top-toast host (elevation 50 on Android).
+    elevation: 40,
     backgroundColor: "#05080a",
   },
   hiddenHost: {
@@ -512,7 +734,8 @@ const styles = StyleSheet.create({
     right: 12,
     width: 268,
     zIndex: 1000,
-    elevation: 1000,
+    // Below the existing top-toast host (elevation 50 on Android).
+    elevation: 40,
     overflow: "hidden",
     borderRadius: 16,
     backgroundColor: "#0b0f12",
@@ -538,13 +761,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.09)",
   },
-  hangupButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  leaveButton: {
+    position: "absolute",
+    right: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#d94a3f",
+    zIndex: 4,
+    elevation: 4,
   },
   penActiveButton: { backgroundColor: "#ffd166" },
   hangupIcon: { transform: [{ rotate: "135deg" }] },

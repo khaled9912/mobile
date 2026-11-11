@@ -224,10 +224,17 @@ publishes as open, and the move is applied the moment they ask — there is no
 approval step. The teacher and every admin get a notification, and the admin
 screen is a read-only history.
 
+A move applies to **one weekly booking (series)**, not to every booked day. With
+Monday 6 PM and Thursday 6 PM booked, moving Monday to Wednesday 7 PM leaves
+Wednesday and Thursday; Thursday is untouched. To move a single date instead,
+use the one-lesson reschedule (`/reschedule-requests`), which the other side must
+accept before the lesson starts and which never changes the weekly series.
+
 | Feature | Mobile caller | Request | Response |
 | --- | --- | --- | --- |
 | My changes | `scheduling.getMyChangeRequests` | `GET /api/student/change-requests` | `LessonChangeRequestDto[]` |
 | Move to another open time | `scheduling.requestTimeChange(seriesId, requestedRuleId, note?)` | `POST /api/student/series/{seriesId}/change-requests` `{ requestedRuleId, note? }` | `201 LessonChangeRequestDto` (`status: "applied"`) |
+| End a weekly booking | `scheduling.endWeeklySeries(seriesId)` | `DELETE /api/student/series/{seriesId}` | `204` |
 | History | `scheduling.getAdminChangeRequests(status?)` | `GET /api/admin/change-requests[?status=applied\|pending\|approved\|rejected]` | `LessonChangeRequestDto[]` |
 
 `LessonChangeRequestDto` carries the series id, teacher/student names, the
@@ -240,9 +247,15 @@ The API checks the move inside a serializable transaction: the series must still
 be active, the target rule must belong to the same teacher and be free, the
 student must not already have another weekly time then, and no materialized
 lesson may clash. A clash returns `409` and the student picks another slot; the
-same `409` covers two students taking the slot at the same moment. On success the
-series is retargeted, future lessons are deleted and rebuilt, and the old slot
-opens up for other students.
+same `409` covers two students taking the slot at the same moment. On success
+only that series is retargeted: its future scheduled lessons are cancelled with
+`cancellationOutcome = "series_rescheduled"` (kept for history, not deleted, and
+shown as "Weekly time changed"), their pending reschedule requests close, lessons
+are rebuilt at the new time, and the old slot opens up for other students.
+
+Ending a weekly booking cancels its future scheduled lessons with
+`series_ended`, closes their pending requests, and frees the slot; other series
+are unaffected. Lessons released either way cannot receive a make-up (`409`).
 
 Requests left as `pending` by the removed approval queue are settled at API
 start-up: each one is applied if the slot is still open, otherwise closed with an

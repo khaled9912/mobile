@@ -9,7 +9,19 @@ export type ReviewFilter =
 
 export type ReviewStatus = "draft" | "submitted";
 
-export type ReviewFlag = "phone" | "email" | "platform" | "offplatform";
+export type ReviewSpeechFlag =
+  | "phone"
+  | "email"
+  | "platform"
+  | "offplatform"
+  | "payment"
+  | "secrecy";
+
+/** Coverage gaps are informational, not speech flags or evidence of misconduct. */
+export type ReviewCoverageReason = "no_transcript" | "unsupported_device";
+export type ReviewFlag = ReviewSpeechFlag | ReviewCoverageReason;
+export const isCoverageReason = (reason: string): reason is ReviewCoverageReason =>
+  reason === "no_transcript" || reason === "unsupported_device";
 
 export interface ReviewQueueItem {
   lessonId: string;
@@ -34,7 +46,18 @@ export interface ReviewSegment {
   text: string;
   atSeconds: number | null;
   createdAt: string;
-  flags: ReviewFlag[];
+  source: "client" | "server";
+  flags: ReviewSpeechFlag[];
+}
+
+export interface ReviewCapture {
+  role: string;
+  lastStatus: string | null;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+  lastSegmentAt: string | null;
+  segmentCount: number;
+  expected: boolean;
 }
 
 export interface ReviewMetrics {
@@ -81,6 +104,8 @@ export interface ReviewWorkspace {
   metrics: ReviewMetrics;
   review: LessonQualityReview | null;
   segments: ReviewSegment[];
+  captures: ReviewCapture[];
+  coverageReasons: string[];
 }
 
 export interface ReviewInput {

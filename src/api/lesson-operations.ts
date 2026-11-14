@@ -131,8 +131,6 @@ export const reportLessonIncident = (
     suppressUnauthorized: input.type === "conduct_concern",
   });
 
-export const getStudentCredits = () =>
-  apiFetch<StudentCredit>("/api/student/credits");
 export const getStudentReliability = () =>
   apiFetch<ReliabilityEvent[]>("/api/student/reliability");
 export const getTeacherReliability = () =>

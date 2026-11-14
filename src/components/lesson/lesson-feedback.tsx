@@ -329,7 +329,6 @@ const StudentReviewSection = ({
       showToast("Thank you — your review has been saved.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lessons", lesson.id] });
-      void queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
       void queryClient.invalidateQueries({
         queryKey: ["teacher-profile", lesson.teacherId],
       });
@@ -382,7 +381,7 @@ const StudentReviewSection = ({
     <Card>
       <SectionTitle icon="chatbubble-ellipses-outline" title="Rate this lesson" />
       <AppText variant="small" color="muted" style={styles.lede}>
-        Your rating helps other students choose a teacher.
+        Your rating helps the academy keep teaching quality up.
       </AppText>
 
       <View style={styles.form}>

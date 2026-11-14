@@ -104,7 +104,6 @@ export const WeeklyAvailabilityEditor = ({
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["availability-rules"] });
     await queryClient.invalidateQueries({ queryKey: ["assigned-teacher"] });
-    await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
     await queryClient.invalidateQueries({ queryKey: ["teacher-profile"] });
     await queryClient.invalidateQueries({ queryKey: ["teachers"] });
     await queryClient.invalidateQueries({ queryKey: ["admin", "teachers"] });
@@ -418,8 +417,8 @@ export const WeeklyAvailabilityEditor = ({
             title="No weekly times announced"
             body={
               isAdmin
-                ? "Announce this teacher's days and hours above. Students can then book a time instantly."
-                : "Announce your days and hours above. Students can then book a time instantly."
+                ? "Announce this teacher's days and hours above. The academy then schedules its students against them."
+                : "Announce your days and hours above. The academy then schedules students against them."
             }
           />
         )}

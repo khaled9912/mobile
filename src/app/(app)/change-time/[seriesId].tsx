@@ -126,7 +126,7 @@ export default function ChangeTimeScreen() {
         queryClient.invalidateQueries({ queryKey: ["assigned-teacher"] }),
       ]);
       showToast("Weekly lessons ended. Your teacher has been notified.");
-      router.navigate("/book");
+      router.navigate("/schedule");
     },
     onError: (mutationError) => {
       showToast(
@@ -142,7 +142,7 @@ export default function ChangeTimeScreen() {
     if (!series) return;
     Alert.alert(
       "End these weekly lessons?",
-      `This cancels your future lessons with ${series.teacherName} and lets your teacher know. You can book a new weekly time at any time.`,
+      `This cancels your future lessons with ${series.teacherName} and lets your teacher know. The academy can set a new weekly time for you afterwards.`,
       [
         { text: "Keep my weekly time", style: "cancel" },
         {
@@ -319,14 +319,14 @@ export default function ChangeTimeScreen() {
                   title="No other times available"
                   body={
                     hiddenByNotice > 0
-                      ? `The times your teacher has open all repeat within the next ${leadMinutes} minutes, so moving onto one would leave them no notice. Try again later, or look for another teacher below.`
-                      : `${series.teacherName} has not announced any other weekly times right now. You can look for another teacher, or end this weekly time below.`
+                      ? `The times your teacher has open all repeat within the next ${leadMinutes} minutes, so moving onto one would leave them no notice. Try again later, or ask the academy to move it for you.`
+                      : `${series.teacherName} has not announced any other weekly times right now. You can ask the academy for a different time, or end this weekly time below.`
                   }
                   action={
                     <View style={styles.actions}>
                       <Button
-                        title="Browse other teachers"
-                        onPress={() => router.navigate("/book")}
+                        title="Ask the academy"
+                        onPress={() => router.push("/contact")}
                       />
                     </View>
                   }
@@ -353,7 +353,7 @@ export default function ChangeTimeScreen() {
                   Ending this weekly time cancels every future lesson with{" "}
                   {series.teacherName}, not just the next one. Your teacher is
                   told and the time opens up for other students. Lessons you
-                  have already taken, and your credits, are unaffected.
+                  have already taken are unaffected.
                 </AppText>
                 <View style={styles.stopAction}>
                   <Button

@@ -19,10 +19,7 @@ import {
   isValidPhone,
   normalizePhone,
 } from "@/lib/validation";
-import {
-  getDeviceCountry,
-  isRegistrationAllowed,
-} from "@/lib/registration";
+import { getDeviceCountry } from "@/lib/registration";
 
 type Mode = "email" | "phone";
 
@@ -30,7 +27,6 @@ export default function LoginScreen() {
   const { applySession, restoreError } = useAuth();
   const { colors } = useTheme();
   const { showToast } = useToast();
-  const registrationBlocked = !isRegistrationAllowed(getDeviceCountry());
 
   const [mode, setMode] = useState<Mode>("email");
 
@@ -46,13 +42,22 @@ export default function LoginScreen() {
   const [fullName, setFullName] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
   const [phoneLoading, setPhoneLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const clearError = (field: string) =>
+    setErrors((current) =>
+      current[field] ? { ...current, [field]: "" } : current
+    );
 
   useEffect(() => {
     if (!restoreError) return;
     showToast(`We could not check your session. ${restoreError}`, "warning");
   }, [restoreError, showToast]);
 
-  const switchMode = (next: Mode) => setMode(next);
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setErrors({});
+  };
 
   const fail = (message: string) => showToast(message, "error");
 
@@ -64,18 +69,17 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
-    if (!trimmedEmail) {
-      fail("Enter your email address.");
+    const invalid: Record<string, string> = {};
+    if (!trimmedEmail) invalid.email = "Enter your email address.";
+    else if (!isValidEmail(trimmedEmail))
+      invalid.email = "Enter a valid email address.";
+    if (!trimmedPassword) invalid.password = "Enter your password.";
+
+    if (Object.keys(invalid).length) {
+      setErrors(invalid);
       return;
     }
-    if (!isValidEmail(trimmedEmail)) {
-      fail("Enter a valid email address.");
-      return;
-    }
-    if (!trimmedPassword) {
-      fail("Enter your password.");
-      return;
-    }
+    setErrors({});
 
     setLoading(true);
     try {
@@ -97,11 +101,12 @@ export default function LoginScreen() {
     if (phoneLoading) return;
     const normalized = normalizePhone(phone);
     if (!isValidPhone(normalized)) {
-      fail(
-        "Enter your full number with country code, for example +962 7 9000 0000."
-      );
+      setErrors({
+        phone: "Enter your full number with country code, for example +962 7 9000 0000.",
+      });
       return;
     }
+    setErrors({});
     setPhoneLoading(true);
     try {
       const result = await requestOtp(normalized);
@@ -118,22 +123,23 @@ export default function LoginScreen() {
 
   const handleVerifyCode = async () => {
     if (phoneLoading) return;
-    if (!isNumericCode(code.trim())) {
-      fail("Enter the numeric code you received.");
-      return;
-    }
-    if (needsName && fullName.trim().length < 2) {
-      fail("Enter your full name to finish creating your account.");
-      return;
-    }
-    if (needsName && fullName.includes("@")) {
-      fail("Enter your name, not an email address.");
+    const invalid: Record<string, string> = {};
+    if (!isNumericCode(code.trim()))
+      invalid.code = "Enter the numeric code you received.";
+    if (needsName && fullName.trim().length < 2)
+      invalid.fullName = "Enter your full name to finish creating your account.";
+    else if (needsName && fullName.includes("@"))
+      invalid.fullName = "Enter your name, not an email address.";
+
+    if (Object.keys(invalid).length) {
+      setErrors(invalid);
       return;
     }
     if (!sentTo) {
       fail("Request a new code to continue.");
       return;
     }
+    setErrors({});
     setPhoneLoading(true);
     try {
       const result = await verifyOtp(
@@ -170,6 +176,7 @@ export default function LoginScreen() {
     setFullName("");
     setDevCode(null);
     setSentTo("");
+    setErrors({});
   };
 
   return (
@@ -192,7 +199,11 @@ export default function LoginScreen() {
           <TextField
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              clearError("email");
+            }}
+            error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -204,7 +215,11 @@ export default function LoginScreen() {
             <TextField
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                clearError("password");
+              }}
+              error={errors.password}
               secure
               autoCapitalize="none"
               autoComplete="current-password"
@@ -239,7 +254,11 @@ export default function LoginScreen() {
           <TextField
             label="Mobile number"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => {
+              setPhone(text);
+              clearError("phone");
+            }}
+            error={errors.phone}
             keyboardType="phone-pad"
             autoComplete="tel"
             textContentType="telephoneNumber"
@@ -264,7 +283,11 @@ export default function LoginScreen() {
           <TextField
             label="Verification code"
             value={code}
-            onChangeText={(next) => setCode(next.replace(/\D/g, ""))}
+            onChangeText={(next) => {
+              setCode(next.replace(/\D/g, ""));
+              clearError("code");
+            }}
+            error={errors.code}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
@@ -284,7 +307,11 @@ export default function LoginScreen() {
             <TextField
               label="Full name"
               value={fullName}
-              onChangeText={setFullName}
+              onChangeText={(text) => {
+                setFullName(text);
+                clearError("fullName");
+              }}
+              error={errors.fullName}
               autoComplete="name"
               textContentType="name"
               hint="No account uses this number yet, so a student account will be created."
@@ -313,23 +340,21 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {registrationBlocked ? null : (
-        <View style={styles.footer}>
-          <AppText variant="small" color="muted">
-            New here?
+      <View style={styles.footer}>
+        <AppText variant="small" color="muted">
+          New here?
+        </AppText>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Create an account"
+          onPress={() => router.push("/signup")}
+          hitSlop={8}
+        >
+          <AppText variant="small" weight="700" color="link">
+            Create account
           </AppText>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="Create an account"
-            onPress={() => router.push("/signup")}
-            hitSlop={8}
-          >
-            <AppText variant="small" weight="700" color="link">
-              Create account
-            </AppText>
-          </Pressable>
-        </View>
-      )}
+        </Pressable>
+      </View>
 
       <Pressable
         accessibilityRole="link"

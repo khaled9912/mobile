@@ -67,6 +67,7 @@ source of truth. A hidden screen is never the only protection.
 | `404` | Shows "The requested item could not be found." |
 | `409` | Shows the server's business message (slot just taken, overlapping weekly time, etc.) |
 | `413` | Avatar upload too large |
+| `428` | Shows "Accept the academy agreement before continuing."; the prompt on each home screen routes to `/policy` |
 | `429` | Shows the server's wait message |
 | `5xx` | Generic retry message; query retries twice |
 | network / timeout | Status `0`; offline banner; query retries twice |
@@ -147,16 +148,20 @@ dashboard derives counts and the next lesson client-side.
 ## 5. Teacher discovery and instant weekly booking (student)
 
 Teachers announce **weekly rules** (weekday + wall-clock range + IANA time
-zone). Announcing a rule is the teacher's consent, so students book instantly —
-there is no teacher or admin approval step.
+zone). The academy — not the student — turns a rule into a repeating series: the
+assignment desk books it, and mobile has no self-booking surface. A student's
+own self-service starts once a series exists: moving it onto another of their
+teacher's rules, or ending it.
 
 | Feature | Mobile caller | Request | Response | Access |
 | --- | --- | --- | --- | --- |
-| Teacher directory | `scheduling.getTeacherDirectory` | `GET /api/teachers/weekly-directory` | `WeeklyTeacherDto[]` | Signed in |
 | Teacher profile | `scheduling.getTeacherProfile` | `GET /api/teachers/{id}/weekly-availability` | `WeeklyAvailabilityDto` | `StudentOnly` |
 | Assigned teacher | `scheduling.getAssignedWeeklyAvailability` | `GET /api/student/teacher/weekly-availability` | `WeeklyAvailabilityDto` or `{ teacher: null, slots: [], series: [] }` | `StudentOnly` |
-| Book weekly times | `scheduling.bookWeeklySlots` | `POST /api/student/bookings` `{ ruleIds }` | `201 { series, lessons }` | `StudentOnly` |
 | My weekly times | `scheduling.getMySeries` | `GET /api/student/series` | `LessonSeriesDto[]` | `StudentOnly` |
+
+`GET /api/teachers/weekly-directory` has no mobile caller, and
+`POST /api/student/bookings` answers `410 Gone`: students no longer pick a
+teacher or book their own weekly times.
 
 `WeeklyRuleDto`:
 
@@ -386,19 +391,17 @@ web-only flow.
 
 ### Open student offers
 
-A student with no active teacher can post one-off times. Every active teacher is
-notified; the first teacher to accept books a one-off lesson instantly. The
-student panel lives on the Book tab when there is no assigned teacher, and the
+A student with no active teacher can post one-off times through the API and the
+first teacher to accept books a one-off lesson instantly, but mobile no longer
+ships the student side: the academy assigns teachers and weekly times. The
 teacher inbox sits above the weekly rules on `(app)/availability`.
 
 | Feature | Mobile caller | Request | Response |
 | --- | --- | --- | --- |
-| My offers | `scheduling.getMyOpenOffers` | `GET /api/student/open-offers` | `OpenStudentOfferDto[]` |
-| Offer a time | `scheduling.publishOpenOffer(startsAt, endsAt)` | `POST /api/student/open-offers` `{ startsAt, endsAt }` | `201 OpenStudentOfferDto` |
-| Withdraw | `scheduling.withdrawOpenOffer(offerId)` | `DELETE /api/student/open-offers/{offerId}` | `204` |
 | Teacher inbox | `scheduling.getTeacherOpenOffers` | `GET /api/teacher/open-offers` | `OpenStudentOfferDto[]` |
 | Accept and book | `scheduling.acceptOpenOffer(offerId)` | `POST /api/teacher/open-offers/{offerId}/accept` | `200 { lessonId, offer }` |
 
+`/api/student/open-offers` (GET, POST, DELETE) has no mobile caller.
 Offers must be future 30-, 45-, or 60-minute lessons; up to 4 open offers per
 student; and no overlap with existing offers or lessons. Accepting is atomic: one
 teacher wins, the student is notified, other notified teachers see that the
@@ -445,6 +448,16 @@ Rules:
 | Avatar image | `assetUrl(avatarUrl)` | `GET /api/users/{id}/avatar` | Image bytes |
 | Send contact message | `contact.sendContactMessage` | `POST /api/contact` `{ name, email, message }` | `202` |
 | Contact inbox | `contact.getContactSubmissions` | `GET /api/admin/contact-submissions` | `ContactSubmission[]` |
+| Agreement state and text | `policy.getPolicyState` | `GET /api/policy/state` | `{ required, accepted, document, acceptedAt }` |
+| Agreement text without a session | `policy.getPolicyDocument` | `GET /api/policy/{teacher\|parent}` | `PolicyDocument` |
+| Sign the agreement | `policy.acceptPolicy` | `POST /api/policy/accept` `{ policyKey, version, clauseIds }` | `{ policyKey, version, acceptedAt, clauseIds }` |
+
+Clause bodies arrive already filled: the cancellation windows in the text come
+from the live `AcademyPolicy` row, and `version` is a fingerprint of that filled
+text rather than a counter. Render what the API returns, send back exactly the
+`version` you were served, and never compare it to a constant or cache a
+document across an admin policy change — editing a window on the admin lesson-ops
+screen re-renders the agreement and invalidates stored signatures.
 
 Profile rules:
 
@@ -473,7 +486,6 @@ reconnect, no mutation retries.
 | `["change-requests", "student"]` | Student's weekly time-change history |
 | `["change-requests", "admin", filter]` | Admin weekly time-change history |
 | `["change-requests"]` | Prefix invalidated after a student moves a weekly time |
-| `["teacher-directory"]` | Teachers and their announced weekly rules |
 | `["teacher-profile", id]` | Weekly availability, series, and reviews for one teacher |
 | `["assigned-teacher"]` | Student's active teacher and their weekly rules |
 | `["series"]` | Student's booked weekly times |
@@ -488,8 +500,9 @@ reconnect, no mutation retries.
 | `["lesson-ops", id]` | Lesson detail with operations state |
 | `["lesson-calls"]` | Calls addressed to me in the last 30 minutes (ringer) |
 | `["billing", …]` | Student statement or teacher earnings |
-| `["open-offers", …]` | Student offers or teacher offer inbox |
+| `["open-offers", "teacher"]` | Teacher offer inbox |
 | `["reviews", …]` | Support review queue, workspace, digest |
+| `["policy-state"]` | Whether this account still owes an agreement, plus its text |
 
 Mutations invalidate the prefixes they affect. Sign-out and a global `401`
 clear the entire cache.

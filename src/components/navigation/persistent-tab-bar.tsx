@@ -20,7 +20,6 @@ export const TAB_BAR_OFFSET = TAB_BAR_CONTENT_HEIGHT + 16;
 
 type TabKey =
   | "home"
-  | "book"
   | "requests"
   | "schedule"
   | "reviews"
@@ -31,7 +30,6 @@ type TabDef = {
   key: TabKey;
   route:
     | "/"
-    | "/book"
     | "/requests"
     | "/schedule"
     | "/reviews"
@@ -49,13 +47,6 @@ const ALL_TABS: TabDef[] = [
     label: "Home",
     icon: "home-outline",
     activeIcon: "home",
-  },
-  {
-    key: "book",
-    route: "/book",
-    label: "Book",
-    icon: "library-outline",
-    activeIcon: "library",
   },
   {
     key: "requests",
@@ -101,7 +92,6 @@ const sectionTab = (
 ): TabKey | null => {
   switch (section) {
     case "teachers":
-      if (role === "student") return "book";
       if (role === "admin" || role === "super_admin") return "people";
       return "home";
     case "lesson":
@@ -137,7 +127,6 @@ export const PersistentTabBar = () => {
 
   const tabs = ALL_TABS.filter((tab) => {
     if (tab.key === "home") return !isSupport;
-    if (tab.key === "book") return isStudent;
     if (tab.key === "requests") return isStudent || isAdmin;
     if (tab.key === "schedule") return !isSupport;
     if (tab.key === "reviews") return canReviewLessons(role);

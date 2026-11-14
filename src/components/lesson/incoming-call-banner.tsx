@@ -20,6 +20,10 @@ type Props = {
 export const IncomingCallBanner = ({ call, onJoin, onDismiss }: Props) => {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
+  // An auto-ring is fired by the monitor; naming the other participant would
+  // claim they pressed the call button.
+  const auto = call.origin === "auto";
+  const caller = auto ? "The academy" : call.callerName;
 
   return (
     <View
@@ -44,14 +48,16 @@ export const IncomingCallBanner = ({ call, onJoin, onDismiss }: Props) => {
           </View>
           <View style={styles.grow}>
             <AppText variant="h3" numberOfLines={2}>
-              {call.callerName} is calling you
+              {caller} is calling you
             </AppText>
             <AppText variant="caption" color="muted">
-              {call.callerRole === "teacher"
-                ? "Your teacher"
-                : call.callerRole === "student"
-                  ? "Your student"
-                  : "The academy"}{" "}
+              {auto
+                ? "Your lesson has started"
+                : call.callerRole === "teacher"
+                  ? "Your teacher"
+                  : call.callerRole === "student"
+                    ? "Your student"
+                    : "The academy"}{" "}
               · called {formatTime(call.createdAt)}
             </AppText>
           </View>

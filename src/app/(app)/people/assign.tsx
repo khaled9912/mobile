@@ -105,7 +105,6 @@ export default function AssignTeacherScreen() {
       await queryClient.invalidateQueries({
         queryKey: ["assigned-teacher"],
       });
-      await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
       showToast(
         `${teacher?.fullName ?? "This teacher"} is now ${
           student?.fullName ?? "the student"

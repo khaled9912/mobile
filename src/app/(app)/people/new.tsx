@@ -212,7 +212,6 @@ export default function NewAccountScreen() {
       await queryClient.invalidateQueries({
         queryKey: ["admin", "support-users"],
       });
-      await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
       showToast(`${user.fullName} now has an account.`);
       router.back();
     },

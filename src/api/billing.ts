@@ -55,6 +55,8 @@ export interface StudentBilling {
   bankAccount: AcademyBankAccount | null;
   claim: MonthlyPaymentClaim | null;
   canClaim: boolean;
+  /** This month's plan bill was settled by card on the web, so no transfer is expected. */
+  cardPaid?: boolean;
 }
 
 export interface TeacherPayoutDetail {

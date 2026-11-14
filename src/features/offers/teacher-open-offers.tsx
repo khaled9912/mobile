@@ -47,7 +47,6 @@ export const TeacherOpenOffers = () => {
       queryClient.invalidateQueries({ queryKey: ["open-offers"] }),
       queryClient.invalidateQueries({ queryKey: ["lessons"] }),
       queryClient.invalidateQueries({ queryKey: ["series"] }),
-      queryClient.invalidateQueries({ queryKey: ["teacher-directory"] }),
     ]);
   };
 

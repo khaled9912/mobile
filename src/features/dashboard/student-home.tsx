@@ -35,6 +35,7 @@ import {
 import { formatWeeklySlot } from "@/lib/format";
 import { getViewerTimeZone, toViewerWeeklyTime } from "@/lib/weekly-time";
 import { TimeZoneNote } from "@/components/student/time-zone-note";
+import { PolicyPrompt } from "@/features/policy/policy-prompt";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
@@ -93,6 +94,8 @@ export const StudentHome = () => {
           subtitle="Your weekly lessons, teacher, and time changes in one place."
         />
       )}
+
+      <PolicyPrompt />
 
       {offlineSession ? (
         <View style={styles.block}>
@@ -174,14 +177,7 @@ export const StudentHome = () => {
               <EmptyState
                 icon="calendar-outline"
                 title="No lessons booked yet"
-                body="Choose a teacher and pick your weekly times. Your first lesson is a trial."
-                action={
-                  <Button
-                    title="Book weekly lessons"
-                    size="sm"
-                    onPress={() => router.navigate("/book")}
-                  />
-                }
+                body="The academy sets your weekly times. Your lessons appear here once they are booked, and your first one is a trial."
               />
             )}
           </View>
@@ -259,13 +255,21 @@ export const StudentHome = () => {
                     {series.map((item) => {
                       const local = toViewerWeeklyTime(item, viewerTimeZone);
                       return (
-                        <AppText key={item.id} variant="caption" color="muted">
-                          {formatWeeklySlot(
-                            local.dayOfWeek,
-                            local.startsAtTime,
-                            local.endsAtTime
-                          )}
-                        </AppText>
+                        <View key={item.id} style={styles.seriesRow}>
+                          <AppText variant="caption" color="muted">
+                            {formatWeeklySlot(
+                              local.dayOfWeek,
+                              local.startsAtTime,
+                              local.endsAtTime
+                            )}
+                          </AppText>
+                          <Button
+                            title="Change"
+                            variant="ghost"
+                            size="sm"
+                            onPress={() => router.push(`/change-time/${item.id}`)}
+                          />
+                        </View>
                       );
                     })}
                   </View>
@@ -277,25 +281,18 @@ export const StudentHome = () => {
                     size="sm"
                     onPress={() => router.push(`/teachers/${teacher.id}`)}
                   />
-                  <Button
-                    title={
-                      series.length ? "Add weekly time" : "Choose weekly times"
-                    }
-                    size="sm"
-                    onPress={() => router.navigate("/book")}
-                  />
                 </View>
               </Card>
             ) : (
               <EmptyState
                 icon="person-add-outline"
                 title="No teacher yet"
-                body="Choose an available teacher and book your first weekly lesson. The academy can also help."
+                body="The academy matches your level and your weekly times with one dedicated teacher. Your teacher and times appear here as soon as they are set."
                 action={
                   <Button
-                    title="Find a teacher"
+                    title="Ask the academy"
                     size="sm"
-                    onPress={() => router.navigate("/book")}
+                    onPress={() => router.push("/contact")}
                   />
                 }
               />
@@ -333,7 +330,13 @@ const styles = StyleSheet.create({
   list: { gap: 10 },
   personRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   personCopy: { flex: 1, gap: 2 },
-  series: { marginTop: 12, gap: 3 },
+  series: { marginTop: 12, gap: 6 },
+  seriesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   rowActions: { flexDirection: "row", gap: 10, marginTop: 14, flexWrap: "wrap" },
   helpAction: { marginTop: 14 },
 });

@@ -318,7 +318,12 @@ function StudentBillingView() {
                   onPress={() => claimMutation.mutate()}
                 />
               </View>
-            ) : claim ? null : !billing.monthClosed ? (
+            ) : claim ? null : billing.cardPaid ? (
+              <AppText variant="small" color="muted">
+                Paid by card on the website. Nothing more is owed for this
+                month, so there is no transfer to send.
+              </AppText>
+            ) : !billing.monthClosed ? (
               <AppText variant="small" color="muted">
                 You can mark this month as paid after it ends, once all lessons
                 are completed.

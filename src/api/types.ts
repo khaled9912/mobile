@@ -285,7 +285,7 @@ export interface LessonCall {
   calleeId: string;
   calleeName: string;
   calleeRole: string;
-  /** room: a participant pressed it | monitor: staff pressed it */
+  /** room: a participant pressed it | monitor: staff pressed it | auto: the lesson monitor fired it */
   origin: string;
   /** not_joined | left | absent */
   calleeStatus: string;
@@ -580,4 +580,33 @@ export interface AppNotification {
 export interface NotificationsFeed {
   items: AppNotification[];
   unread: number;
+}
+
+export interface PolicyClause {
+  id: string;
+  title: string;
+  body: string;
+}
+
+export interface PolicyDocument {
+  key: string;
+  version: number;
+  language: string;
+  title: string;
+  summary: string;
+  clauses: PolicyClause[];
+}
+
+export interface PolicyState {
+  required: boolean;
+  accepted: boolean;
+  document: PolicyDocument | null;
+  acceptedAt: string | null;
+}
+
+export interface PolicyAcceptance {
+  policyKey: string;
+  version: number;
+  acceptedAt: string;
+  clauseIds: string[];
 }

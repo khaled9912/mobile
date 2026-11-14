@@ -198,9 +198,9 @@ const ChoiceChips = <T extends string>({
 function CreditSummary({ preview }: { preview: CancellationPreview }) {
   const parts: string[] = [];
   if (preview.creditEffect === "deduct") {
-    parts.push("One lesson credit will be deducted.");
+    parts.push("This lesson will be counted against the student's record.");
   } else if (preview.creditEffect === "restore") {
-    parts.push("One lesson credit will be restored to the student.");
+    parts.push("This lesson will not be counted against the student.");
   }
   if (preview.teacherPayableMinutes > 0) {
     parts.push(`${preview.teacherPayableMinutes} teacher minutes may be payable.`);
@@ -247,7 +247,6 @@ function CancellationSection({
       showToast("The lesson was cancelled and both sides were notified.");
       void queryClient.invalidateQueries({ queryKey: ["lessons"] });
       void queryClient.invalidateQueries({ queryKey: ["lesson-ops", lesson.id] });
-      void queryClient.invalidateQueries({ queryKey: ["student", "credits"] });
     },
     onError: (failure) =>
       showToast(
@@ -258,12 +257,12 @@ function CancellationSection({
 
   if (record || lesson.status === "cancelled") {
     const outcome = record?.outcome ?? lesson.cancellationOutcome;
-    const credit =
+    const onRecord =
       outcome === "late_cancellation" || outcome === "student_no_show"
-        ? "One credit deducted"
+        ? "Counted against the student"
         : outcome === "free_cancellation" || outcome === "grace_cancellation"
-          ? "No credit change"
-          : "One credit restored";
+          ? "Nothing counted"
+          : "Not counted against the student";
     return (
       <SectionCard title="Cancellation" icon="close-circle" tone="danger">
         <View style={styles.rowWrap}>
@@ -288,7 +287,7 @@ function CancellationSection({
               label="Teacher minutes"
               value={`${record.teacherPayableMinutes} payable`}
             />
-            <Fact label="Credit" value={credit} />
+            <Fact label="On record" value={onRecord} />
           </View>
         ) : null}
         {record?.reason ?? lesson.cancelReason ? (
@@ -327,7 +326,7 @@ function CancellationSection({
           {preview.usedGrace
             ? " Your free grace cancellation for this month is being used."
             : preview.creditEffect === "deduct"
-              ? " One lesson credit will be deducted."
+              ? " This will be counted against your record."
               : ""}
         </AppText>
       ) : null}
@@ -831,7 +830,11 @@ function AttendanceSection({
   const summary = operations.attendance;
   const hours = operations.hours;
   const calls = operations.calls ?? [];
-  const mine = calls.filter((call) => call.callerId === viewerId);
+  // Auto-rings name the other participant as caller but were not their press,
+  // so they never count against the manual cooldown or the per-lesson budget.
+  const mine = calls.filter(
+    (call) => call.callerId === viewerId && call.origin !== "auto"
+  );
   const lastMine = mine[0];
   const coolingForMs = lastMine
     ? CALL_COOLDOWN_MS - (now - Date.parse(lastMine.createdAt))
@@ -962,7 +965,11 @@ function AttendanceSection({
           {calls.slice(0, 3).map((entry) => (
             <Fact
               key={entry.id}
-              label={`${entry.callerName} called ${entry.calleeName}`}
+              label={
+                entry.origin === "auto"
+                  ? `The academy auto-called ${entry.calleeName}`
+                  : `${entry.callerName} called ${entry.calleeName}`
+              }
               value={formatDateTime(entry.createdAt)}
             />
           ))}
@@ -1041,8 +1048,8 @@ function ExcuseSection({
         <View style={styles.form}>
           <AppText variant="small" color="muted">
             If illness, a family emergency, or a technical problem caused this,
-            ask the academy to review it. An approved excuse restores the lesson
-            credit.
+            ask the academy to review it. An approved excuse clears the lesson
+            from your record.
           </AppText>
           <ChoiceChips
             label="Excuse category"

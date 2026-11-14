@@ -22,15 +22,22 @@ export default function ForgotPasswordScreen() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const clearError = (field: string) =>
+    setErrors((current) =>
+      current[field] ? { ...current, [field]: "" } : current
+    );
 
   const fail = (message: string) => showToast(message, "error");
 
   const handleRequest = async () => {
     if (loading) return;
     if (!isValidEmail(email)) {
-      fail("Enter a valid email address.");
+      setErrors({ email: "Enter a valid email address." });
       return;
     }
+    setErrors({});
     setLoading(true);
     try {
       const result = await requestPasswordReset(email.trim());
@@ -49,19 +56,19 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = async () => {
     if (loading) return;
-    if (!isNumericCode(code.trim())) {
-      fail("Enter the numeric code from the email.");
-      return;
-    }
+    const invalid: Record<string, string> = {};
+    if (!isNumericCode(code.trim()))
+      invalid.code = "Enter the numeric code from the email.";
     const problem = passwordProblem(newPassword);
-    if (problem) {
-      fail(problem);
+    if (problem) invalid.newPassword = problem;
+    if (newPassword !== confirm)
+      invalid.confirm = "The new passwords do not match.";
+
+    if (Object.keys(invalid).length) {
+      setErrors(invalid);
       return;
     }
-    if (newPassword !== confirm) {
-      fail("The new passwords do not match.");
-      return;
-    }
+    setErrors({});
     setLoading(true);
     try {
       await resetPassword(email.trim(), code.trim(), newPassword);
@@ -105,7 +112,11 @@ export default function ForgotPasswordScreen() {
           <TextField
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              clearError("email");
+            }}
+            error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -125,7 +136,11 @@ export default function ForgotPasswordScreen() {
           <TextField
             label="Verification code"
             value={code}
-            onChangeText={(next) => setCode(next.replace(/\D/g, ""))}
+            onChangeText={(next) => {
+              setCode(next.replace(/\D/g, ""));
+              clearError("code");
+            }}
+            error={errors.code}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             textContentType="oneTimeCode"
@@ -141,7 +156,11 @@ export default function ForgotPasswordScreen() {
           <TextField
             label="New password"
             value={newPassword}
-            onChangeText={setNewPassword}
+            onChangeText={(text) => {
+              setNewPassword(text);
+              clearError("newPassword");
+            }}
+            error={errors.newPassword}
             secure
             autoCapitalize="none"
             autoComplete="new-password"
@@ -151,7 +170,11 @@ export default function ForgotPasswordScreen() {
           <TextField
             label="Confirm new password"
             value={confirm}
-            onChangeText={setConfirm}
+            onChangeText={(text) => {
+              setConfirm(text);
+              clearError("confirm");
+            }}
+            error={errors.confirm}
             secure
             autoCapitalize="none"
             autoComplete="new-password"

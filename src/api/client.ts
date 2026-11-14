@@ -57,6 +57,10 @@ const statusMessage = (status: number): string => {
       return "That change conflicts with an existing record.";
     case 429:
       return "Too many attempts. Please wait a moment and try again.";
+    // The API refuses an unsigned account's first real action until the
+    // agreement screen has stored the current version.
+    case 428:
+      return "Accept the academy agreement before continuing.";
     case 500:
       return "The server reported an error. Please try again.";
     case 502:

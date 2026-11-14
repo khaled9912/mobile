@@ -221,6 +221,14 @@ export default function ProfileTab() {
           }
           onPress={() => router.push("/profile/reports")}
         />
+        {(isTeacher || isStudent) && (
+          <LinkRow
+            icon="checkbox-outline"
+            title="Academy agreement"
+            subtitle={isTeacher ? "The rules you teach under" : "What the academy promises you"}
+            onPress={() => router.push("/policy")}
+          />
+        )}
         <LinkRow
           icon="chatbubble-ellipses-outline"
           title="Contact the academy"
@@ -250,12 +258,6 @@ export default function ProfileTab() {
           </>
         ) : isStudent ? (
           <>
-            <LinkRow
-              icon="library-outline"
-              title="Find a teacher"
-              subtitle="Browse teachers and request a lesson"
-              onPress={() => router.navigate("/book")}
-            />
             <LinkRow
               icon="calendar-outline"
               title="My schedule"

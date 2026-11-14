@@ -70,7 +70,6 @@ export default function PeopleTab() {
     await queryClient.invalidateQueries({ queryKey: ["admin", "students"] });
     await queryClient.invalidateQueries({ queryKey: ["admin", "teachers"] });
     await queryClient.invalidateQueries({ queryKey: ["admin", "assignments"] });
-    await queryClient.invalidateQueries({ queryKey: ["teacher-directory"] });
   };
 
   const toggleActive = useMutation({

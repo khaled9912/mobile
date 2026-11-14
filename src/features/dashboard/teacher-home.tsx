@@ -27,6 +27,7 @@ import {
 } from "@/lib/lesson-selectors";
 import { formatWeeklySlot } from "@/lib/format";
 import { LIVE_SYNC_INTERVAL } from "@/lib/query-client";
+import { PolicyPrompt } from "@/features/policy/policy-prompt";
 import { isReportDue } from "@/lib/status";
 import { usePullRefresh } from "@/hooks/use-pull-refresh";
 
@@ -69,6 +70,8 @@ export const TeacherHome = () => {
           subtitle="Your teaching week, weekly availability, and lesson reports."
         />
       )}
+
+      <PolicyPrompt />
 
       {loading ? (
         <>

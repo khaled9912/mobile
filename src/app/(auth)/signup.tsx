@@ -11,49 +11,37 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { TextField } from "@/components/ui/text-field";
 import { isValidEmail, passwordProblem } from "@/lib/validation";
-import {
-  REGISTRATION_BLOCKED_MESSAGE,
-  getDeviceCountry,
-  isRegistrationAllowed,
-} from "@/lib/registration";
-import { openWhatsApp } from "@/lib/whatsapp";
+import { getDeviceCountry } from "@/lib/registration";
 
 export default function SignupScreen() {
   const { applySession } = useAuth();
   const { showToast } = useToast();
-  const blocked = !isRegistrationAllowed(getDeviceCountry());
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fail = (message: string) => showToast(message, "error");
 
   const handleSubmit = async () => {
     if (loading) return;
 
-    if (fullName.trim().length < 2) {
-      fail("Enter your full name.");
-      return;
-    }
-    if (fullName.includes("@")) {
-      fail("Enter your name, not an email address.");
-      return;
-    }
-    if (!isValidEmail(email)) {
-      fail("Enter a valid email address.");
-      return;
-    }
+    const invalid: Record<string, string> = {};
+    if (fullName.trim().length < 2) invalid.fullName = "Enter your full name.";
+    else if (fullName.includes("@"))
+      invalid.fullName = "Enter your name, not an email address.";
+    if (!isValidEmail(email)) invalid.email = "Enter a valid email address.";
     const problem = passwordProblem(password);
-    if (problem) {
-      fail(problem);
+    if (problem) invalid.password = problem;
+    if (password !== confirm) invalid.confirm = "The passwords do not match.";
+
+    if (Object.keys(invalid).length) {
+      setErrors(invalid);
       return;
     }
-    if (password !== confirm) {
-      fail("The passwords do not match.");
-      return;
-    }
+    setErrors({});
 
     setLoading(true);
     try {
@@ -82,79 +70,83 @@ export default function SignupScreen() {
       title="Create your account"
       subtitle="Student accounts are free to create. Teachers and administrators are invited by the academy."
     >
-      {blocked ? (
-        <View style={styles.form}>
-          <Notice
-            tone="warning"
-            title="Registration unavailable in your region"
-            message={REGISTRATION_BLOCKED_MESSAGE}
-          />
-          <Button
-            title="Chat with the academy"
-            icon="logo-whatsapp"
-            fullWidth
-            onPress={() => void openWhatsApp()}
-          />
-          <Notice
-            tone="info"
-            message="Our team can still help you get started. If you already have an account, sign in below."
-          />
-        </View>
-      ) : (
-        <View style={styles.form}>
-          <TextField
-            label="Full name"
-            value={fullName}
-            onChangeText={setFullName}
-            autoComplete="name"
-            textContentType="name"
-            autoCapitalize="words"
-            returnKeyType="next"
-          />
-          <TextField
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-          />
-          <TextField
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secure
-            autoCapitalize="none"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            hint="At least 8 characters, including a digit and a lowercase letter."
-            returnKeyType="next"
-          />
-          <TextField
-            label="Confirm password"
-            value={confirm}
-            onChangeText={setConfirm}
-            secure
-            autoCapitalize="none"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="done"
-            onSubmitEditing={() => void handleSubmit()}
-          />
-          <Button
-            title={loading ? "Creating account…" : "Create account"}
-            onPress={() => void handleSubmit()}
-            loading={loading}
-            fullWidth
-          />
-          <Notice
-            tone="info"
-            message="After registration you can choose a teacher and request your first lesson."
-          />
-        </View>
-      )}
+      <View style={styles.form}>
+        <TextField
+          label="Full name"
+          value={fullName}
+          onChangeText={(text) => {
+            setFullName(text);
+            setErrors((current) =>
+              current.fullName ? { ...current, fullName: "" } : current
+            );
+          }}
+          error={errors.fullName}
+          autoComplete="name"
+          textContentType="name"
+          autoCapitalize="words"
+          returnKeyType="next"
+        />
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            setErrors((current) =>
+              current.email ? { ...current, email: "" } : current
+            );
+          }}
+          error={errors.email}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          textContentType="emailAddress"
+          returnKeyType="next"
+        />
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            setErrors((current) =>
+              current.password ? { ...current, password: "" } : current
+            );
+          }}
+          error={errors.password}
+          secure
+          autoCapitalize="none"
+          autoComplete="new-password"
+          textContentType="newPassword"
+          hint="At least 8 characters, including a digit and a lowercase letter."
+          returnKeyType="next"
+        />
+        <TextField
+          label="Confirm password"
+          value={confirm}
+          onChangeText={(text) => {
+            setConfirm(text);
+            setErrors((current) =>
+              current.confirm ? { ...current, confirm: "" } : current
+            );
+          }}
+          error={errors.confirm}
+          secure
+          autoCapitalize="none"
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="done"
+          onSubmitEditing={() => void handleSubmit()}
+        />
+        <Button
+          title={loading ? "Creating account…" : "Create account"}
+          onPress={() => void handleSubmit()}
+          loading={loading}
+          fullWidth
+        />
+        <Notice
+          tone="info"
+          message="After registration, tell us your levels and the weekly times that suit you, and the academy assigns your teacher."
+        />
+      </View>
 
       <View style={styles.footer}>
         <AppText variant="small" color="muted">

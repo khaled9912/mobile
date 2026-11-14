@@ -1,20 +1,14 @@
 import { apiFetch } from "./client";
 import type {
   ChangeRequestStatus,
-  Lesson,
   LessonChangeRequest,
   LessonSeries,
   OpenStudentOffer,
   UserDto,
   WeeklyAvailability,
   WeeklyRule,
-  WeeklyTeacher,
 } from "./types";
 import { normalizeUser } from "./types";
-
-type WeeklyTeacherDto = Omit<WeeklyTeacher, "teacher"> & {
-  teacher: UserDto;
-};
 
 type WeeklyAvailabilityDto = Omit<WeeklyAvailability, "teacher"> & {
   teacher: UserDto | null;
@@ -28,19 +22,6 @@ const normalizeWeekly = (dto: WeeklyAvailabilityDto): WeeklyAvailability => ({
   reviews: dto.reviews ?? null,
   hasLessons: dto.hasLessons ?? false,
 });
-
-export const getTeacherDirectory = async () => {
-  const list = await apiFetch<WeeklyTeacherDto[]>(
-    "/api/teachers/weekly-directory"
-  );
-  return list.map(
-    (dto): WeeklyTeacher => ({
-      ...dto,
-      teacher: normalizeUser(dto.teacher),
-      slots: dto.slots ?? [],
-    })
-  );
-};
 
 // Student-facing weekly availability.
 export const getTeacherProfile = async (teacherId: string) =>
@@ -65,12 +46,6 @@ export const endWeeklySeries = (seriesId: string) =>
     method: "DELETE",
   });
 
-export const bookWeeklySlots = (ruleIds: string[]) =>
-  apiFetch<{ series: LessonSeries[]; lessons: Lesson[] }>(
-    "/api/student/bookings",
-    { method: "POST", json: { ruleIds } }
-  );
-
 export const getMyChangeRequests = () =>
   apiFetch<LessonChangeRequest[]>("/api/student/change-requests");
 
@@ -90,20 +65,6 @@ export const requestTimeChange = (
   );
 
 // Open student offers claimed by the first accepting teacher.
-export const getMyOpenOffers = () =>
-  apiFetch<OpenStudentOffer[]>("/api/student/open-offers");
-
-export const publishOpenOffer = (startsAt: string, endsAt: string) =>
-  apiFetch<OpenStudentOffer>("/api/student/open-offers", {
-    method: "POST",
-    json: { startsAt, endsAt },
-  });
-
-export const withdrawOpenOffer = (offerId: string) =>
-  apiFetch<null>(`/api/student/open-offers/${encodeURIComponent(offerId)}`, {
-    method: "DELETE",
-  });
-
 export const getTeacherOpenOffers = () =>
   apiFetch<OpenStudentOffer[]>("/api/teacher/open-offers");
 

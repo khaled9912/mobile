@@ -93,7 +93,17 @@ export const TextField = ({
           </Pressable>
         ) : null}
       </View>
-      {hint ? (
+      {error ? (
+        <AppText
+          variant="caption"
+          weight="600"
+          color="danger"
+          accessibilityRole="alert"
+          style={styles.hint}
+        >
+          {error}
+        </AppText>
+      ) : hint ? (
         <AppText variant="caption" color="muted" style={styles.hint}>
           {hint}
         </AppText>

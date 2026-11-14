@@ -17,10 +17,6 @@ import { AppText } from "@/components/ui/app-text";
 import { PillPressable } from "@/components/ui/pill-pressable";
 import { openWhatsApp } from "@/lib/whatsapp";
 import {
-  getDeviceCountry,
-  isRegistrationAllowed,
-} from "@/lib/registration";
-import {
   NotificationsBell,
   NotificationsSheet,
 } from "@/components/notifications/notifications-sheet";
@@ -29,7 +25,7 @@ import { useTheme } from "@/providers/theme-provider";
 import type { ThemeColors } from "@/theme/tokens";
 
 type IconName = keyof typeof Ionicons.glyphMap;
-type TabKey = "home" | "teachers";
+type TabKey = "home" | "about";
 type Tone = "brand" | "gold" | "info" | "success";
 
 type Option = {
@@ -94,10 +90,10 @@ const TABS: {
 }[] = [
   { key: "home", label: "Home", icon: "home-outline", activeIcon: "home" },
   {
-    key: "teachers",
-    label: "Teachers",
-    icon: "people-outline",
-    activeIcon: "people",
+    key: "about",
+    label: "About",
+    icon: "information-circle-outline",
+    activeIcon: "information-circle",
   },
 ];
 
@@ -116,7 +112,7 @@ const PERKS: { title: string; body: string; icon: IconName }[] = [
   },
   {
     title: "Flexible scheduling",
-    body: "Pick your teacher's weekly times. Booking is instant and repeats every week.",
+    body: "Give us the weekly times that fit your routine; your lessons repeat at those times every week.",
     icon: "calendar-outline",
   },
   {
@@ -332,8 +328,6 @@ const PillButton = ({
 export const WelcomeExperience = () => {
   const { colors, radius, scheme } = useTheme();
   const { user } = useAuth();
-  const registrationBlocked =
-    !user && !isRegistrationAllowed(getDeviceCountry());
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<TabKey>("home");
   const [activeOption, setActiveOption] = useState(0);
@@ -358,7 +352,7 @@ export const WelcomeExperience = () => {
   };
 
   // Anonymous learners see how it works before choosing sign-up or sign-in.
-  const openCard = () => router.push(user ? "/book" : "/steps");
+  const openCard = () => router.push(user ? "/" : "/steps");
 
   // Dots swap the deck along one progress value: every card travels from its
   // current slot to its target slot, so the outgoing card slides to the back
@@ -542,11 +536,11 @@ export const WelcomeExperience = () => {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${option.title}. ${
-                  user ? "Browse available teachers" : "How it works"
+                  user ? "Open your dashboard" : "How it works"
                 }`}
                 accessibilityHint={
                   user
-                    ? "Opens the teacher directory"
+                    ? "Opens your home tab"
                     : "Opens the steps before sign up"
                 }
                 onPress={openCard}
@@ -661,7 +655,7 @@ export const WelcomeExperience = () => {
     </View>
   );
 
-  const renderTeachers = () => (
+  const renderAbout = () => (
     <View style={styles.section}>
       <View style={styles.pageIntro}>
         <AppText variant="h2">Meet your teacher</AppText>
@@ -700,7 +694,7 @@ export const WelcomeExperience = () => {
 
       <View style={styles.actions}>
         <PillButton
-          title={user ? "Browse teachers" : "Create an account"}
+          title={user ? "Open my dashboard" : "Create an account"}
           icon="arrow-forward"
           onPress={openCard}
         />
@@ -765,22 +759,18 @@ export const WelcomeExperience = () => {
               Log in
             </AppText>
           </PillPressable>
-          {registrationBlocked ? null : (
-            <>
-              <AppText variant="h3" weight="800" color="muted">
-                or
-              </AppText>
-              <PillPressable
-                accessibilityLabel="Sign up"
-                onPress={() => router.push("/signup")}
-                style={styles.greetingLink}
-              >
-                <AppText variant="h3" weight="800">
-                  Sign up
-                </AppText>
-              </PillPressable>
-            </>
-          )}
+          <AppText variant="h3" weight="800" color="muted">
+            or
+          </AppText>
+          <PillPressable
+            accessibilityLabel="Sign up"
+            onPress={() => router.push("/signup")}
+            style={styles.greetingLink}
+          >
+            <AppText variant="h3" weight="800">
+              Sign up
+            </AppText>
+          </PillPressable>
         </View>
       </View>
 
@@ -791,7 +781,7 @@ export const WelcomeExperience = () => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {tab === "home" ? renderHome() : renderTeachers()}
+        {tab === "home" ? renderHome() : renderAbout()}
       </ScrollView>
 
       <View style={styles.navWrap}>

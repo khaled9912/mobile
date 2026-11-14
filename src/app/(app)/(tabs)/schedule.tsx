@@ -195,17 +195,17 @@ export default function ScheduleTab() {
               filter === "cancelled"
                 ? "Cancelled lessons from the past or next week will appear here."
                 : isStudent
-                  ? "Book weekly lessons with a teacher to get started."
+                  ? "The academy sets your weekly times. They appear here as soon as they are booked."
                   : isTeacher
-                    ? "Publish your weekly availability so students can book."
+                    ? "Publish your weekly times so the academy can schedule its students against them."
                     : "Booked lessons will appear here."
             }
             action={
               filter === "cancelled" ? undefined : isStudent ? (
                 <Button
-                  title="Book weekly lessons"
+                  title="Ask the academy"
                   size="sm"
-                  onPress={() => router.navigate("/book")}
+                  onPress={() => router.push("/contact")}
                 />
               ) : isTeacher ? (
                 <Button

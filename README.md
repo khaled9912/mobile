@@ -111,7 +111,7 @@ src/
   app/                 Expo Router routes (every file is a screen)
     (auth)/            welcome, login, signup, forgot-password
     (app)/             signed-in stack
-      (tabs)/          Home, Book, Requests, Schedule, People, Profile
+      (tabs)/          Home, Requests, Schedule, Reviews, People, Profile
       lesson/[id]      live room / recap / feedback
       ...
   api/                 Typed API client and DTOs (the only network layer)
@@ -151,8 +151,8 @@ Navigation rules:
 | Student registration | `(auth)/signup` |
 | Password recovery | `(auth)/forgot-password` |
 | Student portal dashboard | `(app)/(tabs)/index` |
-| Teacher search / course browsing equivalent | `(app)/(tabs)/book` → `(app)/teachers/[id]` |
-| Enrollment equivalent (instant weekly booking) | Teacher profile → pick weekly times |
+| Assigned teacher profile | `(app)/teachers/[id]` |
+| Moving a booked weekly time | `(app)/change-time/[seriesId]` |
 | Schedule / upcoming sessions | `(app)/(tabs)/schedule` |
 | Live classroom | `(app)/lesson/[id]` |
 | Lesson reports | `(app)/profile/reports` + report form in lesson |
@@ -420,7 +420,7 @@ foreground as a fallback. `LIVE_SYNC_INTERVAL` in `src/lib/query-client.ts`
 - `["lessons"]` (owned by the reminder provider, so the schedule, dashboards and
   reminders all update together) and `["lessons", id]` in the lesson room.
 - `["change-requests", …]` for the student's own changes and the admin history.
-- `["teacher-directory"]`, `["assigned-teacher"]`, `["series"]` and
+- `["assigned-teacher"]`, `["series"]` and
   `["availability-rules","teacher"]` so a booking, a published rule, or an
   admin change appears for the other role without a refresh.
 - Notifications, lesson operations, billing, and review queues.
@@ -734,9 +734,10 @@ Manual device QA still matters because unit tests do not exercise native UI:
    landing page every time, both actions work, and signing out returns here.
 2. Sign in with email and with a phone code; force-quit and confirm session
    restore.
-3. Student: browse teachers, book two weekly times (e.g. Monday and Thursday),
-   change Monday's weekly time to another open slot and confirm Thursday is
-   unchanged and Monday's old lessons show "Weekly time changed"; propose a
+3. Student: with two weekly times assigned by the admin (e.g. Monday and
+   Thursday), confirm they show on Home and the schedule, change Monday's weekly
+   time to another open slot and confirm Thursday is unchanged and Monday's old
+   lessons show "Weekly time changed"; propose a
    one-lesson move, accept it as the teacher, and confirm the weekly booking
    stays; join the room at the start time, submit a review after the lesson.
 4. Teacher: announce weekly rules, start the room, submit a report after the end
@@ -746,7 +747,7 @@ Manual device QA still matters because unit tests do not exercise native UI:
    assign a teacher, manage a teacher's weekly rules from People, read contact
    messages.
 6. Time zones: set the device to a US or UK zone while the teacher is in another
-   zone and confirm the Book, teacher profile, Home, and change-time screens show
+   zone and confirm the teacher profile, Home, and change-time screens show
    converted times and the "Times shown in your time zone" note; teacher and
    admin screens still show the teacher's clock.
 7. Schedule: confirm Upcoming initially shows only the nearest lesson day and

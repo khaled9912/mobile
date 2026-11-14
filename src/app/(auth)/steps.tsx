@@ -3,37 +3,30 @@ import { router } from "expo-router";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AppText } from "@/components/ui/app-text";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
-import {
-  REGISTRATION_BLOCKED_MESSAGE,
-  getDeviceCountry,
-  isRegistrationAllowed,
-} from "@/lib/registration";
 import { useAuth } from "@/providers/auth-provider";
 import { useTheme } from "@/providers/theme-provider";
 
 const STEPS: { number: string; title: string; body: string }[] = [
   {
     number: "01",
-    title: "Meet your teacher",
-    body: "We connect each student with a dedicated teacher who understands their goals and learning pace.",
+    title: "Tell us your level and times",
+    body: "Create an account, set the level for each subject, and give us the weekly times that suit your family.",
   },
   {
     number: "02",
-    title: "Choose your weekly times",
-    body: "See each teacher's weekly schedule and pick the times that fit your routine — as many as you need.",
+    title: "The academy assigns your teacher",
+    body: "We match your level and your times with one dedicated teacher, then set your weekly lessons around them.",
   },
   {
     number: "03",
     title: "Learn one-to-one every week",
-    body: "Your times lock in instantly and repeat every week. Join each lesson online, starting with a trial.",
+    body: "The same teacher at the same weekly time, shown in your own time zone — starting with a free trial lesson.",
   },
 ];
 
 export default function StepsScreen() {
   const { colors, radius } = useTheme();
   const { user } = useAuth();
-  const blocked = !user && !isRegistrationAllowed(getDeviceCountry());
 
   return (
     <AuthShell
@@ -66,16 +59,12 @@ export default function StepsScreen() {
       ))}
 
       <View style={styles.actions}>
-        {blocked ? (
-          <Notice tone="warning" message={REGISTRATION_BLOCKED_MESSAGE} />
-        ) : (
-          <Button
-            title={user ? "Browse teachers" : "Create an account"}
-            icon="arrow-forward"
-            fullWidth
-            onPress={() => router.push(user ? "/book" : "/signup")}
-          />
-        )}
+        <Button
+          title={user ? "Open my dashboard" : "Create an account"}
+          icon="arrow-forward"
+          fullWidth
+          onPress={() => router.push(user ? "/" : "/signup")}
+        />
         {user ? null : (
           <Button
             title="I already have an account"

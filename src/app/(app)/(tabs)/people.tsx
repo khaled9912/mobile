@@ -147,7 +147,7 @@ export default function PeopleTab() {
     if (person.isActive) {
       Alert.alert(
         `Deactivate ${person.fullName}?`,
-        "They will not be able to sign in. Accounts with upcoming lessons cannot be deactivated until those lessons are cancelled.",
+        "They will not be able to sign in, but their lessons and assignments stay booked.",
         [
           { text: "Cancel", style: "cancel" },
           {

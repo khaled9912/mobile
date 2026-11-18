@@ -500,6 +500,7 @@ export interface LessonSeries {
   timeZoneId: string;
   isActive: boolean;
   createdAt: string;
+  nextLessonStartsAt?: string | null;
 }
 
 /** `pending`/`approved`/`rejected` only appear on rows the old approval queue left behind. */

@@ -77,18 +77,13 @@ export async function createStudent(
   );
 }
 
-// Deactivation mirrors the web app: DELETE applies the full server-side
-// guardrails (upcoming lessons, pending requests, future slots, assignments).
-// PATCH is only used to reactivate an existing account.
+// Deactivation is a pause: sign-in stops but bookings stay. DELETE on this
+// endpoint now means a full account removal that releases booked lessons.
 export const setUserActive = (
   id: string,
   isActive: boolean
-): Promise<UserDto | null> =>
-  isActive
-    ? apiFetch<UserDto>(`/api/admin/users/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        json: { isActive: true },
-      })
-    : apiFetch<null>(`/api/admin/users/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
+): Promise<UserDto> =>
+  apiFetch<UserDto>(`/api/admin/users/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    json: { isActive },
+  });

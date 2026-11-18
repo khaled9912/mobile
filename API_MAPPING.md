@@ -417,7 +417,7 @@ student picked another teacher, and the student's remaining offers are withdrawn
 | Teachers | `people.getTeachers(includeInactive?)` | `GET /api/teachers[?includeInactive=true]` | `UserDto[]` |
 | Create teacher/admin | `people.createManagedUser` | `POST /api/admin/users` `{ fullName, email, password, role }` | `201 { user }` |
 | Create student | `people.createStudent` | `POST /api/students` `{ fullName, email, password, grade? }` | `201 UserDto` |
-| Deactivate | `people.setUserActive(id, false)` | `DELETE /api/admin/users/{id}` | `204` |
+| Deactivate | `people.setUserActive(id, false)` | `PATCH /api/admin/users/{id}` `{ isActive: false }` | `UserDto` |
 | Reactivate | `people.setUserActive(id, true)` | `PATCH /api/admin/users/{id}` `{ isActive: true }` | `UserDto` |
 | Assignments | `people.getAssignments` | `GET /api/admin/assignments` | `AssignmentDto[]` |
 | Create assignment | `people.createAssignment(teacherId, studentId)` | `POST /api/teacher-student-assignments` `{ teacherId, studentId }` | `201 AssignmentDto` |
@@ -425,10 +425,10 @@ student picked another teacher, and the student's remaining offers are withdrawn
 
 Rules:
 
-- Only teachers and students can be deactivated. The `DELETE` route refuses
-  accounts with upcoming lessons (`409`), ends assignments, and stops their
-  weekly rules from being bookable. This is why the app uses `DELETE` for
-  deactivation and `PATCH` only for reactivation, matching the web app.
+- Deactivation is a pause: `PATCH { isActive: false }` blocks sign-in and kills
+  existing sessions, but lessons, series and assignments stay booked.
+  `DELETE /api/admin/users/{id}` is a full account removal that releases booked
+  lessons; only the web admin screens offer it, mobile does not call it.
 - Assigning a student to a new teacher ends any other active assignment. The
   API always keeps a single active teacher per student.
 - `role` on `POST /api/admin/users` accepts `teacher` or `admin` only.

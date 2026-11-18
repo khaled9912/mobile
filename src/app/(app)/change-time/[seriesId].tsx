@@ -69,6 +69,19 @@ export default function ChangeTimeScreen() {
   // worked out each nextStartsAt, so the client clock never enters in.
   const noticeAfter =
     (teacherQuery.dataUpdatedAt ?? 0) + leadMinutes * 60_000;
+  // The same window protects the class being left: inside it the move is
+  // locked, and the student attends or cancels that lesson through the normal
+  // policy flow first. The API refuses the move either way.
+  const nextLessonStartsAt = series?.nextLessonStartsAt
+    ? new Date(series.nextLessonStartsAt).getTime()
+    : null;
+  const moveLocked =
+    leadMinutes > 0 &&
+    nextLessonStartsAt !== null &&
+    nextLessonStartsAt < (seriesQuery.dataUpdatedAt ?? 0) + leadMinutes * 60_000;
+  const lessonInSession =
+    nextLessonStartsAt !== null &&
+    nextLessonStartsAt <= (seriesQuery.dataUpdatedAt ?? 0);
   const openRules = (teacherQuery.data?.slots ?? []).filter(
     (rule) => rule.status === "available"
   );
@@ -204,7 +217,7 @@ export default function ChangeTimeScreen() {
     <RoleGate roles={["student"]}>
       <Screen
         footer={
-          series && available.length ? (
+          series && available.length && !moveLocked ? (
             <View style={styles.actionBar}>
               <Button
                 title={submit.isPending ? "Moving…" : "Move to this time"}
@@ -272,6 +285,30 @@ export default function ChangeTimeScreen() {
               </View>
             </Card>
 
+            {moveLocked ? (
+              <View style={styles.section}>
+                <Card>
+                  <AppText variant="h3">
+                    {lessonInSession
+                      ? "Your class is in session"
+                      : "Your next class is starting soon"}
+                  </AppText>
+                  <AppText variant="small" color="muted">
+                    {lessonInSession
+                      ? "Once it ends you can move your weekly time."
+                      : `Your next class starts in under ${leadMinutes} minutes. Attend it or cancel it from your schedule first, then come back to move your weekly time.`}
+                  </AppText>
+                  <View style={styles.stopAction}>
+                    <Button
+                      title="Open schedule"
+                      size="sm"
+                      onPress={() => router.navigate("/schedule")}
+                    />
+                  </View>
+                </Card>
+              </View>
+            ) : (
+            <>
             <View style={styles.section}>
               <SectionHeader title="Choose a new time" />
               {teacherQuery.isLoading ? (
@@ -345,6 +382,8 @@ export default function ChangeTimeScreen() {
                 />
               </View>
             ) : null}
+            </>
+            )}
 
             <View style={styles.section}>
               <SectionHeader title="Stop these weekly lessons" />

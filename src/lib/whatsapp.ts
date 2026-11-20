@@ -1,12 +1,10 @@
 import { Alert, Linking } from "react-native";
 
-// The academy's WhatsApp username. A handle resolves to the same chat as a
-// phone number but keeps the digits out of the app bundle and out of the
-// handoff screen, which prints whatever identifier the link carries.
+// The academy's WhatsApp username.
 // EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME lets staging point elsewhere without
 // editing code.
 const ACADEMY_WHATSAPP_USERNAME = (
-  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME?.trim() || "anaquran"
+  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME?.trim() || "ana.quran"
 ).replace(/^@/, "");
 const DEFAULT_MESSAGE =
   "Assalamu alaikum, I'd like to know more about Ana Quran lessons.";
@@ -49,9 +47,6 @@ export const openWhatsApp = (text?: string) => {
     return;
   }
 
-  // wa.me has no username form of the private scheme, so this relies on the
-  // universal link: the OS hands it to WhatsApp when installed, and otherwise
-  // lands on the page offering to install it.
   void Linking.openURL(
     `https://wa.me/@${ACADEMY_WHATSAPP_USERNAME}?text=${encodeURIComponent(
       DEFAULT_MESSAGE

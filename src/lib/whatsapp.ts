@@ -1,11 +1,11 @@
 import { Alert, Linking } from "react-native";
 
-// The academy's WhatsApp username.
-// EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME lets staging point elsewhere without
+// The academy's WhatsApp phone number, with the country code but no + or spaces.
+// EXPO_PUBLIC_ACADEMY_WHATSAPP_NUMBER lets staging point elsewhere without
 // editing code.
-const ACADEMY_WHATSAPP_USERNAME = (
-  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP_USERNAME?.trim() || "ana.quran"
-).replace(/^@/, "");
+const ACADEMY_WHATSAPP_NUMBER = (
+  process.env.EXPO_PUBLIC_ACADEMY_WHATSAPP_NUMBER?.trim() || "201501229155"
+).replace(/[^0-9]/g, "");
 const DEFAULT_MESSAGE =
   "Assalamu alaikum, I'd like to know more about Ana Quran lessons.";
 
@@ -48,7 +48,7 @@ export const openWhatsApp = (text?: string) => {
   }
 
   void Linking.openURL(
-    `https://wa.me/@${ACADEMY_WHATSAPP_USERNAME}?text=${encodeURIComponent(
+    `https://wa.me/${ACADEMY_WHATSAPP_NUMBER}?text=${encodeURIComponent(
       DEFAULT_MESSAGE
     )}`
   ).catch(() => {
